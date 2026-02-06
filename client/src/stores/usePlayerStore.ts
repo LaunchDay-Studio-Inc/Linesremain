@@ -29,6 +29,7 @@ interface PlayerState {
   setThirst: (thirst: number) => void;
   setTemperature: (temperature: number) => void;
   setInventory: (inventory: (ItemStack | null)[]) => void;
+  setEquipment: (equipment: Record<string, ItemStack | null>) => void;
   setHotbarIndex: (index: number) => void;
 }
 
@@ -48,5 +49,6 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setThirst: (thirst) => set({ thirst }),
   setTemperature: (temperature) => set({ temperature }),
   setInventory: (inventory) => set({ inventory }),
+  setEquipment: (equipment) => set({ equipment }),
   setHotbarIndex: (index) => set({ hotbarIndex: index }),
 }));

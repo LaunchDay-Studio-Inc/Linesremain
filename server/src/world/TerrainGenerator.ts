@@ -21,7 +21,12 @@ export class TerrainGenerator {
   private oreNoise: SeededNoise;
   private treeNoise: SeededNoise;
   private decoNoise: SeededNoise;
-  private biomeManager: BiomeManager;
+  private _biomeManager: BiomeManager;
+
+  /** Public accessor for biome lookups from other systems */
+  get biomeManager(): BiomeManager {
+    return this._biomeManager;
+  }
 
   constructor(seed: number) {
     this.continentNoise = new SeededNoise(seed);
@@ -31,7 +36,7 @@ export class TerrainGenerator {
     this.oreNoise = new SeededNoise(seed + 4);
     this.treeNoise = new SeededNoise(seed + 5);
     this.decoNoise = new SeededNoise(seed + 6);
-    this.biomeManager = new BiomeManager(seed);
+    this._biomeManager = new BiomeManager(seed);
   }
 
   /**
