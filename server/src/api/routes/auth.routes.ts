@@ -1,15 +1,15 @@
 // ─── Auth Routes ───
 
 import { Router } from 'express';
+import type { NextFunction, Request, Response } from 'express';
 import rateLimit from 'express-rate-limit';
-import { authService, AuthError } from '../../auth/AuthService.js';
+import { authService } from '../../auth/AuthService.js';
 import { authenticateRequest } from '../../auth/middleware.js';
 import {
   RegisterSchema,
   LoginSchema,
   RefreshSchema,
 } from '../validators/auth.validators.js';
-import { logger } from '../../utils/logger.js';
 
 const router = Router();
 
@@ -28,25 +28,9 @@ const authRateLimiter = rateLimit({
   },
 });
 
-// ─── Helpers ───
-
-function handleAuthError(error: unknown, res: import('express').Response): void {
-  if (error instanceof AuthError) {
-    res.status(error.statusCode).json({
-      error: { code: error.code, message: error.message },
-    });
-    return;
-  }
-
-  logger.error(error, 'Unexpected auth error');
-  res.status(500).json({
-    error: { code: 'INTERNAL_ERROR', message: 'An unexpected error occurred' },
-  });
-}
-
 // ─── POST /register ───
 
-router.post('/register', authRateLimiter, async (req, res) => {
+router.post('/register', authRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = RegisterSchema.safeParse(req.body);
     if (!validation.success) {
@@ -62,13 +46,13 @@ router.post('/register', authRateLimiter, async (req, res) => {
 
     res.status(201).json(result);
   } catch (error) {
-    handleAuthError(error, res);
+    next(error);
   }
 });
 
 // ─── POST /login ───
 
-router.post('/login', authRateLimiter, async (req, res) => {
+router.post('/login', authRateLimiter, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = LoginSchema.safeParse(req.body);
     if (!validation.success) {
@@ -84,13 +68,13 @@ router.post('/login', authRateLimiter, async (req, res) => {
 
     res.status(200).json(result);
   } catch (error) {
-    handleAuthError(error, res);
+    next(error);
   }
 });
 
 // ─── POST /refresh ───
 
-router.post('/refresh', async (req, res) => {
+router.post('/refresh', async (req: Request, res: Response, next: NextFunction) => {
   try {
     const validation = RefreshSchema.safeParse(req.body);
     if (!validation.success) {
@@ -106,13 +90,13 @@ router.post('/refresh', async (req, res) => {
 
     res.status(200).json(tokens);
   } catch (error) {
-    handleAuthError(error, res);
+    next(error);
   }
 });
 
 // ─── POST /logout ───
 
-router.post('/logout', authenticateRequest, async (req, res) => {
+router.post('/logout', authenticateRequest, async (req: Request, res: Response, next: NextFunction) => {
   try {
     const { refreshToken } = req.body as { refreshToken?: string };
 
@@ -127,7 +111,7 @@ router.post('/logout', authenticateRequest, async (req, res) => {
 
     res.status(200).json({ message: 'Logged out successfully' });
   } catch (error) {
-    handleAuthError(error, res);
+    next(error);
   }
 });
 

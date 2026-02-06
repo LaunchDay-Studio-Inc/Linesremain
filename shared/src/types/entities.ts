@@ -60,21 +60,21 @@ export interface TemperatureComponent {
 }
 
 export interface InventoryComponent {
-  slots: (import('./items').ItemStack | null)[];
+  slots: (import('./items.js').ItemStack | null)[];
   maxSlots: number;
 }
 
 export interface EquipmentComponent {
-  head: import('./items').ItemStack | null;
-  chest: import('./items').ItemStack | null;
-  legs: import('./items').ItemStack | null;
-  feet: import('./items').ItemStack | null;
-  held: import('./items').ItemStack | null;
+  head: import('./items.js').ItemStack | null;
+  chest: import('./items.js').ItemStack | null;
+  legs: import('./items.js').ItemStack | null;
+  feet: import('./items.js').ItemStack | null;
+  held: import('./items.js').ItemStack | null;
 }
 
 export interface BuildingComponent {
-  pieceType: import('./buildings').BuildingPieceType;
-  tier: import('./buildings').BuildingTier;
+  pieceType: import('./buildings.js').BuildingPieceType;
+  tier: import('./buildings.js').BuildingTier;
   stability: number; // 0-1
 }
 

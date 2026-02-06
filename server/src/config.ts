@@ -1,6 +1,6 @@
 // ─── Server Configuration ───
 
-import dotenv from 'dotenv';
+import { config as dotenvConfig } from 'dotenv';
 import { z } from 'zod';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -8,7 +8,7 @@ import { fileURLToPath } from 'node:url';
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
 
 // Load .env from project root
-dotenv.config({ path: path.resolve(__dirname, '../../.env') });
+dotenvConfig({ path: path.resolve(__dirname, '../../.env') });
 
 const envSchema = z.object({
   // Server

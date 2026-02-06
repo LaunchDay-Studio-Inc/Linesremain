@@ -1,0 +1,92 @@
+/* ─── CSS Custom Properties ─── */
+:root {
+  --bg-dark: #0A0A1A;
+  --bg-panel: rgba(26, 26, 46, 0.85);
+  --bg-card: rgba(255, 255, 255, 0.05);
+  --border-subtle: rgba(255, 255, 255, 0.1);
+  --accent: #F0A500;
+  --accent-hover: #FFB830;
+  --accent-light: #FFD166;
+  --accent-glow: rgba(240, 165, 0, 0.3);
+  --danger: #E74C3C;
+  --danger-light: #FF6B6B;
+  --success: #2ECC71;
+  --text-primary: #FFFFFF;
+  --text-secondary: #A0A0B0;
+  --text-muted: rgba(255, 255, 255, 0.5);
+  --text-faint: rgba(255, 255, 255, 0.4);
+  --font-ui: 'Inter', system-ui, sans-serif;
+}
+
+/* ─── Reset ─── */
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
+}
+
+/* ─── Body ─── */
+html,
+body {
+  overflow: hidden;
+  width: 100vw;
+  height: 100vh;
+  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  background: #0A0A1A;
+  color: var(--text-primary);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+}
+
+#root {
+  width: 100%;
+  height: 100%;
+  position: relative;
+}
+
+/* ─── Hide Scrollbars ─── */
+::-webkit-scrollbar {
+  display: none;
+}
+
+* {
+  -ms-overflow-style: none;
+  scrollbar-width: none;
+}
+
+/* ─── Selection ─── */
+::selection {
+  background: var(--accent);
+  color: #0A0A1A;
+}
+
+/* ─── Links ─── */
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  color: var(--accent-hover);
+}
+
+/* ─── Inputs ─── */
+input,
+button,
+textarea,
+select {
+  font-family: inherit;
+  font-size: inherit;
+}
+
+button {
+  cursor: pointer;
+  border: none;
+  outline: none;
+}
+
+input {
+  outline: none;
+}

@@ -97,7 +97,7 @@ io.on('connection', (socket) => {
 
 // ─── Graceful Shutdown ───
 
-setupGracefulShutdown();
+setupGracefulShutdown({ httpServer, io });
 
 // ─── Start Server ───
 

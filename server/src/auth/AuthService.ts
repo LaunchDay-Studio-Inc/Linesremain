@@ -8,10 +8,6 @@ import { db } from '../database/connection.js';
 import { refreshTokens } from '../database/schema.js';
 import { playerRepository } from '../database/repositories/PlayerRepository.js';
 import { hashPassword, comparePassword } from './PasswordUtils.js';
-import {
-  RegisterSchema,
-  LoginSchema,
-} from '../api/validators/auth.validators.js';
 import { logger } from '../utils/logger.js';
 
 // ─── Types ───
@@ -90,13 +86,6 @@ export class AuthService {
     email: string,
     password: string,
   ): Promise<AuthResult> {
-    // Validate input
-    const validation = RegisterSchema.safeParse({ username, email, password });
-    if (!validation.success) {
-      const firstError = validation.error.errors[0]!;
-      throw new AuthError(firstError.message, 'VALIDATION_ERROR', 400);
-    }
-
     // Check username uniqueness
     const existingUsername = await playerRepository.findByUsername(username);
     if (existingUsername) {
@@ -143,13 +132,6 @@ export class AuthService {
    * Authenticate a player with email and password.
    */
   async login(email: string, password: string): Promise<AuthResult> {
-    // Validate input
-    const validation = LoginSchema.safeParse({ email, password });
-    if (!validation.success) {
-      const firstError = validation.error.errors[0]!;
-      throw new AuthError(firstError.message, 'VALIDATION_ERROR', 400);
-    }
-
     // Find player by email
     const player = await playerRepository.findByEmail(email);
     if (!player) {
