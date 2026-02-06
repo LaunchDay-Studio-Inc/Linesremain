@@ -37,9 +37,3 @@ export interface UpgradeCost {
   quantity: number;
 }
 
-export interface BuildingPieceDefinition {
-  type: BuildingPieceType;
-  healthPerTier: Map<BuildingTier, number>;
-  snapPoints: SnapPoint[];
-  upgradeCosts: Map<BuildingTier, UpgradeCost[]>;
-}

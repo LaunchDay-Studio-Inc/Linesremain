@@ -90,6 +90,16 @@ function getFaceName(face: typeof FACES[number]): FaceName {
 
 // ─── AO Calculation ───
 
+// Helper to select coordinate by axis index (avoids literal-type narrowing errors from FACES `as const`)
+function coord(axis: number, x: number, y: number, z: number): number {
+  return axis === 0 ? x : axis === 1 ? y : z;
+}
+
+// Reusable coordinate arrays to avoid per-call allocations in hot inner loop
+const _aoSideA = [0, 0, 0];
+const _aoSideB = [0, 0, 0];
+const _aoCorner = [0, 0, 0];
+
 function computeAO(
   data: Uint8Array,
   neighbors: NeighborChunks,
@@ -100,26 +110,28 @@ function computeAO(
   cornerU: number,
   cornerV: number,
 ): number {
-  // Get the 3 neighbors for this vertex corner
-  const pos = [x, y, z];
-  const sideA = [x, y, z];
-  const sideB = [x, y, z];
-  const corner = [x, y, z];
+  // Compute the face-offset w coordinate once
+  const wOffset = coord(face.wAxis, x, y, z) + face.dir;
 
-  // Offset into the face direction
-  pos[face.wAxis] = pos[face.wAxis]! + face.dir;
-  sideA[face.wAxis] = pos[face.wAxis]!;
-  sideB[face.wAxis] = pos[face.wAxis]!;
-  corner[face.wAxis] = pos[face.wAxis]!;
+  // sideA: offset w + offset u
+  _aoSideA[0] = x; _aoSideA[1] = y; _aoSideA[2] = z;
+  _aoSideA[face.wAxis] = wOffset;
+  _aoSideA[face.uAxis] = coord(face.uAxis, x, y, z) + cornerU;
 
-  sideA[face.uAxis] = sideA[face.uAxis]! + cornerU;
-  sideB[face.vAxis] = sideB[face.vAxis]! + cornerV;
-  corner[face.uAxis] = corner[face.uAxis]! + cornerU;
-  corner[face.vAxis] = corner[face.vAxis]! + cornerV;
+  // sideB: offset w + offset v
+  _aoSideB[0] = x; _aoSideB[1] = y; _aoSideB[2] = z;
+  _aoSideB[face.wAxis] = wOffset;
+  _aoSideB[face.vAxis] = coord(face.vAxis, x, y, z) + cornerV;
 
-  const s1 = isOpaque(getBlockWithNeighbors(data, neighbors, sideA[0]!, sideA[1]!, sideA[2]!)) ? 1 : 0;
-  const s2 = isOpaque(getBlockWithNeighbors(data, neighbors, sideB[0]!, sideB[1]!, sideB[2]!)) ? 1 : 0;
-  const c = isOpaque(getBlockWithNeighbors(data, neighbors, corner[0]!, corner[1]!, corner[2]!)) ? 1 : 0;
+  // corner: offset w + offset u + offset v
+  _aoCorner[0] = x; _aoCorner[1] = y; _aoCorner[2] = z;
+  _aoCorner[face.wAxis] = wOffset;
+  _aoCorner[face.uAxis] = coord(face.uAxis, x, y, z) + cornerU;
+  _aoCorner[face.vAxis] = coord(face.vAxis, x, y, z) + cornerV;
+
+  const s1 = isOpaque(getBlockWithNeighbors(data, neighbors, _aoSideA[0]!, _aoSideA[1]!, _aoSideA[2]!)) ? 1 : 0;
+  const s2 = isOpaque(getBlockWithNeighbors(data, neighbors, _aoSideB[0]!, _aoSideB[1]!, _aoSideB[2]!)) ? 1 : 0;
+  const c = isOpaque(getBlockWithNeighbors(data, neighbors, _aoCorner[0]!, _aoCorner[1]!, _aoCorner[2]!)) ? 1 : 0;
 
   if (s1 && s2) return 0; // Full occlusion
   return 3 - (s1 + s2 + c);

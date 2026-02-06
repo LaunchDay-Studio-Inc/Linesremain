@@ -86,6 +86,11 @@ export class LocalPlayerController {
   private readonly right = new THREE.Vector3();
   private readonly moveDir = new THREE.Vector3();
 
+  // Store sync: only push to React when position changes meaningfully
+  private lastSyncX = NaN;
+  private lastSyncY = NaN;
+  private lastSyncZ = NaN;
+
   constructor(
     input: InputManager,
     cameraController: CameraController,
@@ -338,7 +343,20 @@ export class LocalPlayerController {
 
   // ─── Store Sync ───
 
+  private static readonly SYNC_THRESHOLD_SQ = 0.001 * 0.001; // ~1mm movement threshold
+
   private syncStore(): void {
+    const dx = this.position.x - this.lastSyncX;
+    const dy = this.position.y - this.lastSyncY;
+    const dz = this.position.z - this.lastSyncZ;
+
+    // Skip if position hasn't changed meaningfully (avoids unnecessary React re-renders)
+    if (dx * dx + dy * dy + dz * dz < LocalPlayerController.SYNC_THRESHOLD_SQ) return;
+
+    this.lastSyncX = this.position.x;
+    this.lastSyncY = this.position.y;
+    this.lastSyncZ = this.position.z;
+
     usePlayerStore.getState().setPosition(
       this.position.x,
       this.position.y,

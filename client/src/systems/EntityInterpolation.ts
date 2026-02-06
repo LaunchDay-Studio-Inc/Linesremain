@@ -24,6 +24,9 @@ const INTERPOLATION_DELAY_MS = 100; // 100ms interpolation delay
 const MAX_SNAPSHOTS = 20;
 const MAX_EXTRAPOLATION_MS = 200; // max time to extrapolate beyond last snapshot
 
+// Reusable vector to avoid per-frame allocations during extrapolation
+const _extrapolationVelocity = new THREE.Vector3();
+
 // ─── Entity Interpolation ───
 
 export class EntityInterpolation {
@@ -106,9 +109,11 @@ export class EntityInterpolation {
         if (duration > 0) {
           const t = (renderTime - from.timestamp) / duration;
           const clampedT = Math.min(t, 1); // don't extrapolate too far
-          entity.currentPosition.lerpVectors(from.position, from.position.clone().add(
-            from.position.clone().sub(prev.position).multiplyScalar(clampedT),
-          ), 1);
+          // Extrapolate: position = from + (from - prev) * t
+          entity.currentPosition.copy(from.position).addScaledVector(
+            _extrapolationVelocity.copy(from.position).sub(prev.position),
+            clampedT,
+          );
           entity.currentYaw = from.yaw + (from.yaw - prev.yaw) * clampedT;
         }
       } else {

@@ -101,8 +101,9 @@ export class ParticleSystem {
 
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= MAX_PARTICLES) {
-        // Remove oldest particle
-        this.particles.shift();
+        // Overwrite oldest particle (index 0) by swapping with last and popping
+        this.particles[0] = this.particles[this.particles.length - 1]!;
+        this.particles.pop();
       }
 
       // Random velocity in a sphere
@@ -170,8 +171,9 @@ export class ParticleSystem {
   // ─── Update ───
 
   update(dt: number): void {
-    // Update particles
-    for (let i = this.particles.length - 1; i >= 0; i--) {
+    // Update particles — swap-and-pop for O(1) removal
+    let i = 0;
+    while (i < this.particles.length) {
       const p = this.particles[i]!;
 
       // Physics
@@ -179,9 +181,13 @@ export class ParticleSystem {
       p.position.addScaledVector(p.velocity, dt);
       p.lifetime -= dt;
 
-      // Remove dead particles
+      // Remove dead particles via swap-and-pop
       if (p.lifetime <= 0) {
-        this.particles.splice(i, 1);
+        this.particles[i] = this.particles[this.particles.length - 1]!;
+        this.particles.pop();
+        // Don't increment i — re-check the swapped element
+      } else {
+        i++;
       }
     }
 
@@ -203,15 +209,6 @@ export class ParticleSystem {
       this.colors[i3 + 2] = p.color.b * alpha;
 
       this.sizes[i] = p.size * (0.5 + alpha * 0.5);
-    }
-
-    // Zero out unused slots
-    for (let i = count; i < MAX_PARTICLES; i++) {
-      const i3 = i * 3;
-      this.positions[i3] = 0;
-      this.positions[i3 + 1] = -1000; // offscreen
-      this.positions[i3 + 2] = 0;
-      this.sizes[i] = 0;
     }
 
     // Mark buffers for upload

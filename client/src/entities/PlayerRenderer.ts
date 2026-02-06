@@ -138,15 +138,11 @@ export class PlayerRenderer {
 
     // Three.js texture UV offset (bottom-left origin)
     // Sprite sheet has row 0 at top, so we need to flip Y
-    const totalRows = 1 / this.frameV;
     const offsetX = col * this.frameU;
     const offsetY = 1 - (row + 1) * this.frameV; // flip Y
 
     this.texture.offset.set(offsetX, offsetY);
     this.texture.repeat.set(this.frameU, this.frameV);
-
-    // Suppress unused variable lint
-    void totalRows;
   }
 
   // ─── Position ───

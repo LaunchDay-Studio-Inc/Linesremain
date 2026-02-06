@@ -8,6 +8,7 @@ export class CameraController {
   private camera: THREE.PerspectiveCamera;
   private target = new THREE.Vector3();
   private currentPosition = new THREE.Vector3();
+  private desiredPosition = new THREE.Vector3();
 
   // Orbit parameters
   private azimuth = 0; // degrees
@@ -70,14 +71,14 @@ export class CameraController {
     const elevRad = this.elevation * DEG2RAD;
     const azimRad = this.azimuth * DEG2RAD;
 
-    const desiredPosition = new THREE.Vector3(
+    this.desiredPosition.set(
       this.target.x + this.distance * Math.cos(elevRad) * Math.sin(azimRad),
       this.target.y + this.distance * Math.sin(elevRad),
       this.target.z + this.distance * Math.cos(elevRad) * Math.cos(azimRad),
     );
 
     // Smooth follow
-    this.currentPosition.lerp(desiredPosition, this.lerpFactor);
+    this.currentPosition.lerp(this.desiredPosition, this.lerpFactor);
     this.camera.position.copy(this.currentPosition);
     this.camera.lookAt(this.target);
   }

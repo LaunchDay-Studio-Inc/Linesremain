@@ -41,6 +41,7 @@ export class TerrainGenerator {
   generateChunk(chunkX: number, chunkZ: number): Uint8Array {
     const blocks = new Uint8Array(BLOCKS_PER_CHUNK);
     const heightMap = new Uint8Array(CHUNK_SIZE_X * CHUNK_SIZE_Z);
+    const biomeMap = new Array<BiomeType>(CHUNK_SIZE_X * CHUNK_SIZE_Z);
 
     // ── Pass 1: Generate base terrain ──
     for (let lx = 0; lx < CHUNK_SIZE_X; lx++) {
@@ -61,8 +62,9 @@ export class TerrainGenerator {
 
         heightMap[lx + lz * CHUNK_SIZE_X] = finalHeight;
 
-        // Get biome for this column
+        // Get biome for this column and cache it
         const biome = this.biomeManager.getBiome(worldX, worldZ);
+        biomeMap[lx + lz * CHUNK_SIZE_X] = biome;
         const biomeProps = this.biomeManager.getBiomeProperties(biome);
 
         // ── Fill column ──
@@ -106,11 +108,11 @@ export class TerrainGenerator {
       }
     }
 
-    // ── Pass 2: Trees ──
-    this.generateTrees(chunkX, chunkZ, blocks, heightMap);
+    // ── Pass 2: Trees (reuse biomeMap from Pass 1) ──
+    this.generateTrees(chunkX, chunkZ, blocks, heightMap, biomeMap);
 
-    // ── Pass 3: Decorations ──
-    this.generateDecorations(chunkX, chunkZ, blocks, heightMap);
+    // ── Pass 3: Decorations (reuse biomeMap from Pass 1) ──
+    this.generateDecorations(chunkX, chunkZ, blocks, heightMap, biomeMap);
 
     return blocks;
   }
@@ -147,6 +149,7 @@ export class TerrainGenerator {
     chunkZ: number,
     blocks: Uint8Array,
     heightMap: Uint8Array,
+    biomeMap: BiomeType[],
   ): void {
     for (let lx = 2; lx < CHUNK_SIZE_X - 2; lx++) {
       for (let lz = 2; lz < CHUNK_SIZE_Z - 2; lz++) {
@@ -158,8 +161,8 @@ export class TerrainGenerator {
         // Skip underwater or too high
         if (surfaceY <= SEA_LEVEL - 1 || surfaceY >= CHUNK_SIZE_Y - 10) continue;
 
-        // Get biome tree density
-        const biome = this.biomeManager.getBiome(worldX, worldZ);
+        // Get biome tree density (cached from Pass 1)
+        const biome = biomeMap[lx + lz * CHUNK_SIZE_X]!;
         const biomeProps = this.biomeManager.getBiomeProperties(biome);
 
         if (biomeProps.treeFrequency <= 0) continue;
@@ -227,6 +230,7 @@ export class TerrainGenerator {
     chunkZ: number,
     blocks: Uint8Array,
     heightMap: Uint8Array,
+    biomeMap: BiomeType[],
   ): void {
     for (let lx = 0; lx < CHUNK_SIZE_X; lx++) {
       for (let lz = 0; lz < CHUNK_SIZE_Z; lz++) {
@@ -241,7 +245,7 @@ export class TerrainGenerator {
         if (blocks[aboveIdx] !== BlockType.Air) continue;
 
         const surfaceBlock = blocks[getBlockIndex(lx, surfaceY, lz)];
-        const biome = this.biomeManager.getBiome(worldX, worldZ);
+        const biome = biomeMap[lx + lz * CHUNK_SIZE_X]!;
         const decoVal = (this.decoNoise.noise2D(worldX, worldZ, 0.8, 1) + 1) / 2;
 
         if (surfaceBlock === BlockType.Grass) {

@@ -38,6 +38,9 @@ export class ChunkManager {
   private pendingChunks = new Set<string>();
   private dirtyChunks = new Set<string>();
 
+  // Rate-limit chunk rebuilds per frame to avoid frame spikes
+  private static readonly MAX_REBUILDS_PER_FRAME = 2;
+
   private scene: THREE.Scene;
   private opaqueMaterial: THREE.MeshLambertMaterial;
   private transparentMaterial: THREE.MeshLambertMaterial;
@@ -109,15 +112,18 @@ export class ChunkManager {
       }
     }
 
-    // Re-mesh dirty chunks
+    // Re-mesh dirty chunks (rate-limited to avoid frame spikes)
+    let rebuilds = 0;
     for (const key of this.dirtyChunks) {
+      if (rebuilds >= ChunkManager.MAX_REBUILDS_PER_FRAME) break;
       const chunk = this.loadedChunks.get(key);
       if (chunk) {
         const [cx, cz] = key.split(',').map(Number) as [number, number];
         this.buildChunkMesh(cx, cz, chunk);
+        rebuilds++;
       }
+      this.dirtyChunks.delete(key);
     }
-    this.dirtyChunks.clear();
   }
 
   // ─── Chunk Data ───

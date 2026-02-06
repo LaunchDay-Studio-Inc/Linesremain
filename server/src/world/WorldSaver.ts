@@ -34,26 +34,29 @@ export class WorldSaver {
   ): Promise<void> {
     const startTime = Date.now();
 
-    // ── Save dirty chunks ──
+    // ── Save dirty chunks (batched in parallel) ──
     const dirtyChunks = chunkStore.getDirtyChunks();
-    let chunkCount = 0;
-
-    for (const { chunkX, chunkZ, data } of dirtyChunks) {
+    const chunkPromises = dirtyChunks.map(({ chunkX, chunkZ, data }) => {
       const compressed = ChunkStore.compress(data);
-      await worldRepository.saveChunk(chunkX, chunkZ, Buffer.from(compressed));
-      chunkCount++;
-    }
+      return worldRepository.saveChunk(chunkX, chunkZ, Buffer.from(compressed));
+    });
+    await Promise.all(chunkPromises);
+    const chunkCount = chunkPromises.length;
 
     chunkStore.clearDirty();
 
-    // ── Save player states ──
+    // ── Save player states (batched in parallel) ──
+    const playerResults = await Promise.allSettled(
+      playerStates.map(({ playerId, state }) =>
+        playerRepository.savePlayerState(playerId, state).then(() => playerId),
+      ),
+    );
     let playerCount = 0;
-    for (const { playerId, state } of playerStates) {
-      try {
-        await playerRepository.savePlayerState(playerId, state);
+    for (const result of playerResults) {
+      if (result.status === 'fulfilled') {
         playerCount++;
-      } catch (err) {
-        logger.error({ playerId, err }, 'Failed to save player state');
+      } else {
+        logger.error({ err: result.reason }, 'Failed to save player state');
       }
     }
 

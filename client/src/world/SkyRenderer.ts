@@ -132,6 +132,19 @@ void main() {
 
 // ─── Interpolation ───
 
+// Reusable result object to avoid per-frame allocations
+const _lerpResult: SkyKeyframe = {
+  time: 0,
+  topColor: new THREE.Color(),
+  horizonColor: new THREE.Color(),
+  sunIntensity: 0,
+  moonIntensity: 0,
+  ambientIntensity: 0,
+  ambientColor: new THREE.Color(),
+  fogNear: 0,
+  fogFar: 0,
+};
+
 function lerpKeyframes(time: number): SkyKeyframe {
   // Find surrounding keyframes
   let a = SKY_KEYFRAMES[0]!;
@@ -148,17 +161,17 @@ function lerpKeyframes(time: number): SkyKeyframe {
   const range = b.time - a.time;
   const t = range > 0 ? (time - a.time) / range : 0;
 
-  return {
-    time,
-    topColor: new THREE.Color().lerpColors(a.topColor, b.topColor, t),
-    horizonColor: new THREE.Color().lerpColors(a.horizonColor, b.horizonColor, t),
-    sunIntensity: a.sunIntensity + (b.sunIntensity - a.sunIntensity) * t,
-    moonIntensity: a.moonIntensity + (b.moonIntensity - a.moonIntensity) * t,
-    ambientIntensity: a.ambientIntensity + (b.ambientIntensity - a.ambientIntensity) * t,
-    ambientColor: new THREE.Color().lerpColors(a.ambientColor, b.ambientColor, t),
-    fogNear: a.fogNear + (b.fogNear - a.fogNear) * t,
-    fogFar: a.fogFar + (b.fogFar - a.fogFar) * t,
-  };
+  _lerpResult.time = time;
+  _lerpResult.topColor.lerpColors(a.topColor, b.topColor, t);
+  _lerpResult.horizonColor.lerpColors(a.horizonColor, b.horizonColor, t);
+  _lerpResult.sunIntensity = a.sunIntensity + (b.sunIntensity - a.sunIntensity) * t;
+  _lerpResult.moonIntensity = a.moonIntensity + (b.moonIntensity - a.moonIntensity) * t;
+  _lerpResult.ambientIntensity = a.ambientIntensity + (b.ambientIntensity - a.ambientIntensity) * t;
+  _lerpResult.ambientColor.lerpColors(a.ambientColor, b.ambientColor, t);
+  _lerpResult.fogNear = a.fogNear + (b.fogNear - a.fogNear) * t;
+  _lerpResult.fogFar = a.fogFar + (b.fogFar - a.fogFar) * t;
+
+  return _lerpResult;
 }
 
 // ─── SkyRenderer Class ───

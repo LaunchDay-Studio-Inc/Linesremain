@@ -14,7 +14,14 @@ import { LocalPlayerController } from '../../entities/LocalPlayerController';
 import { AnimationSystem } from '../../systems/AnimationSystem';
 import { generateSpriteSheet } from '../../assets/SpriteGenerator';
 import { useGameStore } from '../../stores/useGameStore';
+import { useUIStore } from '../../stores/useUIStore';
+import { useChatStore } from '../../stores/useChatStore';
 import { SEA_LEVEL } from '@shared/constants/game';
+import { HUD } from '../hud/HUD';
+import { InventoryPanel } from '../panels/InventoryPanel';
+import { CraftingPanel } from '../panels/CraftingPanel';
+import { BuildingPanel } from '../panels/BuildingPanel';
+import { MapPanel } from '../panels/MapPanel';
 
 // ─── Scene Setup Helpers ───
 
@@ -45,6 +52,12 @@ export const GameCanvas: React.FC = () => {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engineRef = useRef<Engine | null>(null);
   const screen = useGameStore((s) => s.screen);
+  const setCursorLocked = useUIStore((s) => s.setCursorLocked);
+  const toggleInventory = useUIStore((s) => s.toggleInventory);
+  const toggleCrafting = useUIStore((s) => s.toggleCrafting);
+  const toggleMap = useUIStore((s) => s.toggleMap);
+  const toggleBuildingMode = useUIStore((s) => s.toggleBuildingMode);
+  const closeAll = useUIStore((s) => s.closeAll);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -105,6 +118,42 @@ export const GameCanvas: React.FC = () => {
     // ── Generate initial terrain ──
     chunkManager.generateLocalTestChunks(16, 16, 4);
 
+    // ── Pointer Lock tracking ──
+    const handleLockChange = () => {
+      const locked = document.pointerLockElement === canvas;
+      setCursorLocked(locked);
+    };
+    document.addEventListener('pointerlockchange', handleLockChange);
+
+    // ── UI keybinds ──
+    const handleUIKeys = (e: KeyboardEvent) => {
+      // Don't process game keybinds when typing in an input/textarea
+      const tag = (e.target as HTMLElement)?.tagName;
+      if (tag === 'INPUT' || tag === 'TEXTAREA') {
+        return;
+      }
+
+      // Don't process letter keys when chat is open
+      const chatOpen = useChatStore.getState().isOpen;
+
+      if (e.key === 'Tab') {
+        e.preventDefault();
+        toggleInventory();
+      } else if (e.key === 'Escape') {
+        closeAll();
+      } else if (!chatOpen) {
+        // Only process letter keybinds when chat is closed
+        if ((e.key === 'c' || e.key === 'C') && !e.ctrlKey && !e.metaKey) {
+          toggleCrafting();
+        } else if ((e.key === 'm' || e.key === 'M') && !e.ctrlKey && !e.metaKey) {
+          toggleMap();
+        } else if ((e.key === 'b' || e.key === 'B') && !e.ctrlKey && !e.metaKey) {
+          toggleBuildingMode();
+        }
+      }
+    };
+    window.addEventListener('keydown', handleUIKeys);
+
     // ── Pointer Lock on Click ──
     const handleClick = () => {
       if (!input.isPointerLocked()) {
@@ -155,6 +204,8 @@ export const GameCanvas: React.FC = () => {
 
     // ── Cleanup ──
     return () => {
+      document.removeEventListener('pointerlockchange', handleLockChange);
+      window.removeEventListener('keydown', handleUIKeys);
       canvas.removeEventListener('click', handleClick);
       cameraController.detach();
       playerRenderer.removeFromScene(scene);
@@ -170,17 +221,14 @@ export const GameCanvas: React.FC = () => {
     <div style={{ position: 'fixed', inset: 0 }}>
       <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
 
-      {/* HUD Overlay */}
-      <div style={styles.hud}>
-        <p style={styles.hudText}>
-          Click to lock mouse · WASD to move · Space to jump · Shift to sprint · Right-click drag to orbit
-        </p>
-      </div>
+      {/* Full game HUD */}
+      <HUD />
 
-      {/* Crosshair */}
-      <div style={styles.crosshair}>
-        <div style={styles.crosshairDot} />
-      </div>
+      {/* Panels */}
+      <InventoryPanel />
+      <CraftingPanel />
+      <BuildingPanel />
+      <MapPanel />
 
       {/* Death overlay */}
       {screen === 'dead' && (
@@ -238,35 +286,6 @@ function generateLocalChunk(cx: number, cz: number): Uint8Array {
 // ─── Styles ───
 
 const styles: Record<string, React.CSSProperties> = {
-  hud: {
-    position: 'absolute',
-    bottom: '20px',
-    left: '50%',
-    transform: 'translateX(-50%)',
-    pointerEvents: 'none',
-  },
-  hudText: {
-    color: 'rgba(255,255,255,0.5)',
-    fontSize: '13px',
-    fontFamily: 'Inter, system-ui, sans-serif',
-    letterSpacing: '1px',
-    textShadow: '0 1px 3px rgba(0,0,0,0.5)',
-    margin: 0,
-  },
-  crosshair: {
-    position: 'absolute',
-    top: '50%',
-    left: '50%',
-    transform: 'translate(-50%, -50%)',
-    pointerEvents: 'none',
-  },
-  crosshairDot: {
-    width: '4px',
-    height: '4px',
-    borderRadius: '50%',
-    background: 'rgba(255,255,255,0.7)',
-    boxShadow: '0 0 4px rgba(0,0,0,0.5)',
-  },
   deathOverlay: {
     position: 'absolute',
     inset: 0,
