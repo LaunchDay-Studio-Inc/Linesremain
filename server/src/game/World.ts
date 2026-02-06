@@ -25,6 +25,15 @@ import {
   type DecayComponent,
   type OwnershipComponent,
   type ResourceNodeComponent,
+  type ProjectileComponent,
+  type NPCTypeComponent,
+  type CraftQueueComponent,
+  type AIComponent,
+  type LootableComponent,
+  type LootTableEntry,
+  AIState,
+  NPCCreatureType,
+  AIBehavior,
   type BuildingPieceType,
   type BuildingTier,
   type ItemStack,
@@ -77,6 +86,11 @@ export class GameWorld {
     this.ecs.registerComponent<DecayComponent>(ComponentType.Decay);
     this.ecs.registerComponent<OwnershipComponent>(ComponentType.Ownership);
     this.ecs.registerComponent<ResourceNodeComponent>(ComponentType.ResourceNode);
+    this.ecs.registerComponent<ProjectileComponent>(ComponentType.Projectile);
+    this.ecs.registerComponent<NPCTypeComponent>(ComponentType.NPCType);
+    this.ecs.registerComponent<CraftQueueComponent>(ComponentType.CraftQueue);
+    this.ecs.registerComponent<AIComponent>(ComponentType.AI);
+    this.ecs.registerComponent<LootableComponent>(ComponentType.Lootable);
 
     logger.info({ seed }, 'GameWorld initialized');
   }
@@ -304,6 +318,21 @@ export class GameWorld {
   createNPCEntity(
     type: string,
     position: { x: number; y: number; z: number },
+    config?: {
+      creatureType?: NPCCreatureType;
+      behavior?: AIBehavior;
+      health?: number;
+      damage?: number;
+      walkSpeed?: number;
+      runSpeed?: number;
+      aggroRange?: number;
+      attackRange?: number;
+      attackCooldown?: number;
+      wanderRadius?: number;
+      colliderWidth?: number;
+      colliderHeight?: number;
+      lootTable?: LootTableEntry[];
+    },
   ): EntityId {
     const entityId = this.ecs.createEntity();
 
@@ -315,12 +344,123 @@ export class GameWorld {
       vx: 0, vy: 0, vz: 0,
     });
 
+    const hp = config?.health ?? 150;
     this.ecs.addComponent<HealthComponent>(entityId, ComponentType.Health, {
-      current: 150, max: 150,
+      current: hp, max: hp,
     });
 
     this.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
-      width: 0.8, height: 1.8, depth: 0.8, isStatic: false,
+      width: config?.colliderWidth ?? 0.8,
+      height: config?.colliderHeight ?? 1.8,
+      depth: config?.colliderWidth ?? 0.8,
+      isStatic: false,
+    });
+
+    this.ecs.addComponent<AIComponent>(entityId, ComponentType.AI, {
+      state: AIState.Idle,
+      aggroRange: config?.aggroRange ?? 15,
+      attackRange: config?.attackRange ?? 2.0,
+      attackDamage: config?.damage ?? 20,
+      attackCooldown: config?.attackCooldown ?? 1.5,
+      lastAttackTime: 0,
+      targetEntityId: null,
+      homePosition: { x: position.x, y: position.y, z: position.z, rotation: 0 },
+      roamRadius: config?.wanderRadius ?? 20,
+    });
+
+    this.ecs.addComponent<NPCTypeComponent>(entityId, ComponentType.NPCType, {
+      creatureType: config?.creatureType ?? NPCCreatureType.DustHopper,
+      behavior: config?.behavior ?? AIBehavior.Passive,
+      walkSpeed: config?.walkSpeed ?? 2.0,
+      runSpeed: config?.runSpeed ?? 5.0,
+      wanderRadius: config?.wanderRadius ?? 20,
+      wanderTarget: null,
+      wanderWaitUntil: 0,
+      fleeUntil: 0,
+      neutralAggroUntil: 0,
+    });
+
+    if (config?.lootTable && config.lootTable.length > 0) {
+      this.ecs.addComponent<LootableComponent>(entityId, ComponentType.Lootable, {
+        lootTable: config.lootTable,
+        isLooted: false,
+      });
+    }
+
+    return entityId;
+  }
+
+  // ─── Projectile Entity Factory ───
+
+  createProjectileEntity(
+    sourceEntityId: EntityId,
+    sourcePlayerId: string,
+    weaponId: number,
+    damage: number,
+    position: { x: number; y: number; z: number },
+    velocity: { vx: number; vy: number; vz: number },
+    maxRange: number,
+    maxLifetime: number,
+  ): EntityId {
+    const entityId = this.ecs.createEntity();
+
+    this.ecs.addComponent<PositionComponent>(entityId, ComponentType.Position, {
+      x: position.x, y: position.y, z: position.z, rotation: 0,
+    });
+
+    this.ecs.addComponent<VelocityComponent>(entityId, ComponentType.Velocity, {
+      vx: velocity.vx, vy: velocity.vy, vz: velocity.vz,
+    });
+
+    this.ecs.addComponent<ProjectileComponent>(entityId, ComponentType.Projectile, {
+      sourceEntityId,
+      sourcePlayerId,
+      weaponId,
+      damage,
+      maxRange,
+      distanceTraveled: 0,
+      spawnTime: Date.now(),
+      maxLifetime,
+    });
+
+    this.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
+      width: 0.1, height: 0.1, depth: 0.1, isStatic: false,
+    });
+
+    return entityId;
+  }
+
+  // ─── Loot Bag Entity Factory ───
+
+  createLootBagEntity(
+    position: { x: number; y: number; z: number },
+    items: (ItemStack | null)[],
+    despawnSeconds: number,
+  ): EntityId {
+    const entityId = this.ecs.createEntity();
+
+    this.ecs.addComponent<PositionComponent>(entityId, ComponentType.Position, {
+      x: position.x, y: position.y, z: position.z, rotation: 0,
+    });
+
+    this.ecs.addComponent<InventoryComponent>(entityId, ComponentType.Inventory, {
+      slots: items.filter((s) => s !== null) as ItemStack[],
+      maxSlots: items.filter((s) => s !== null).length,
+    });
+
+    this.ecs.addComponent<LootableComponent>(entityId, ComponentType.Lootable, {
+      lootTable: [],
+      isLooted: false,
+    });
+
+    this.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
+      width: 0.6, height: 0.6, depth: 0.6, isStatic: true,
+    });
+
+    this.ecs.addComponent<DecayComponent>(entityId, ComponentType.Decay, {
+      lastInteractionTime: Date.now(),
+      decayStartDelay: despawnSeconds,
+      decayRate: 9999, // instant removal once decay starts
     });
 
     return entityId;

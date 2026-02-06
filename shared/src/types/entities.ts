@@ -20,6 +20,9 @@ export enum ComponentType {
   AI = 'AI',
   Lootable = 'Lootable',
   ResourceNode = 'ResourceNode',
+  Projectile = 'Projectile',
+  NPCType = 'NPCType',
+  CraftQueue = 'CraftQueue',
 }
 
 // ─── Component Interfaces ───
@@ -135,4 +138,54 @@ export interface ResourceNodeComponent {
   maxAmount: number;
   respawnTimeSeconds: number;
   lastDepletedTime: number | null;
+}
+
+export interface ProjectileComponent {
+  sourceEntityId: EntityId;
+  sourcePlayerId: string;
+  weaponId: number;
+  damage: number;
+  maxRange: number;
+  distanceTraveled: number;
+  spawnTime: number;
+  maxLifetime: number; // seconds
+}
+
+export enum NPCCreatureType {
+  DustHopper = 'DustHopper',
+  RidgeGrazer = 'RidgeGrazer',
+  TuskWalker = 'TuskWalker',
+  HuskWalker = 'HuskWalker',
+  SporeCrawler = 'SporeCrawler',
+  MireBrute = 'MireBrute',
+  ShoreSnapper = 'ShoreSnapper',
+}
+
+export enum AIBehavior {
+  Passive = 'passive',
+  Hostile = 'hostile',
+  Neutral = 'neutral',
+}
+
+export interface NPCTypeComponent {
+  creatureType: NPCCreatureType;
+  behavior: AIBehavior;
+  walkSpeed: number;
+  runSpeed: number;
+  wanderRadius: number;
+  wanderTarget: { x: number; y: number; z: number } | null;
+  wanderWaitUntil: number;
+  fleeUntil: number;
+  neutralAggroUntil: number; // for neutral creatures hit by player
+}
+
+export interface CraftQueueItem {
+  recipeId: number;
+  progress: number; // seconds elapsed
+  totalTime: number; // seconds required
+}
+
+export interface CraftQueueComponent {
+  queue: CraftQueueItem[];
+  maxQueue: number;
 }

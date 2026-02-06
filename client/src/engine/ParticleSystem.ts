@@ -168,6 +168,106 @@ export class ParticleSystem {
     });
   }
 
+  /**
+   * Emit blood splatter particles on hit.
+   */
+  emitBlood(position: THREE.Vector3, direction?: THREE.Vector3): void {
+    const basePos = position.clone();
+    if (direction) {
+      // Offset slightly in hit direction
+      basePos.addScaledVector(direction, 0.2);
+    }
+    this.emit({
+      position: basePos,
+      count: 8,
+      color: new THREE.Color(0x8b0000),
+      speed: 3.5,
+      spread: 0.6,
+      lifetime: 0.6,
+      size: 0.12,
+      gravity: -12.0,
+    });
+    // Secondary darker droplets
+    this.emit({
+      position: basePos,
+      count: 4,
+      color: new THREE.Color(0x4a0000),
+      speed: 2.0,
+      spread: 0.4,
+      lifetime: 0.8,
+      size: 0.08,
+      gravity: -15.0,
+    });
+  }
+
+  /**
+   * Emit arrow/projectile impact particles.
+   */
+  emitArrowHit(position: THREE.Vector3, surfaceColor?: THREE.Color): void {
+    // Wood/stone chip particles
+    this.emit({
+      position,
+      count: 6,
+      color: surfaceColor ?? new THREE.Color(0x9e8c6c),
+      speed: 2.5,
+      spread: 0.5,
+      lifetime: 0.5,
+      size: 0.1,
+      gravity: -10.0,
+    });
+    // Small dust cloud
+    this.emit({
+      position,
+      count: 4,
+      color: new THREE.Color(0xc8b898),
+      speed: 1.0,
+      spread: 0.3,
+      lifetime: 0.3,
+      size: 0.15,
+      gravity: -3.0,
+    });
+  }
+
+  /**
+   * Emit muzzle flash particles (bright, short-lived).
+   */
+  emitMuzzleFlash(position: THREE.Vector3, direction: THREE.Vector3): void {
+    const flashPos = position.clone().addScaledVector(direction, 0.3);
+    // Bright flash core
+    this.emit({
+      position: flashPos,
+      count: 3,
+      color: new THREE.Color(0xffdd44),
+      speed: 8.0,
+      spread: 0.15,
+      lifetime: 0.08,
+      size: 0.25,
+      gravity: 0,
+    });
+    // Sparks
+    this.emit({
+      position: flashPos,
+      count: 5,
+      color: new THREE.Color(0xff8800),
+      speed: 6.0,
+      spread: 0.4,
+      lifetime: 0.15,
+      size: 0.08,
+      gravity: -5.0,
+    });
+    // Smoke puff
+    this.emit({
+      position: flashPos,
+      count: 2,
+      color: new THREE.Color(0x888888),
+      speed: 1.5,
+      spread: 0.3,
+      lifetime: 0.4,
+      size: 0.2,
+      gravity: 2.0, // smoke rises
+    });
+  }
+
   // ─── Update ───
 
   update(dt: number): void {
