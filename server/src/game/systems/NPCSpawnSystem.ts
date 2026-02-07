@@ -280,7 +280,7 @@ function pickWeightedTemplate(): CreatureTemplate {
     roll -= template.weight;
     if (roll <= 0) return template;
   }
-  return CREATURE_TEMPLATES[0];
+  return CREATURE_TEMPLATES[0]!;
 }
 
 function findSpawnPosition(
