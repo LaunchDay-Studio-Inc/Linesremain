@@ -29,8 +29,8 @@ export const InventoryPanel: React.FC = () => {
 
     // Swap items locally in the store
     const inv = [...usePlayerStore.getState().inventory];
-    const temp = inv[fromSlot];
-    inv[fromSlot] = inv[toSlot];
+    const temp = inv[fromSlot] ?? null;
+    inv[fromSlot] = inv[toSlot] ?? null;
     inv[toSlot] = temp;
     usePlayerStore.getState().setInventory(inv);
 
