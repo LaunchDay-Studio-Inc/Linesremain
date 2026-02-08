@@ -8,6 +8,7 @@ import {
   ComponentType,
   HEADSHOT_MULT,
   LEG_MULT,
+  MAX_ARMOR_REDUCTION,
   MELEE_KNOCKBACK_FORCE,
   PLAYER_EYE_HEIGHT,
   TORSO_MULT,
@@ -99,7 +100,7 @@ function getHitZoneMultiplier(zone: HitZone): number {
 
 // ─── Armor Damage Reduction ───
 
-function calculateArmorReduction(world: GameWorld, targetEntityId: EntityId): number {
+export function calculateArmorReduction(world: GameWorld, targetEntityId: EntityId): number {
   const equipment = world.ecs.getComponent<EquipmentComponent>(
     targetEntityId,
     ComponentType.Equipment,
@@ -118,7 +119,7 @@ function calculateArmorReduction(world: GameWorld, targetEntityId: EntityId): nu
     }
   }
 
-  return totalReduction;
+  return Math.min(totalReduction, MAX_ARMOR_REDUCTION);
 }
 
 // ─── Reduce Weapon Durability ───
@@ -131,17 +132,20 @@ function reduceWeaponDurability(world: GameWorld, entityId: EntityId): void {
     equipment.held.durability -= 1;
     if (equipment.held.durability <= 0) {
       equipment.held = null; // weapon broke
+      // TODO: emit weapon-broke event to client (needs emitToPlayer on GameWorld)
     }
   }
 }
 
-// ─── Distance Helper ───
+// ─── Distance Helpers ───
 
-function distance3D(a: PositionComponent, b: PositionComponent): number {
+/** Maximum vertical difference allowed for melee hits (blocks) */
+const MELEE_Y_TOLERANCE = 3.0;
+
+function distanceXZ(a: PositionComponent, b: PositionComponent): number {
   const dx = a.x - b.x;
-  const dy = a.y - b.y;
   const dz = a.z - b.z;
-  return Math.sqrt(dx * dx + dy * dy + dz * dz);
+  return Math.sqrt(dx * dx + dz * dz);
 }
 
 // ─── Angle Between Vectors (XZ plane) ───
@@ -182,14 +186,21 @@ function processMeleeAttack(
   for (const targetId of targets) {
     if (targetId === request.attackerEntityId) continue;
 
+    // Only hit combatants: NPCs or players (entities with Equipment)
+    const isNPC = world.ecs.hasComponent(targetId, ComponentType.NPCType);
+    const isPlayer = world.ecs.hasComponent(targetId, ComponentType.Equipment);
+    if (!isNPC && !isPlayer) continue;
+
     const targetPos = world.ecs.getComponent<PositionComponent>(targetId, ComponentType.Position)!;
     const targetCollider = world.ecs.getComponent<ColliderComponent>(
       targetId,
       ComponentType.Collider,
     )!;
 
-    // Distance check
-    const dist = distance3D(attackerPos, targetPos);
+    // Distance check (XZ plane + vertical tolerance)
+    const dy = Math.abs(attackerPos.y - targetPos.y);
+    if (dy > MELEE_Y_TOLERANCE) continue;
+    const dist = distanceXZ(attackerPos, targetPos);
     if (dist > range + targetCollider.width / 2) continue;
 
     // Cone check (XZ plane)
@@ -234,9 +245,9 @@ function processMeleeAttack(
   // Calculate damage
   let damage = weaponStats.baseDamage * zoneMult;
 
-  // Armor reduction
-  const armorReduction = calculateArmorReduction(world, closestTarget);
-  damage = Math.max(1, damage - armorReduction);
+  // Armor reduction (percentage-based)
+  const armorPercent = calculateArmorReduction(world, closestTarget);
+  damage = Math.max(1, Math.round(damage * (1 - armorPercent)));
 
   // Apply damage
   targetHealth.current = Math.max(0, targetHealth.current - damage);
@@ -384,8 +395,8 @@ function processRangedAttack(
 
 export const combatSystem: SystemFn = (world: GameWorld, _dt: number): void => {
   // Process all pending attack requests
-  while (pendingAttacks.length > 0) {
-    const request = pendingAttacks.shift()!;
+  for (let i = 0; i < pendingAttacks.length; i++) {
+    const request = pendingAttacks[i]!;
 
     // Get attacker's held weapon
     const equipment = world.ecs.getComponent<EquipmentComponent>(
@@ -408,6 +419,7 @@ export const combatSystem: SystemFn = (world: GameWorld, _dt: number): void => {
       processMeleeAttack(world, request, weaponStats);
     }
   }
+  pendingAttacks.length = 0;
 };
 
 // ─── Apply Projectile Damage (called by ProjectileSystem on hit) ───
@@ -419,6 +431,8 @@ export function applyProjectileDamage(
   weaponId: number,
   hitPosition: PositionComponent,
   _sourcePosition: PositionComponent,
+  sourceEntityId: EntityId,
+  sourcePlayerId: string,
 ): { hitZone: HitZone; finalDamage: number } {
   const targetHealth = world.ecs.getComponent<HealthComponent>(
     targetEntityId,
@@ -449,12 +463,29 @@ export function applyProjectileDamage(
   const zoneMult = headshotCapable ? getHitZoneMultiplier(hitZone) : TORSO_MULT;
   let finalDamage = damage * zoneMult;
 
-  // Armor reduction
-  const armorReduction = calculateArmorReduction(world, targetEntityId);
-  finalDamage = Math.max(1, finalDamage - armorReduction);
+  // Armor reduction (percentage-based)
+  const armorPercent = calculateArmorReduction(world, targetEntityId);
+  finalDamage = Math.max(1, Math.round(finalDamage * (1 - armorPercent)));
 
   // Apply damage
   targetHealth.current = Math.max(0, targetHealth.current - finalDamage);
+
+  // Notify AI system (triggers flee, aggro, retarget behaviors)
+  if (finalDamage > 0) {
+    const isNPC = world.ecs.hasComponent(targetEntityId, ComponentType.NPCType);
+    if (isNPC && targetHealth.current > 0) {
+      onNPCDamaged(world, targetEntityId, sourceEntityId);
+    }
+
+    // Track kill for achievements
+    if (targetHealth.current <= 0) {
+      if (isNPC) {
+        trackNPCKill(sourcePlayerId);
+      } else {
+        trackPVPKill(sourcePlayerId);
+      }
+    }
+  }
 
   return { hitZone, finalDamage };
 }

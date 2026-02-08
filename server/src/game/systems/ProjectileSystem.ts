@@ -12,8 +12,6 @@ import {
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
 import type { GameWorld, SystemFn } from '../World.js';
-import { trackNPCKill, trackPVPKill } from './AchievementSystem.js';
-import { onNPCDamaged } from './AISystem.js';
 import { applyProjectileDamage } from './CombatSystem.js';
 
 // ─── Constants ───
@@ -53,7 +51,16 @@ export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void =
     ComponentType.Position,
     ComponentType.Velocity,
   );
+  if (projectiles.length === 0) return;
+
   const now = Date.now();
+
+  // Hoist target query outside per-projectile loop
+  const targets = world.ecs.query(
+    ComponentType.Position,
+    ComponentType.Health,
+    ComponentType.Collider,
+  );
 
   for (const projectileId of projectiles) {
     const proj = world.ecs.getComponent<ProjectileComponent>(
@@ -109,11 +116,6 @@ export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void =
     }
 
     // Check entity collision
-    const targets = world.ecs.query(
-      ComponentType.Position,
-      ComponentType.Health,
-      ComponentType.Collider,
-    );
     let hitTarget = false;
 
     for (const targetId of targets) {
@@ -145,13 +147,17 @@ export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void =
           targetCollider.depth,
         )
       ) {
-        // Hit! Apply damage
-        const result = applyProjectileDamage(world, targetId, proj.damage, proj.weaponId, pos, {
-          x: pos.x - dx,
-          y: pos.y - dy,
-          z: pos.z - dz,
-          rotation: 0,
-        });
+        // Hit! Apply damage (includes AI notification and kill tracking)
+        const result = applyProjectileDamage(
+          world,
+          targetId,
+          proj.damage,
+          proj.weaponId,
+          pos,
+          { x: pos.x - dx, y: pos.y - dy, z: pos.z - dz, rotation: 0 },
+          proj.sourceEntityId,
+          proj.sourcePlayerId,
+        );
 
         logger.debug(
           {
@@ -163,35 +169,6 @@ export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void =
           },
           'Projectile hit entity',
         );
-
-        // Notify AI system of damage (triggers flee, aggro, retarget behaviors)
-        if (result.finalDamage > 0) {
-          const isNPC = world.ecs.getComponent(targetId, ComponentType.NPCType) !== undefined;
-          if (isNPC) {
-            const targetHealth = world.ecs.getComponent<
-              import('@lineremain/shared').HealthComponent
-            >(targetId, ComponentType.Health);
-            if (targetHealth && targetHealth.current > 0) {
-              onNPCDamaged(world, targetId, proj.sourceEntityId);
-            }
-          }
-        }
-
-        // Track kill for achievements
-        if (result.finalDamage > 0) {
-          const targetHealth = world.ecs.getComponent<import('@lineremain/shared').HealthComponent>(
-            targetId,
-            ComponentType.Health,
-          );
-          if (targetHealth && targetHealth.current <= 0) {
-            const isNPC = world.ecs.getComponent(targetId, ComponentType.NPCType) !== undefined;
-            if (isNPC) {
-              trackNPCKill(proj.sourcePlayerId);
-            } else {
-              trackPVPKill(proj.sourcePlayerId);
-            }
-          }
-        }
 
         // Destroy projectile on hit
         world.ecs.destroyEntity(projectileId);

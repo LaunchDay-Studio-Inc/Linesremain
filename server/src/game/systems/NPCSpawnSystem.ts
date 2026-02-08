@@ -185,6 +185,27 @@ const NEUTRAL_TEMPLATES: CreatureTemplate[] = [
       BiomeType.Mossreach,
     ],
   },
+  {
+    creatureType: NPCCreatureType.Bear,
+    behavior: AIBehavior.Neutral,
+    health: 400,
+    damage: 60,
+    walkSpeed: 1.8,
+    runSpeed: 4.0,
+    aggroRange: 8,
+    attackRange: 3.0,
+    attackCooldown: 2.0,
+    wanderRadius: 20,
+    colliderWidth: 1.4,
+    colliderHeight: 2.0,
+    lootTable: [
+      { itemId: 53, quantity: 6, chance: 1.0 }, // Raw Meat
+      { itemId: 7, quantity: 4, chance: 0.9 }, // Leather
+      { itemId: 8, quantity: 3, chance: 0.7 }, // Animal Fat
+      { itemId: 9, quantity: 3, chance: 0.6 }, // Bone
+    ],
+    weight: 3,
+  },
 ];
 
 const HOSTILE_TEMPLATES: CreatureTemplate[] = [
@@ -269,11 +290,7 @@ const HOSTILE_TEMPLATES: CreatureTemplate[] = [
     ],
     weight: 8,
     groupSize: { min: 2, max: 3 },
-    spawnBiomes: [
-      BiomeType.FrostveilPeaks,
-      BiomeType.SnowmeltWoods,
-      BiomeType.GlacialExpanse,
-    ],
+    spawnBiomes: [BiomeType.FrostveilPeaks, BiomeType.SnowmeltWoods, BiomeType.GlacialExpanse],
   },
   {
     creatureType: NPCCreatureType.Wolf,
@@ -296,27 +313,6 @@ const HOSTILE_TEMPLATES: CreatureTemplate[] = [
     weight: 10,
     groupSize: { min: 2, max: 4 },
     packRadius: 15,
-  },
-  {
-    creatureType: NPCCreatureType.Bear,
-    behavior: AIBehavior.Hostile,
-    health: 400,
-    damage: 60,
-    walkSpeed: 1.8,
-    runSpeed: 4.0,
-    aggroRange: 15,
-    attackRange: 3.0,
-    attackCooldown: 2.0,
-    wanderRadius: 20,
-    colliderWidth: 1.4,
-    colliderHeight: 2.0,
-    lootTable: [
-      { itemId: 53, quantity: 6, chance: 1.0 }, // Raw Meat
-      { itemId: 7, quantity: 4, chance: 0.9 }, // Leather
-      { itemId: 8, quantity: 3, chance: 0.7 }, // Animal Fat
-      { itemId: 9, quantity: 3, chance: 0.6 }, // Bone
-    ],
-    weight: 3,
   },
   {
     creatureType: NPCCreatureType.Zombie,
@@ -410,17 +406,20 @@ const BLOOD_MOON_TEMPLATES: CreatureTemplate[] = [
   },
 ];
 
-// Combined passive+neutral pool for daytime spawning
-const DAYTIME_TEMPLATES = [...PASSIVE_TEMPLATES, ...NEUTRAL_TEMPLATES];
+// Daytime-active hostiles: hostiles that can spawn during the day (no nightOnly flag)
+const DAYTIME_HOSTILE_TEMPLATES = HOSTILE_TEMPLATES.filter((t) => !t.nightOnly);
+
+// Combined passive+neutral+daytime-hostile pool for daytime spawning
+const DAYTIME_TEMPLATES = [
+  ...PASSIVE_TEMPLATES,
+  ...NEUTRAL_TEMPLATES,
+  ...DAYTIME_HOSTILE_TEMPLATES,
+];
 const DAYTIME_TOTAL_WEIGHT = DAYTIME_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
 
 // All templates for nighttime spawning (hostile gets extra weight at night)
 const NIGHTTIME_TEMPLATES = [...PASSIVE_TEMPLATES, ...NEUTRAL_TEMPLATES, ...HOSTILE_TEMPLATES];
 const NIGHTTIME_TOTAL_WEIGHT = NIGHTTIME_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
-
-// Pre-allocated blood moon spawn pool (avoid per-tick array concatenation)
-const NON_NIGHT_HOSTILE_TEMPLATES = HOSTILE_TEMPLATES.filter((t) => !t.nightOnly);
-const NON_NIGHT_HOSTILE_WEIGHT = NON_NIGHT_HOSTILE_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
 
 // Pre-allocated blood moon spawn pool (avoid per-tick array concatenation)
 const BLOOD_MOON_POOL = [...HOSTILE_TEMPLATES, ...BLOOD_MOON_TEMPLATES];
@@ -569,10 +568,10 @@ function pickTemplate(
     return pickWeightedTemplate(BLOOD_MOON_POOL, BLOOD_MOON_TOTAL_WEIGHT);
   }
 
-  // During day: only spawn passive/neutral
+  // During day: spawn passive/neutral + daytime-active hostiles
   // At night: spawn all types (hostiles included)
   if (daytime) {
-    if (passiveCount >= MAX_PASSIVE_NPCS) return null;
+    if (passiveCount >= MAX_PASSIVE_NPCS && hostileCount >= MAX_HOSTILE_NPCS) return null;
     return pickWeightedTemplate(DAYTIME_TEMPLATES, DAYTIME_TOTAL_WEIGHT);
   }
 
@@ -644,17 +643,16 @@ function despawnDistantHostiles(world: GameWorld, allNPCs: number[]): void {
     if (pos) playerPositions.push(pos);
   }
 
+  // Collect IDs to despawn first, then destroy (avoid mutating ECS during iteration)
+  const toDespawn: number[] = [];
+
   for (const npcId of allNPCs) {
     const npcType = world.ecs.getComponent<NPCTypeComponent>(npcId, ComponentType.NPCType);
     if (!npcType || npcType.behavior !== AIBehavior.Hostile) continue;
 
     // nightOnly creatures always despawn during daytime regardless of distance
     if (npcType.nightOnly) {
-      world.ecs.destroyEntity(npcId);
-      logger.debug(
-        { npc: npcId, creature: npcType.creatureType },
-        'Despawned nightOnly NPC (dawn)',
-      );
+      toDespawn.push(npcId);
       continue;
     }
 
@@ -673,11 +671,15 @@ function despawnDistantHostiles(world: GameWorld, allNPCs: number[]): void {
     }
 
     if (!nearPlayer) {
-      world.ecs.destroyEntity(npcId);
-      logger.debug(
-        { npc: npcId, creature: npcType.creatureType },
-        'Despawned hostile NPC (daytime)',
-      );
+      toDespawn.push(npcId);
     }
+  }
+
+  // Now destroy collected entities
+  for (const npcId of toDespawn) {
+    world.ecs.destroyEntity(npcId);
+  }
+  if (toDespawn.length > 0) {
+    logger.debug({ count: toDespawn.length }, 'Despawned hostile NPCs (daytime)');
   }
 }

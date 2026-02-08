@@ -175,6 +175,26 @@ const DEFAULT_SPREAD = 1.0;
 const DEFAULT_SIZE = 0.15;
 const DEFAULT_GRAVITY = -10.0;
 
+/** Default fallback color (white) */
+const COLOR_WHITE = new THREE.Color(0xffffff);
+
+/** Pre-cached color arrays for each preset (avoids per-emit allocations) */
+const PRESET_COLORS: Record<ParticlePreset, THREE.Color[]> = {} as Record<
+  ParticlePreset,
+  THREE.Color[]
+>;
+for (const [key, config] of Object.entries(PRESET_CONFIGS)) {
+  PRESET_COLORS[key as ParticlePreset] = config.colors.map((hex) => new THREE.Color(hex));
+}
+
+/** Pre-cached named colors for convenience emitters */
+const COLOR_DARK_BLOOD = new THREE.Color(0x4a0000);
+const COLOR_ARROW_DEFAULT = new THREE.Color(0x9e8c6c);
+const COLOR_ARROW_DUST = new THREE.Color(0xc8b898);
+const COLOR_MUZZLE_FLASH = new THREE.Color(0xffdd44);
+const COLOR_MUZZLE_FIRE = new THREE.Color(0xff8800);
+const COLOR_MUZZLE_SMOKE = new THREE.Color(0x888888);
+
 // ─── Particle System ───
 
 export class ParticleSystem {
@@ -230,7 +250,7 @@ export class ParticleSystem {
   emitPreset(preset: ParticlePreset, position: THREE.Vector3, count?: number): void {
     const config = PRESET_CONFIGS[preset];
     const c = count ?? config.count;
-    const colorObjs = config.colors.map((hex) => new THREE.Color(hex));
+    const colorObjs = PRESET_COLORS[preset]!;
 
     this.emit({
       position,
@@ -262,7 +282,7 @@ export class ParticleSystem {
       gravity = DEFAULT_GRAVITY,
     } = options;
 
-    const baseColor = color ?? new THREE.Color(0xffffff);
+    const baseColor = color ?? COLOR_WHITE;
 
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= MAX_PARTICLES) {
@@ -355,7 +375,7 @@ export class ParticleSystem {
     this.emit({
       position: basePos,
       count: 4,
-      color: new THREE.Color(0x4a0000),
+      color: COLOR_DARK_BLOOD,
       speed: 2.0,
       spread: 0.4,
       lifetime: 0.8,
@@ -378,7 +398,7 @@ export class ParticleSystem {
     this.emit({
       position,
       count: 6,
-      color: surfaceColor ?? new THREE.Color(0x9e8c6c),
+      color: surfaceColor ?? COLOR_ARROW_DEFAULT,
       speed: 2.5,
       spread: 0.5,
       lifetime: 0.5,
@@ -388,7 +408,7 @@ export class ParticleSystem {
     this.emit({
       position,
       count: 4,
-      color: new THREE.Color(0xc8b898),
+      color: COLOR_ARROW_DUST,
       speed: 1.0,
       spread: 0.3,
       lifetime: 0.3,
@@ -405,7 +425,7 @@ export class ParticleSystem {
     this.emit({
       position: flashPos,
       count: 3,
-      color: new THREE.Color(0xffdd44),
+      color: COLOR_MUZZLE_FLASH,
       speed: 8.0,
       spread: 0.15,
       lifetime: 0.08,
@@ -415,7 +435,7 @@ export class ParticleSystem {
     this.emit({
       position: flashPos,
       count: 5,
-      color: new THREE.Color(0xff8800),
+      color: COLOR_MUZZLE_FIRE,
       speed: 6.0,
       spread: 0.4,
       lifetime: 0.15,
@@ -425,7 +445,7 @@ export class ParticleSystem {
     this.emit({
       position: flashPos,
       count: 2,
-      color: new THREE.Color(0x888888),
+      color: COLOR_MUZZLE_SMOKE,
       speed: 1.5,
       spread: 0.3,
       lifetime: 0.4,

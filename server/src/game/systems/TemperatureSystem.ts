@@ -2,31 +2,36 @@
 // Calculates environmental temperature for entities based on biome, time of day,
 // altitude, clothing, fire proximity, and water immersion. Applies freezing/heat damage.
 
-import type { GameWorld } from '../World.js';
 import {
-  ComponentType,
-  SEA_LEVEL,
-  CAMPFIRE_WARMTH_RADIUS,
-  CAMPFIRE_WARMTH_BONUS,
-  NIGHT_TEMPERATURE_DROP,
-  COLD_THRESHOLD,
-  FREEZING_THRESHOLD,
-  HEAT_THRESHOLD,
-  COLD_DAMAGE_RATE,
-  HEAT_DAMAGE_RATE,
+  ARMOR_STATS,
   BuildingPieceType,
+  CAMPFIRE_WARMTH_BONUS,
+  CAMPFIRE_WARMTH_RADIUS,
+  COLD_DAMAGE_RATE,
+  COLD_THRESHOLD,
+  ComponentType,
+  FREEZING_THRESHOLD,
+  HEAT_DAMAGE_RATE,
+  HEAT_THRESHOLD,
+  NIGHT_TEMPERATURE_DROP,
+  SEA_LEVEL,
+  type ColliderComponent,
+  type EquipmentComponent,
+  type HealthComponent,
   type PositionComponent,
   type TemperatureComponent,
-  type HealthComponent,
   type ThirstComponent,
-  type ColliderComponent,
 } from '@lineremain/shared';
+import type { GameWorld } from '../World.js';
 import { getBlockAt, isWaterBlock } from './PhysicsSystem.js';
 
 // ─── Constants ───
 
 /** Run temperature checks every 60 ticks (3 seconds at 20 TPS) */
 const TEMP_CHECK_INTERVAL = 60;
+
+/** Pre-computed seconds per check interval for scaling per-second damage rates */
+const CHECK_INTERVAL_SECONDS = TEMP_CHECK_INTERVAL / 20;
 
 /** Temperature loss per 20 blocks above sea level */
 const ALTITUDE_TEMP_DROP_PER_20 = 1.0;
@@ -49,6 +54,21 @@ export function temperatureSystem(world: GameWorld, _dt: number): void {
 
   const biomeManager = world.terrainGenerator.biomeManager;
 
+  // Pre-query campfire positions once (avoid O(N²) per-entity building scan)
+  const buildingEntities = world.ecs.query(ComponentType.Building, ComponentType.Position);
+  const campfirePositions: PositionComponent[] = [];
+  for (const buildingId of buildingEntities) {
+    const building = world.ecs.getComponent<import('@lineremain/shared').BuildingComponent>(
+      buildingId,
+      ComponentType.Building,
+    )!;
+    if (building.pieceType === BuildingPieceType.Campfire) {
+      campfirePositions.push(
+        world.ecs.getComponent<PositionComponent>(buildingId, ComponentType.Position)!,
+      );
+    }
+  }
+
   const entities = world.ecs.query(ComponentType.Temperature, ComponentType.Position);
 
   for (const entityId of entities) {
@@ -67,9 +87,7 @@ export function temperatureSystem(world: GameWorld, _dt: number): void {
     const timeAngle = (world.worldTime - 0.25) * Math.PI * 2; // offset so 0.25 (noon) = sin peak
     const timeMod = -Math.sin(timeAngle); // +1 at noon, -1 at midnight
     // Map: +1 → +5°C, -1 → -NIGHT_TEMPERATURE_DROP
-    const timeTemp = timeMod > 0
-      ? timeMod * 5
-      : timeMod * NIGHT_TEMPERATURE_DROP;
+    const timeTemp = timeMod > 0 ? timeMod * 5 : timeMod * NIGHT_TEMPERATURE_DROP;
     envTemp += timeTemp;
 
     // ── 3. Altitude modifier ──
@@ -80,31 +98,31 @@ export function temperatureSystem(world: GameWorld, _dt: number): void {
     }
 
     // ── 4. Clothing insulation modifier ──
-    // TODO: Sum insulation values from equipped armor once item properties are defined
-    // For now, clothing provides no modifier
+    const equipment = world.ecs.getComponent<EquipmentComponent>(entityId, ComponentType.Equipment);
+    if (equipment) {
+      const slots = [equipment.head, equipment.chest, equipment.legs, equipment.feet];
+      for (const slot of slots) {
+        if (slot) {
+          const armorStats = ARMOR_STATS[slot.itemId];
+          if (armorStats) {
+            envTemp += armorStats.insulation;
+          }
+        }
+      }
+    }
 
     // ── 5. Fire proximity ──
-    // Check if any entity with a "Campfire" building type is within CAMPFIRE_WARMTH_RADIUS
-    // We approximate by checking building entities nearby
-    const buildingEntities = world.ecs.query(ComponentType.Building, ComponentType.Position);
+    // Check if any campfire is within CAMPFIRE_WARMTH_RADIUS
     let nearFire = false;
-    for (const buildingId of buildingEntities) {
-      const bPos = world.ecs.getComponent<PositionComponent>(buildingId, ComponentType.Position)!;
+    const warmthRadSq = CAMPFIRE_WARMTH_RADIUS * CAMPFIRE_WARMTH_RADIUS;
+    for (const bPos of campfirePositions) {
       const dx = pos.x - bPos.x;
       const dy = pos.y - bPos.y;
       const dz = pos.z - bPos.z;
       const distSq = dx * dx + dy * dy + dz * dz;
-      if (distSq <= CAMPFIRE_WARMTH_RADIUS * CAMPFIRE_WARMTH_RADIUS) {
-        // Check if this building is a campfire (pieceType check)
-        const building = world.ecs.getComponent<import('@lineremain/shared').BuildingComponent>(
-          buildingId,
-          ComponentType.Building,
-        )!;
-        // Convention: 'campfire' piece type
-        if (building.pieceType === BuildingPieceType.Campfire) {
-          nearFire = true;
-          break;
-        }
+      if (distSq <= warmthRadSq) {
+        nearFire = true;
+        break;
       }
     }
     if (nearFire) {
@@ -125,29 +143,30 @@ export function temperatureSystem(world: GameWorld, _dt: number): void {
 
     // Body temperature lerps toward environmental with some homeostatic resistance
     // Body naturally regulates toward 37°C but environmental extremes overwhelm it
-    const bodyTarget = envTemp < COLD_THRESHOLD
-      ? Math.max(envTemp, envTemp + (37 - envTemp) * 0.3)
-      : envTemp > HEAT_THRESHOLD
-        ? Math.min(envTemp, envTemp - (envTemp - 37) * 0.3)
-        : 37;
+    const bodyTarget =
+      envTemp < COLD_THRESHOLD
+        ? Math.max(envTemp, envTemp + (37 - envTemp) * 0.3)
+        : envTemp > HEAT_THRESHOLD
+          ? Math.min(envTemp, envTemp - (envTemp - 37) * 0.3)
+          : 37;
     temp.current += (bodyTarget - temp.current) * 0.1;
 
     // ── 7. Temperature damage effects ──
     if (!health) continue;
 
-    // Freezing damage
+    // Freezing damage (scaled to check interval)
     if (envTemp <= FREEZING_THRESHOLD) {
-      // Severe cold: 6 damage per check + movement debuff (handled elsewhere)
-      health.current -= COLD_DAMAGE_RATE * 4;
+      // Severe cold: high damage per second
+      health.current -= COLD_DAMAGE_RATE * 4 * CHECK_INTERVAL_SECONDS;
     } else if (envTemp < COLD_THRESHOLD) {
-      // Cold: 3 damage per check
-      health.current -= COLD_DAMAGE_RATE * 2;
+      // Cold: moderate damage per second
+      health.current -= COLD_DAMAGE_RATE * 2 * CHECK_INTERVAL_SECONDS;
     }
 
-    // Heat damage
+    // Heat damage (scaled to check interval)
     if (envTemp >= HEAT_THRESHOLD) {
-      // Heatstroke: 3 damage per check + increased thirst drain
-      health.current -= HEAT_DAMAGE_RATE * 3;
+      // Heatstroke: damage per second + increased thirst drain
+      health.current -= HEAT_DAMAGE_RATE * 3 * CHECK_INTERVAL_SECONDS;
 
       // Double thirst drain in extreme heat
       const thirst = world.ecs.getComponent<ThirstComponent>(entityId, ComponentType.Thirst);

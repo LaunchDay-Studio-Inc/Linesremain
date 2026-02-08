@@ -48,13 +48,23 @@ export class EntityInterpolation {
       this.entities.set(entityId, entity);
     }
 
+    // Reuse oldest snapshot's Vector3 to avoid allocation when buffer is full
+    let snapshotPos: THREE.Vector3;
+    if (entity.snapshots.length >= MAX_SNAPSHOTS) {
+      // Reclaim the Vector3 from the snapshot about to be evicted
+      snapshotPos = entity.snapshots[0]!.position;
+      snapshotPos.copy(position);
+    } else {
+      snapshotPos = position.clone();
+    }
+
     entity.snapshots.push({
       timestamp,
-      position: position.clone(),
+      position: snapshotPos,
       yaw,
     });
 
-    // Keep buffer bounded
+    // Keep buffer bounded (shift is acceptable here — array capped at 6 elements)
     if (entity.snapshots.length > MAX_SNAPSHOTS) {
       entity.snapshots.shift();
     }
@@ -145,7 +155,7 @@ export class EntityInterpolation {
     while (yawDiff < -Math.PI) yawDiff += Math.PI * 2;
     entity.currentYaw = from.yaw + yawDiff * t;
 
-    // Prune old snapshots (keep at least 2)
+    // Prune old snapshots (keep at least 2; shift is acceptable — array capped at 6 elements)
     while (snapshots.length > 2 && (snapshots[1]?.timestamp ?? 0) < renderTime) {
       snapshots.shift();
     }

@@ -16,6 +16,7 @@ import {
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
 import type { GameWorld, SystemFn } from '../World.js';
+import { calculateArmorReduction } from './CombatSystem.js';
 
 // ─── Constants ───
 
@@ -23,7 +24,7 @@ const WANDER_PAUSE_MIN_S = 3;
 const WANDER_PAUSE_MAX_S = 8;
 const FLEE_DURATION_S = 5;
 const NEUTRAL_AGGRO_DURATION_S = 30;
-const MAX_CHASE_DISTANCE = 40; // give up chasing if too far from home
+const MAX_CHASE_DISTANCE = 60; // give up chasing if too far from home
 
 // ─── Helpers ───
 
@@ -75,7 +76,7 @@ function findNearestPlayer(
   const players = world.ecs.query(
     ComponentType.Position,
     ComponentType.Health,
-    ComponentType.Equipment,
+    ComponentType.Inventory,
   );
   let nearest: EntityId | null = null;
   let nearestDist = maxRange;
@@ -109,6 +110,11 @@ function handleIdle(
 ): void {
   vel.vx = 0;
   vel.vz = 0;
+
+  // Subtle idle rotation — small random look-around to feel alive
+  if (Math.random() < 0.02) {
+    pos.rotation += (Math.random() - 0.5) * 0.8;
+  }
 
   // Check if wander wait is over
   if (now >= npcType.wanderWaitUntil) {
@@ -184,8 +190,8 @@ function handleChasing(
   }
 
   // Check if too far from home
-  const homeDistSq = distanceXZ(pos.x, pos.z, ai.homePosition.x, ai.homePosition.z);
-  if (homeDistSq > MAX_CHASE_DISTANCE) {
+  const homeDist = distanceXZ(pos.x, pos.z, ai.homePosition.x, ai.homePosition.z);
+  if (homeDist > MAX_CHASE_DISTANCE) {
     ai.targetEntityId = null;
     ai.state = AIState.Roaming;
     npcType.wanderTarget = { x: ai.homePosition.x, y: ai.homePosition.y, z: ai.homePosition.z };
@@ -252,15 +258,17 @@ function handleAttacking(
   const cooldownMs = ai.attackCooldown * 1000;
   if (now - ai.lastAttackTime < cooldownMs) return;
 
-  // Deal damage
+  // Deal damage (apply target's armor reduction)
   ai.lastAttackTime = now;
-  targetHealth.current = Math.max(0, targetHealth.current - ai.attackDamage);
+  const armorPercent = calculateArmorReduction(world, ai.targetEntityId);
+  const finalDamage = Math.max(1, Math.round(ai.attackDamage * (1 - armorPercent)));
+  targetHealth.current = Math.max(0, targetHealth.current - finalDamage);
 
   logger.debug(
     {
       npc: entityId,
       target: ai.targetEntityId,
-      damage: ai.attackDamage,
+      damage: finalDamage,
       remaining: targetHealth.current,
     },
     'NPC attacked',

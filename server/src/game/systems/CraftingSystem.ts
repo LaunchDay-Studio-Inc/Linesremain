@@ -81,6 +81,7 @@ export const craftingSystem: SystemFn = (world: GameWorld, dt: number): void => 
 
       if (remaining > 0) {
         // Inventory full — drop on ground via item drop entity
+        // TODO: notify player that crafted items were dropped (needs emitToPlayer on GameWorld)
         const pos = world.ecs.getComponent(entityId, ComponentType.Position);
         if (pos) {
           const p = pos as { x: number; y: number; z: number };

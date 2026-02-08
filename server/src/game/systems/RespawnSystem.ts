@@ -5,9 +5,9 @@
 import {
   ComponentType,
   CORPSE_DESPAWN_SECONDS,
+  levelFromXP,
   SEA_LEVEL,
   WORLD_SIZE,
-  levelFromXP,
   type AncestorRecord,
   type EntityId,
   type EquipmentComponent,
@@ -56,8 +56,8 @@ export function checkPlayerDeath(world: GameWorld, playerId: string, entityId: E
 export function processPlayerDeaths(world: GameWorld): DeathRecord[] {
   const processed: DeathRecord[] = [];
 
-  while (pendingDeaths.length > 0) {
-    const death = pendingDeaths.shift()!;
+  for (let i = 0; i < pendingDeaths.length; i++) {
+    const death = pendingDeaths[i]!;
     processed.push(death);
 
     // Gather all items from inventory + equipment
@@ -106,6 +106,7 @@ export function processPlayerDeaths(world: GameWorld): DeathRecord[] {
     logger.info({ playerId: death.playerId, position: death.deathPosition }, 'Player died');
   }
 
+  pendingDeaths.length = 0;
   return processed;
 }
 
@@ -152,7 +153,7 @@ function findRandomSpawnPosition(world: GameWorld): { x: number; y: number; z: n
     // Simple surface check — find the highest solid block
     for (let checkY = 63; checkY >= SEA_LEVEL; checkY--) {
       const block = world.chunkStore.getBlock(Math.floor(x), checkY, Math.floor(z));
-      if (block !== undefined && block !== 0) {
+      if (block !== undefined && block !== 0 && block !== 14) {
         return { x, y: checkY + 1, z };
       }
     }
@@ -167,10 +168,22 @@ function findRandomSpawnPosition(world: GameWorld): { x: number; y: number; z: n
 const NEAR_BASE_RADIUS = 50;
 
 /** Find a spawn point near the player's buildings (for line death respawn) */
-function findNearBaseSpawn(world: GameWorld, playerId: string): { x: number; y: number; z: number } | null {
+function findNearBaseSpawn(
+  world: GameWorld,
+  playerId: string,
+): { x: number; y: number; z: number } | null {
   // Query all building entities with ownership
-  const owned = world.ecs.query(ComponentType.Building, ComponentType.Ownership, ComponentType.Position);
-  let bestPos: { x: number; y: number; z: number } | null = null;
+  const owned = world.ecs.query(
+    ComponentType.Building,
+    ComponentType.Ownership,
+    ComponentType.Position,
+  );
+
+  // Compute centroid of all owned buildings
+  let sumX = 0;
+  let sumY = 0;
+  let sumZ = 0;
+  let count = 0;
 
   for (const entityId of owned) {
     const ownership = world.ecs.getComponent<OwnershipComponent>(entityId, ComponentType.Ownership);
@@ -179,12 +192,15 @@ function findNearBaseSpawn(world: GameWorld, playerId: string): { x: number; y: 
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position);
     if (!pos) continue;
 
-    // Use the first owned building we find
-    bestPos = { x: pos.x, y: pos.y, z: pos.z };
-    break;
+    sumX += pos.x;
+    sumY += pos.y;
+    sumZ += pos.z;
+    count++;
   }
 
-  if (!bestPos) return null;
+  if (count === 0) return null;
+
+  const bestPos = { x: sumX / count, y: sumY / count, z: sumZ / count };
 
   // Pick a random point within NEAR_BASE_RADIUS blocks
   for (let attempt = 0; attempt < 20; attempt++) {
@@ -200,7 +216,7 @@ function findNearBaseSpawn(world: GameWorld, playerId: string): { x: number; y: 
     // Find solid ground
     for (let checkY = 63; checkY >= SEA_LEVEL; checkY--) {
       const block = world.chunkStore.getBlock(Math.floor(cx), checkY, Math.floor(cz));
-      if (block !== undefined && block !== 0) {
+      if (block !== undefined && block !== 0 && block !== 14) {
         return { x: cx, y: checkY + 1, z: cz };
       }
     }
@@ -288,7 +304,10 @@ export function processRespawn(
     if (bagResult && now - bagResult.bag.lastUsedTime >= SLEEPING_BAG_COOLDOWN_MS) {
       spawnPos = { x: bagResult.pos.x, y: bagResult.pos.y + 1, z: bagResult.pos.z };
       bagResult.bag.lastUsedTime = now;
-      logger.info({ playerId, bagEntityId: bagResult.entityId }, 'Player respawning at sleeping bag');
+      logger.info(
+        { playerId, bagEntityId: bagResult.entityId },
+        'Player respawning at sleeping bag',
+      );
     } else {
       spawnPos = findRandomSpawnPosition(world);
       logger.info({ playerId }, 'Sleeping bag unavailable or on cooldown, random respawn');

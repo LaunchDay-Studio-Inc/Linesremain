@@ -8,12 +8,6 @@ import * as THREE from 'three';
 
 export type WeatherType = 'clear' | 'cloudy' | 'rain';
 
-interface RainDrop {
-  mesh: THREE.Line;
-  velocity: THREE.Vector3;
-  life: number;
-}
-
 interface Cloud {
   mesh: THREE.Sprite;
   driftSpeed: number;
@@ -29,6 +23,12 @@ const RAIN_SPEED = 25;
 const RAIN_LENGTH = 1.2;
 const RAIN_ANGLE = 0.15; // slight wind angle
 
+// Pre-computed rain velocity
+const RAIN_VX = RAIN_ANGLE * RAIN_SPEED;
+const RAIN_VY = -RAIN_SPEED;
+const RAIN_STREAK_X = RAIN_VX * (RAIN_LENGTH / RAIN_SPEED);
+const RAIN_STREAK_Y = RAIN_VY * (RAIN_LENGTH / RAIN_SPEED);
+
 const CLOUD_COUNT = 8;
 const CLOUD_Y_MIN = 55;
 const CLOUD_Y_MAX = 60;
@@ -42,9 +42,11 @@ export class WeatherSystem {
   private scene: THREE.Scene;
   private weather: WeatherType = 'clear';
 
-  // Rain
-  private rainDrops: RainDrop[] = [];
-  private rainGroup: THREE.Group;
+  // Rain — single batched LineSegments with shared buffer
+  private rainPositions: Float32Array; // RAIN_COUNT * 6 (2 endpoints × 3 components)
+  private rainLives: Float32Array; // per-drop lifetime
+  private rainGeometry: THREE.BufferGeometry;
+  private rainMesh: THREE.LineSegments;
   private rainMaterial: THREE.LineBasicMaterial;
 
   // Clouds
@@ -68,10 +70,12 @@ export class WeatherSystem {
   constructor(scene: THREE.Scene) {
     this.scene = scene;
 
-    // ── Rain setup ──
-    this.rainGroup = new THREE.Group();
-    this.rainGroup.visible = false;
-    scene.add(this.rainGroup);
+    // ── Rain setup (single batched mesh) ──
+    this.rainPositions = new Float32Array(RAIN_COUNT * 6);
+    this.rainLives = new Float32Array(RAIN_COUNT);
+
+    this.rainGeometry = new THREE.BufferGeometry();
+    this.rainGeometry.setAttribute('position', new THREE.BufferAttribute(this.rainPositions, 3));
 
     this.rainMaterial = new THREE.LineBasicMaterial({
       color: 0x8899bb,
@@ -80,9 +84,14 @@ export class WeatherSystem {
       depthWrite: false,
     });
 
-    // Pre-create rain drops
+    this.rainMesh = new THREE.LineSegments(this.rainGeometry, this.rainMaterial);
+    this.rainMesh.frustumCulled = false;
+    this.rainMesh.visible = false;
+    scene.add(this.rainMesh);
+
+    // Initialize all rain drops
     for (let i = 0; i < RAIN_COUNT; i++) {
-      this.rainDrops.push(this.createRainDrop());
+      this.resetRainDrop(i);
     }
 
     // ── Cloud setup ──
@@ -140,44 +149,24 @@ export class WeatherSystem {
     return tex;
   }
 
-  // ─── Rain Drop Creation ───
+  // ─── Rain Drop Reset ───
 
-  private createRainDrop(): RainDrop {
-    const geometry = new THREE.BufferGeometry();
-    const positions = new Float32Array(6); // 2 points × 3 components
-    geometry.setAttribute('position', new THREE.BufferAttribute(positions, 3));
-
-    const mesh = new THREE.Line(geometry, this.rainMaterial);
-    this.rainGroup.add(mesh);
-
-    const drop: RainDrop = {
-      mesh,
-      velocity: new THREE.Vector3(RAIN_ANGLE * RAIN_SPEED, -RAIN_SPEED, 0),
-      life: 0,
-    };
-
-    this.resetRainDrop(drop);
-    return drop;
-  }
-
-  private resetRainDrop(drop: RainDrop): void {
+  private resetRainDrop(index: number): void {
     const x = this.playerPos.x + (Math.random() - 0.5) * RAIN_AREA;
     const y = this.playerPos.y + RAIN_HEIGHT * (0.5 + Math.random() * 0.5);
     const z = this.playerPos.z + (Math.random() - 0.5) * RAIN_AREA;
 
-    const positions = (drop.mesh.geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+    const base = index * 6;
     // Start point
-    positions[0] = x;
-    positions[1] = y;
-    positions[2] = z;
+    this.rainPositions[base] = x;
+    this.rainPositions[base + 1] = y;
+    this.rainPositions[base + 2] = z;
     // End point (streak direction)
-    positions[3] = x + drop.velocity.x * (RAIN_LENGTH / RAIN_SPEED);
-    positions[4] = y + drop.velocity.y * (RAIN_LENGTH / RAIN_SPEED);
-    positions[5] = z + drop.velocity.z * (RAIN_LENGTH / RAIN_SPEED);
+    this.rainPositions[base + 3] = x + RAIN_STREAK_X;
+    this.rainPositions[base + 4] = y + RAIN_STREAK_Y;
+    this.rainPositions[base + 5] = z;
 
-    (drop.mesh.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
-
-    drop.life = Math.random() * 2; // stagger start times
+    this.rainLives[index] = Math.random() * 2; // stagger start times
   }
 
   // ─── Cloud Creation ───
@@ -197,7 +186,8 @@ export class WeatherSystem {
 
     this.cloudGroup.add(sprite);
 
-    const driftSpeed = CLOUD_DRIFT_SPEED_MIN + Math.random() * (CLOUD_DRIFT_SPEED_MAX - CLOUD_DRIFT_SPEED_MIN);
+    const driftSpeed =
+      CLOUD_DRIFT_SPEED_MIN + Math.random() * (CLOUD_DRIFT_SPEED_MAX - CLOUD_DRIFT_SPEED_MIN);
     const windAngle = Math.random() * Math.PI * 0.3; // slight variation in wind direction
 
     return {
@@ -216,7 +206,7 @@ export class WeatherSystem {
     const showRain = weather === 'rain';
     const showClouds = weather === 'rain' || weather === 'cloudy';
 
-    this.rainGroup.visible = showRain;
+    this.rainMesh.visible = showRain;
     this.cloudGroup.visible = showClouds;
 
     // Adjust lighting
@@ -274,34 +264,37 @@ export class WeatherSystem {
   }
 
   private updateRain(dt: number): void {
-    for (const drop of this.rainDrops) {
-      drop.life -= dt;
+    const dx = RAIN_VX * dt;
+    const dy = RAIN_VY * dt;
 
-      const positions = (drop.mesh.geometry.getAttribute('position') as THREE.BufferAttribute).array as Float32Array;
+    for (let i = 0; i < RAIN_COUNT; i++) {
+      this.rainLives[i]! -= dt;
+      const base = i * 6;
 
-      // Move drop
-      const dx = drop.velocity.x * dt;
-      const dy = drop.velocity.y * dt;
-      const dz = drop.velocity.z * dt;
-
-      positions[0]! += dx;
-      positions[1]! += dy;
-      positions[2]! += dz;
-      positions[3]! += dx;
-      positions[4]! += dy;
-      positions[5]! += dz;
-
-      (drop.mesh.geometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
+      // Move both endpoints
+      this.rainPositions[base]! += dx;
+      this.rainPositions[base + 1]! += dy;
+      // z unchanged (no z velocity)
+      this.rainPositions[base + 3]! += dx;
+      this.rainPositions[base + 4]! += dy;
+      // z unchanged
 
       // Reset if below ground or too far from player
-      const dropY = positions[1]!;
-      const distX = Math.abs(positions[0]! - this.playerPos.x);
-      const distZ = Math.abs(positions[2]! - this.playerPos.z);
+      const dropY = this.rainPositions[base + 1]!;
+      const distX = Math.abs(this.rainPositions[base]! - this.playerPos.x);
+      const distZ = Math.abs(this.rainPositions[base + 2]! - this.playerPos.z);
 
-      if (dropY < this.playerPos.y - 5 || distX > RAIN_AREA || distZ > RAIN_AREA || drop.life <= 0) {
-        this.resetRainDrop(drop);
+      if (
+        dropY < this.playerPos.y - 5 ||
+        distX > RAIN_AREA ||
+        distZ > RAIN_AREA ||
+        this.rainLives[i]! <= 0
+      ) {
+        this.resetRainDrop(i);
       }
     }
+
+    (this.rainGeometry.getAttribute('position') as THREE.BufferAttribute).needsUpdate = true;
   }
 
   private updateClouds(dt: number): void {
@@ -325,13 +318,9 @@ export class WeatherSystem {
 
   dispose(): void {
     // Rain cleanup
-    for (const drop of this.rainDrops) {
-      drop.mesh.geometry.dispose();
-      this.rainGroup.remove(drop.mesh);
-    }
-    this.rainDrops.length = 0;
+    this.rainGeometry.dispose();
     this.rainMaterial.dispose();
-    this.scene.remove(this.rainGroup);
+    this.scene.remove(this.rainMesh);
 
     // Cloud cleanup
     for (const cloud of this.clouds) {

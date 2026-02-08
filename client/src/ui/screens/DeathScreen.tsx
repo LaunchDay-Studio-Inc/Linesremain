@@ -11,6 +11,7 @@ export const DeathScreen: React.FC = () => {
   const [fadeIn, setFadeIn] = useState(false);
   const isConnected = useGameStore((s) => s.isConnected);
   const hasSleepingBag = useGameStore((s) => s.hasSleepingBag);
+  const deathCause = useGameStore((s) => s.deathCause);
 
   useEffect(() => {
     const timer = setTimeout(() => setFadeIn(true), 200);
@@ -113,7 +114,23 @@ export const DeathScreen: React.FC = () => {
             userSelect: 'none',
           }}
         >
-          The world claimed another soul.
+          {deathCause === 'hunger'
+            ? 'Starvation took its toll.'
+            : deathCause === 'thirst'
+              ? 'Dehydration claimed you.'
+              : deathCause === 'cold'
+                ? 'The cold seeped into your bones.'
+                : deathCause === 'heat'
+                  ? 'The heat was unbearable.'
+                  : deathCause === 'animal'
+                    ? 'Torn apart by the wildlife.'
+                    : deathCause === 'player'
+                      ? 'Killed by another survivor.'
+                      : deathCause === 'fall'
+                        ? 'The ground broke your fall.'
+                        : deathCause === 'bleeding'
+                          ? 'You bled out.'
+                          : 'The world claimed another soul.'}
         </p>
 
         {/* Buttons */}
