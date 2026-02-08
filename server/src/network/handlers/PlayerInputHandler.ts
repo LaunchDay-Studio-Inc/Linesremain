@@ -2,29 +2,28 @@
 // Receives client input packets, validates them, applies movement,
 // and queues attack actions for the combat system.
 
-import type { Server, Socket } from 'socket.io';
-import type { GameWorld } from '../../game/World.js';
 import {
-  ComponentType,
   ClientMessage,
-  PLAYER_WALK_SPEED,
-  PLAYER_SPRINT_SPEED,
-  PLAYER_CROUCH_SPEED,
-  PLAYER_JUMP_VELOCITY,
+  ComponentType,
   HOTBAR_SLOTS,
   INTERACT_RANGE,
-  PICKUP_RANGE,
   ITEM_REGISTRY,
+  PICKUP_RANGE,
+  PLAYER_CROUCH_SPEED,
+  PLAYER_SPRINT_SPEED,
+  PLAYER_WALK_SPEED,
   type EntityId,
+  type EquipmentComponent,
+  type InputPayload,
+  type InventoryComponent,
   type PositionComponent,
   type VelocityComponent,
-  type EquipmentComponent,
-  type InventoryComponent,
-  type InputPayload,
 } from '@lineremain/shared';
+import type { Server, Socket } from 'socket.io';
 import { queueAttack } from '../../game/systems/CombatSystem.js';
-import { inputRateLimiter } from '../RateLimiter.js';
+import type { GameWorld } from '../../game/World.js';
 import { logger } from '../../utils/logger.js';
+import { inputRateLimiter } from '../RateLimiter.js';
 
 // ─── Validation ───
 
@@ -33,13 +32,19 @@ function isValidInput(payload: unknown): payload is InputPayload {
   const p = payload as Record<string, unknown>;
 
   return (
-    typeof p.seq === 'number' && Number.isInteger(p.seq) &&
-    typeof p.forward === 'number' && p.forward >= -1 && p.forward <= 1 &&
-    typeof p.right === 'number' && p.right >= -1 && p.right <= 1 &&
+    typeof p.seq === 'number' &&
+    Number.isInteger(p.seq) &&
+    typeof p.forward === 'number' &&
+    p.forward >= -1 &&
+    p.forward <= 1 &&
+    typeof p.right === 'number' &&
+    p.right >= -1 &&
+    p.right <= 1 &&
     typeof p.jump === 'boolean' &&
     typeof p.crouch === 'boolean' &&
     typeof p.sprint === 'boolean' &&
-    typeof p.rotation === 'number' && isFinite(p.rotation) &&
+    typeof p.rotation === 'number' &&
+    isFinite(p.rotation) &&
     typeof p.primaryAction === 'boolean' &&
     typeof p.secondaryAction === 'boolean' &&
     typeof p.selectedSlot === 'number' &&
@@ -96,19 +101,13 @@ function processMovement(
   vel.vx = moveX;
   vel.vz = moveZ;
 
-  // Jump (only if on ground — simple check: vy near 0)
-  if (input.jump && Math.abs(vel.vy) < 0.1) {
-    vel.vy = PLAYER_JUMP_VELOCITY;
-  }
+  // Jump is handled by GameLoop.processInputs() which has proper 5-point
+  // ground detection (Issue 102). No duplicate jump logic here.
 }
 
 // ─── Selected Slot Sync ───
 
-function syncSelectedSlot(
-  world: GameWorld,
-  entityId: EntityId,
-  selectedSlot: number,
-): void {
+function syncSelectedSlot(world: GameWorld, entityId: EntityId, selectedSlot: number): void {
   const inventory = world.ecs.getComponent<InventoryComponent>(entityId, ComponentType.Inventory);
   const equipment = world.ecs.getComponent<EquipmentComponent>(entityId, ComponentType.Equipment);
   if (!inventory || !equipment) return;
@@ -163,7 +162,11 @@ function processSecondaryAction(
   if (!pos) return;
 
   // Find nearest interactable entity in range
-  const lootables = world.ecs.query(ComponentType.Position, ComponentType.Lootable, ComponentType.Inventory);
+  const lootables = world.ecs.query(
+    ComponentType.Position,
+    ComponentType.Lootable,
+    ComponentType.Inventory,
+  );
 
   let closestId: EntityId | null = null;
   let closestDist = INTERACT_RANGE;
@@ -216,7 +219,10 @@ function processSecondaryAction(
   }
 
   if (closestDrop !== null) {
-    const dropInv = world.ecs.getComponent<InventoryComponent>(closestDrop, ComponentType.Inventory);
+    const dropInv = world.ecs.getComponent<InventoryComponent>(
+      closestDrop,
+      ComponentType.Inventory,
+    );
     const playerInv = world.ecs.getComponent<InventoryComponent>(entityId, ComponentType.Inventory);
     if (dropInv && playerInv) {
       // Try to add items to player inventory
@@ -231,7 +237,10 @@ function processSecondaryAction(
         } else {
           // Try stacking
           const stackIdx = playerInv.slots.findIndex(
-            (s) => s !== null && s.itemId === item.itemId && s.quantity < (ITEM_REGISTRY[item.itemId]?.maxStack ?? 999),
+            (s) =>
+              s !== null &&
+              s.itemId === item.itemId &&
+              s.quantity < (ITEM_REGISTRY[item.itemId]?.maxStack ?? 999),
           );
           if (stackIdx !== -1) {
             playerInv.slots[stackIdx]!.quantity += item.quantity;

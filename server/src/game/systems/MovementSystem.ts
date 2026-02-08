@@ -10,6 +10,7 @@ import {
   FALL_DAMAGE_THRESHOLD,
   type ColliderComponent,
   type HealthComponent,
+  type LastDamageSourceComponent,
   type PositionComponent,
   type VelocityComponent,
 } from '@lineremain/shared';
@@ -123,6 +124,13 @@ export function movementSystem(world: GameWorld, dt: number): void {
           const health = world.ecs.getComponent<HealthComponent>(entityId, ComponentType.Health);
           if (health) {
             health.current = Math.max(0, health.current - damage);
+            // Record fall as damage source for death cause tracking (Issue 124)
+            world.ecs.addComponent<LastDamageSourceComponent>(entityId, ComponentType.LastDamageSource, {
+              cause: 'fall',
+              attackerEntityId: null,
+              attackerPlayerId: null,
+              timestamp: Date.now(),
+            });
           }
         }
       } else {

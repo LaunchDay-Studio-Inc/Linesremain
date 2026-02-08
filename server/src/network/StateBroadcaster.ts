@@ -365,9 +365,16 @@ export class StateBroadcaster {
     if (deaths.length === 0) return;
 
     for (const death of deaths) {
+      // Resolve killer name from connected players (Issue 124)
+      let killerName = death.killerName;
+      if (!killerName && death.killerId) {
+        const killer = this.socketServer.getConnectedPlayers().get(death.killerId);
+        killerName = killer?.username ?? null;
+      }
+
       const payload: DeathPayload = {
-        killerId: null,
-        killerName: null,
+        killerId: death.killerId,
+        killerName,
         cause: death.cause,
         hasSleepingBag: death.hasSleepingBag,
         isLineDeath: death.isLineDeath,

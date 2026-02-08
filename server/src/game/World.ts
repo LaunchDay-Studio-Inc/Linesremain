@@ -31,6 +31,7 @@ import {
   type InventoryComponent,
   type ItemStack,
   type LandmineComponent,
+  type LastDamageSourceComponent,
   type LootableComponent,
   type LootTableEntry,
   type NPCTypeComponent,
@@ -105,6 +106,7 @@ export class GameWorld {
     this.ecs.registerComponent<LandmineComponent>(ComponentType.Landmine);
     this.ecs.registerComponent<ResearchComponent>(ComponentType.Research);
     this.ecs.registerComponent<BarricadeComponent>(ComponentType.Barricade);
+    this.ecs.registerComponent<LastDamageSourceComponent>(ComponentType.LastDamageSource);
 
     logger.info({ seed }, 'GameWorld initialized');
   }
@@ -199,6 +201,13 @@ export class GameWorld {
     this.ecs.addComponent<CraftQueueComponent>(entityId, ComponentType.CraftQueue, {
       queue: [],
       maxQueue: 5,
+    });
+
+    this.ecs.addComponent<LastDamageSourceComponent>(entityId, ComponentType.LastDamageSource, {
+      cause: '',
+      attackerEntityId: null,
+      attackerPlayerId: null,
+      timestamp: 0,
     });
 
     this.playerEntityMap.set(playerId, entityId);

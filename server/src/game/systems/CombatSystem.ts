@@ -17,6 +17,7 @@ import {
   type EquipmentComponent,
   type HealthComponent,
   type InventoryComponent,
+  type LastDamageSourceComponent,
   type PositionComponent,
   type VelocityComponent,
 } from '@lineremain/shared';
@@ -264,6 +265,14 @@ function processMeleeAttack(
 
   // Apply damage
   targetHealth.current = Math.max(0, targetHealth.current - damage);
+
+  // Record damage source for death cause tracking (Issue 124)
+  world.ecs.addComponent<LastDamageSourceComponent>(closestTarget, ComponentType.LastDamageSource, {
+    cause: 'combat',
+    attackerEntityId: request.attackerEntityId,
+    attackerPlayerId: request.attackerPlayerId,
+    timestamp: Date.now(),
+  });
 
   // Notify AI system of damage (triggers flee, aggro, retarget behaviors)
   if (world.ecs.getComponent(closestTarget, ComponentType.NPCType) !== undefined) {
@@ -523,6 +532,14 @@ export function applyProjectileDamage(
 
   // Apply damage
   targetHealth.current = Math.max(0, targetHealth.current - finalDamage);
+
+  // Record damage source for death cause tracking (Issue 124)
+  world.ecs.addComponent<LastDamageSourceComponent>(targetEntityId, ComponentType.LastDamageSource, {
+    cause: 'combat',
+    attackerEntityId: sourceEntityId,
+    attackerPlayerId: sourcePlayerId,
+    timestamp: Date.now(),
+  });
 
   // Notify AI system (triggers flee, aggro, retarget behaviors)
   if (finalDamage > 0) {

@@ -30,6 +30,7 @@ export enum ComponentType {
   Research = 'Research',
   Barricade = 'Barricade',
   SleepingBag = 'SleepingBag',
+  LastDamageSource = 'LastDamageSource',
 }
 
 // ─── Component Interfaces ───
@@ -257,4 +258,11 @@ export interface BarricadeComponent {
 export interface SleepingBagComponent {
   placerId: string;
   lastUsedTime: number; // timestamp of last respawn use (for cooldown)
+}
+
+export interface LastDamageSourceComponent {
+  cause: string; // 'combat', 'fall', 'hunger', 'thirst', 'cold', 'heat'
+  attackerEntityId: EntityId | null; // entity that dealt the damage (player or NPC)
+  attackerPlayerId: string | null; // playerId if attacker was a player
+  timestamp: number; // when the damage was dealt (Date.now())
 }

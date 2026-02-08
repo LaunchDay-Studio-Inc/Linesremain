@@ -8,6 +8,7 @@ import {
   ComponentType,
   type HealthComponent,
   type HungerComponent,
+  type LastDamageSourceComponent,
   type LootableComponent,
   type PositionComponent,
   type TemperatureComponent,
@@ -24,6 +25,8 @@ import { checkPlayerDeath, playerHasSleepingBag, processPlayerDeaths } from './R
 export interface DeathNotification {
   playerId: string;
   cause: string;
+  killerId: string | null; // playerId of attacker (if PvP)
+  killerName: string | null; // display name of attacker (if PvP)
   hasSleepingBag: boolean;
   isLineDeath: boolean; // true = no sleeping bag, lineage advances
   lineage?: {
@@ -68,10 +71,10 @@ export function deathSystem(world: GameWorld, _dt: number): void {
     const wasDead = checkPlayerDeath(world, playerId, entityId);
     if (!wasDead) continue;
 
-    const cause = determineCauseOfDeath(world, entityId);
+    const { cause, killerId, killerName } = determineCauseOfDeath(world, entityId);
     const hasBag = playerHasSleepingBag(world, playerId);
     const isLineDeath = !hasBag;
-    getDeathQueue(world).push({ playerId, cause, hasSleepingBag: hasBag, isLineDeath });
+    getDeathQueue(world).push({ playerId, cause, killerId, killerName, hasSleepingBag: hasBag, isLineDeath });
     trackDeath(playerId);
     logger.info({ playerId, cause }, 'Player death detected');
   }
@@ -110,32 +113,49 @@ export function deathSystem(world: GameWorld, _dt: number): void {
   }
 }
 
-// ─── Cause of Death Heuristic ───
+// ─── Cause of Death (Issue 124) ───
+// Uses LastDamageSourceComponent for accurate cause tracking instead of
+// heuristic guessing. Falls back to environment checks if no component exists.
 
-function determineCauseOfDeath(world: GameWorld, entityId: number): string {
-  // Check environmental extremes first (most specific causes)
+function determineCauseOfDeath(
+  world: GameWorld,
+  entityId: number,
+): { cause: string; killerId: string | null; killerName: string | null } {
+  // Check LastDamageSource component first (most accurate)
+  const lastDamage = world.ecs.getComponent<LastDamageSourceComponent>(
+    entityId,
+    ComponentType.LastDamageSource,
+  );
+
+  if (lastDamage) {
+    return {
+      cause: lastDamage.cause,
+      killerId: lastDamage.attackerPlayerId,
+      killerName: null, // resolved by StateBroadcaster which has access to player names
+    };
+  }
+
+  // Fallback: environmental heuristic (for deaths from systems that don't set LastDamageSource yet)
   const temp = world.ecs.getComponent<TemperatureComponent>(
     entityId,
     ComponentType.Temperature,
   );
   if (temp) {
-    if (temp.current < 20) return 'cold';
-    if (temp.current > 50) return 'heat';
+    if (temp.current < 20) return { cause: 'cold', killerId: null, killerName: null };
+    if (temp.current > 50) return { cause: 'heat', killerId: null, killerName: null };
   }
 
-  // Check survival deprivation (only if reserves are fully depleted)
   const hunger = world.ecs.getComponent<HungerComponent>(
     entityId,
     ComponentType.Hunger,
   );
-  if (hunger && hunger.current <= 0) return 'hunger';
+  if (hunger && hunger.current <= 0) return { cause: 'hunger', killerId: null, killerName: null };
 
   const thirst = world.ecs.getComponent<ThirstComponent>(
     entityId,
     ComponentType.Thirst,
   );
-  if (thirst && thirst.current <= 0) return 'thirst';
+  if (thirst && thirst.current <= 0) return { cause: 'thirst', killerId: null, killerName: null };
 
-  // Default: combat damage (most common cause)
-  return 'combat';
+  return { cause: 'combat', killerId: null, killerName: null };
 }
