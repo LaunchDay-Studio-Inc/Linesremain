@@ -167,6 +167,12 @@ export enum NPCCreatureType {
   ShoreSnapper = 'ShoreSnapper',
   FrostStalker = 'FrostStalker',
   CrimsonHusk = 'CrimsonHusk',
+  Boar = 'Boar',
+  Wolf = 'Wolf',
+  Bear = 'Bear',
+  Zombie = 'Zombie',
+  Bandit = 'Bandit',
+  ScrapHulk = 'ScrapHulk',
 }
 
 export enum AIBehavior {
@@ -185,6 +191,10 @@ export interface NPCTypeComponent {
   wanderWaitUntil: number;
   fleeUntil: number;
   neutralAggroUntil: number; // for neutral creatures hit by player
+  nightOnly: boolean;
+  fleeHealthPercent: number;
+  packRadius: number;
+  isBoss: boolean;
 }
 
 export interface CraftQueueItem {
@@ -242,4 +252,3 @@ export interface ResearchComponent {
 export interface BarricadeComponent {
   placerId: string;
 }
-

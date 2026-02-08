@@ -13,6 +13,7 @@ import {
 import { logger } from '../../utils/logger.js';
 import type { GameWorld, SystemFn } from '../World.js';
 import { trackNPCKill, trackPVPKill } from './AchievementSystem.js';
+import { onNPCDamaged } from './AISystem.js';
 import { applyProjectileDamage } from './CombatSystem.js';
 
 // ─── Constants ───
@@ -162,6 +163,19 @@ export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void =
           },
           'Projectile hit entity',
         );
+
+        // Notify AI system of damage (triggers flee, aggro, retarget behaviors)
+        if (result.finalDamage > 0) {
+          const isNPC = world.ecs.getComponent(targetId, ComponentType.NPCType) !== undefined;
+          if (isNPC) {
+            const targetHealth = world.ecs.getComponent<
+              import('@lineremain/shared').HealthComponent
+            >(targetId, ComponentType.Health);
+            if (targetHealth && targetHealth.current > 0) {
+              onNPCDamaged(world, targetId, proj.sourceEntityId);
+            }
+          }
+        }
 
         // Track kill for achievements
         if (result.finalDamage > 0) {

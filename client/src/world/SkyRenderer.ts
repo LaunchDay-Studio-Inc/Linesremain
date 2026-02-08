@@ -18,92 +18,114 @@ interface SkyKeyframe {
 
 const SKY_KEYFRAMES: SkyKeyframe[] = [
   {
-    time: 0.0, // Midnight
-    topColor: new THREE.Color('#0A0A2E'),
-    horizonColor: new THREE.Color('#1A1A3E'),
+    time: 0.0, // Midnight — near-total darkness
+    topColor: new THREE.Color('#050510'),
+    horizonColor: new THREE.Color('#0A0A18'),
     sunIntensity: 0,
-    moonIntensity: 0.2,
-    ambientIntensity: 0.1,
-    ambientColor: new THREE.Color('#4466AA'),
-    fogNear: 30,
-    fogFar: 120,
+    moonIntensity: 0.02,
+    ambientIntensity: 0.05,
+    ambientColor: new THREE.Color('#223355'),
+    fogNear: 5,
+    fogFar: 60,
   },
   {
-    time: 0.2, // Dawn
+    time: 0.2, // Dawn — orange tint, still dim
     topColor: new THREE.Color('#2E1A3E'),
     horizonColor: new THREE.Color('#FF7F50'),
     sunIntensity: 0.3,
     moonIntensity: 0,
-    ambientIntensity: 0.25,
+    ambientIntensity: 0.3,
     ambientColor: new THREE.Color('#AA8866'),
-    fogNear: 50,
-    fogFar: 200,
+    fogNear: 40,
+    fogFar: 180,
   },
   {
-    time: 0.3, // Morning
+    time: 0.25, // Early morning — transition to full day
     topColor: new THREE.Color('#3A70B0'),
     horizonColor: new THREE.Color('#FFD4A0'),
-    sunIntensity: 1.0,
+    sunIntensity: 0.8,
     moonIntensity: 0,
-    ambientIntensity: 0.4,
+    ambientIntensity: 0.5,
     ambientColor: new THREE.Color('#DDCCAA'),
-    fogNear: 70,
-    fogFar: 280,
+    fogNear: 60,
+    fogFar: 250,
   },
   {
-    time: 0.5, // Noon
+    time: 0.35, // Morning
+    topColor: new THREE.Color('#4488CC'),
+    horizonColor: new THREE.Color('#AADDFF'),
+    sunIntensity: 1.0,
+    moonIntensity: 0,
+    ambientIntensity: 0.6,
+    ambientColor: new THREE.Color('#EEDDCC'),
+    fogNear: 80,
+    fogFar: 300,
+  },
+  {
+    time: 0.5, // Noon — full brightness
     topColor: new THREE.Color('#4A90D9'),
     horizonColor: new THREE.Color('#87CEEB'),
     sunIntensity: 1.5,
     moonIntensity: 0,
-    ambientIntensity: 0.5,
+    ambientIntensity: 0.6,
     ambientColor: new THREE.Color('#FFF4E0'),
     fogNear: 80,
     fogFar: 300,
   },
   {
-    time: 0.7, // Afternoon
-    topColor: new THREE.Color('#3A70B0'),
-    horizonColor: new THREE.Color('#FFD4A0'),
+    time: 0.65, // Afternoon
+    topColor: new THREE.Color('#4488CC'),
+    horizonColor: new THREE.Color('#AADDFF'),
     sunIntensity: 1.0,
     moonIntensity: 0,
-    ambientIntensity: 0.4,
-    ambientColor: new THREE.Color('#DDCCAA'),
-    fogNear: 70,
-    fogFar: 280,
+    ambientIntensity: 0.6,
+    ambientColor: new THREE.Color('#EEDDCC'),
+    fogNear: 80,
+    fogFar: 300,
   },
   {
-    time: 0.8, // Dusk
+    time: 0.75, // Dusk — orange tint, dimming
     topColor: new THREE.Color('#4A2040'),
     horizonColor: new THREE.Color('#FF6347'),
-    sunIntensity: 0.3,
+    sunIntensity: 0.4,
     moonIntensity: 0,
-    ambientIntensity: 0.25,
+    ambientIntensity: 0.3,
     ambientColor: new THREE.Color('#AA6644'),
-    fogNear: 50,
-    fogFar: 200,
+    fogNear: 40,
+    fogFar: 180,
   },
   {
-    time: 0.9, // Night
-    topColor: new THREE.Color('#0A0A2E'),
-    horizonColor: new THREE.Color('#1A1A3E'),
+    time: 0.8, // Early night — rapid darkening
+    topColor: new THREE.Color('#0E0E28'),
+    horizonColor: new THREE.Color('#1A1A30'),
     sunIntensity: 0,
-    moonIntensity: 0.2,
-    ambientIntensity: 0.1,
-    ambientColor: new THREE.Color('#4466AA'),
-    fogNear: 30,
-    fogFar: 120,
+    moonIntensity: 0.02,
+    ambientIntensity: 0.08,
+    ambientColor: new THREE.Color('#334466'),
+    fogNear: 10,
+    fogFar: 80,
+  },
+  {
+    time: 0.9, // Deep night — near-total darkness
+    topColor: new THREE.Color('#050510'),
+    horizonColor: new THREE.Color('#0A0A18'),
+    sunIntensity: 0,
+    moonIntensity: 0.02,
+    ambientIntensity: 0.05,
+    ambientColor: new THREE.Color('#223355'),
+    fogNear: 5,
+    fogFar: 60,
   },
   {
     time: 1.0, // Midnight (wrap)
-    topColor: new THREE.Color('#0A0A2E'),
-    horizonColor: new THREE.Color('#1A1A3E'),
+    topColor: new THREE.Color('#050510'),
+    horizonColor: new THREE.Color('#0A0A18'),
     sunIntensity: 0,
-    moonIntensity: 0.2,
-    ambientIntensity: 0.1,
-    ambientColor: new THREE.Color('#4466AA'),
-    fogNear: 30,
-    fogFar: 120,
+    moonIntensity: 0.02,
+    ambientIntensity: 0.05,
+    ambientColor: new THREE.Color('#223355'),
+    fogNear: 5,
+    fogFar: 60,
   },
 ];
 

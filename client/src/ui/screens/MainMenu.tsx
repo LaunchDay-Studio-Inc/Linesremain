@@ -259,8 +259,7 @@ export const MainMenu: React.FC = () => {
 
   const handleMenuClick = (id: string) => {
     if (id === 'play') {
-      const customization = useAchievementStore.getState().customization;
-      if (customization.bodyType) {
+      if (useAchievementStore.getState().hasChosenBodyType) {
         setScreen('loading');
       } else {
         setScreen('character-select');
@@ -501,8 +500,7 @@ export const MainMenu: React.FC = () => {
               onMouseLeave={() => setHoveredBtn(null)}
               onClick={() => {
                 useGameStore.getState().setOffline(true);
-                const customization = useAchievementStore.getState().customization;
-                if (customization.bodyType) {
+                if (useAchievementStore.getState().hasChosenBodyType) {
                   setScreen('playing');
                 } else {
                   setScreen('character-select');

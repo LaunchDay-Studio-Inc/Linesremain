@@ -3,20 +3,19 @@
 // hostile (idle→wander→chase→attack→return), neutral (passive until hit,
 // then hostile for 30s). Simple pathfinding with direct movement.
 
-import type { GameWorld } from '../World.js';
-import type { SystemFn } from '../World.js';
 import {
-  ComponentType,
-  AIState,
   AIBehavior,
+  AIState,
+  ComponentType,
+  type AIComponent,
   type EntityId,
+  type HealthComponent,
+  type NPCTypeComponent,
   type PositionComponent,
   type VelocityComponent,
-  type HealthComponent,
-  type AIComponent,
-  type NPCTypeComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld, SystemFn } from '../World.js';
 
 // ─── Constants ───
 
@@ -56,7 +55,9 @@ function moveToward(
 }
 
 function pickRandomWanderTarget(
-  homeX: number, homeZ: number, radius: number,
+  homeX: number,
+  homeZ: number,
+  radius: number,
 ): { x: number; z: number } {
   const angle = Math.random() * Math.PI * 2;
   const dist = Math.random() * radius;
@@ -71,7 +72,11 @@ function findNearestPlayer(
   pos: PositionComponent,
   maxRange: number,
 ): EntityId | null {
-  const players = world.ecs.query(ComponentType.Position, ComponentType.Health, ComponentType.Equipment);
+  const players = world.ecs.query(
+    ComponentType.Position,
+    ComponentType.Health,
+    ComponentType.Equipment,
+  );
   let nearest: EntityId | null = null;
   let nearestDist = maxRange;
 
@@ -125,7 +130,8 @@ function handleRoaming(
 ): void {
   if (!npcType.wanderTarget) {
     ai.state = AIState.Idle;
-    npcType.wanderWaitUntil = now + (WANDER_PAUSE_MIN_S + Math.random() * (WANDER_PAUSE_MAX_S - WANDER_PAUSE_MIN_S)) * 1000;
+    npcType.wanderWaitUntil =
+      now + (WANDER_PAUSE_MIN_S + Math.random() * (WANDER_PAUSE_MAX_S - WANDER_PAUSE_MIN_S)) * 1000;
     return;
   }
 
@@ -134,7 +140,8 @@ function handleRoaming(
     // Reached wander target
     ai.state = AIState.Idle;
     npcType.wanderTarget = null;
-    npcType.wanderWaitUntil = now + (WANDER_PAUSE_MIN_S + Math.random() * (WANDER_PAUSE_MAX_S - WANDER_PAUSE_MIN_S)) * 1000;
+    npcType.wanderWaitUntil =
+      now + (WANDER_PAUSE_MIN_S + Math.random() * (WANDER_PAUSE_MAX_S - WANDER_PAUSE_MIN_S)) * 1000;
     vel.vx = 0;
     vel.vz = 0;
     return;
@@ -160,8 +167,14 @@ function handleChasing(
   }
 
   // Check target still exists and is alive
-  const targetPos = world.ecs.getComponent<PositionComponent>(ai.targetEntityId, ComponentType.Position);
-  const targetHealth = world.ecs.getComponent<HealthComponent>(ai.targetEntityId, ComponentType.Health);
+  const targetPos = world.ecs.getComponent<PositionComponent>(
+    ai.targetEntityId,
+    ComponentType.Position,
+  );
+  const targetHealth = world.ecs.getComponent<HealthComponent>(
+    ai.targetEntityId,
+    ComponentType.Health,
+  );
   if (!targetPos || !targetHealth || targetHealth.current <= 0) {
     ai.targetEntityId = null;
     ai.state = AIState.Idle;
@@ -210,8 +223,14 @@ function handleAttacking(
     return;
   }
 
-  const targetPos = world.ecs.getComponent<PositionComponent>(ai.targetEntityId, ComponentType.Position);
-  const targetHealth = world.ecs.getComponent<HealthComponent>(ai.targetEntityId, ComponentType.Health);
+  const targetPos = world.ecs.getComponent<PositionComponent>(
+    ai.targetEntityId,
+    ComponentType.Position,
+  );
+  const targetHealth = world.ecs.getComponent<HealthComponent>(
+    ai.targetEntityId,
+    ComponentType.Health,
+  );
   if (!targetPos || !targetHealth || targetHealth.current <= 0) {
     ai.targetEntityId = null;
     ai.state = AIState.Idle;
@@ -237,12 +256,15 @@ function handleAttacking(
   ai.lastAttackTime = now;
   targetHealth.current = Math.max(0, targetHealth.current - ai.attackDamage);
 
-  logger.debug({
-    npc: entityId,
-    target: ai.targetEntityId,
-    damage: ai.attackDamage,
-    remaining: targetHealth.current,
-  }, 'NPC attacked');
+  logger.debug(
+    {
+      npc: entityId,
+      target: ai.targetEntityId,
+      damage: ai.attackDamage,
+      remaining: targetHealth.current,
+    },
+    'NPC attacked',
+  );
 }
 
 function handleFleeing(
@@ -256,16 +278,34 @@ function handleFleeing(
 ): void {
   // Flee until timer expires
   if (now >= npcType.fleeUntil) {
-    ai.state = AIState.Roaming;
-    npcType.wanderTarget = { x: ai.homePosition.x, y: ai.homePosition.y, z: ai.homePosition.z };
-    vel.vx = 0;
-    vel.vz = 0;
-    return;
+    // If creature has fleeHealthPercent and is still low health, keep fleeing
+    if (npcType.fleeHealthPercent > 0) {
+      const health = world.ecs.getComponent<HealthComponent>(_entityId, ComponentType.Health);
+      if (health && health.current / health.max <= npcType.fleeHealthPercent) {
+        npcType.fleeUntil = now + FLEE_DURATION_S * 1000;
+        // Continue fleeing below
+      } else {
+        ai.state = AIState.Roaming;
+        npcType.wanderTarget = { x: ai.homePosition.x, y: ai.homePosition.y, z: ai.homePosition.z };
+        vel.vx = 0;
+        vel.vz = 0;
+        return;
+      }
+    } else {
+      ai.state = AIState.Roaming;
+      npcType.wanderTarget = { x: ai.homePosition.x, y: ai.homePosition.y, z: ai.homePosition.z };
+      vel.vx = 0;
+      vel.vz = 0;
+      return;
+    }
   }
 
   // Flee away from target
   if (ai.targetEntityId !== null) {
-    const targetPos = world.ecs.getComponent<PositionComponent>(ai.targetEntityId, ComponentType.Position);
+    const targetPos = world.ecs.getComponent<PositionComponent>(
+      ai.targetEntityId,
+      ComponentType.Position,
+    );
     if (targetPos) {
       const dx = pos.x - targetPos.x;
       const dz = pos.z - targetPos.z;
@@ -285,7 +325,12 @@ function handleFleeing(
 // ─── AI System ───
 
 export const aiSystem: SystemFn = (world: GameWorld, _dt: number): void => {
-  const npcs = world.ecs.query(ComponentType.AI, ComponentType.NPCType, ComponentType.Position, ComponentType.Velocity);
+  const npcs = world.ecs.query(
+    ComponentType.AI,
+    ComponentType.NPCType,
+    ComponentType.Position,
+    ComponentType.Velocity,
+  );
   const now = Date.now();
 
   for (const entityId of npcs) {
@@ -340,6 +385,41 @@ export const aiSystem: SystemFn = (world: GameWorld, _dt: number): void => {
   }
 };
 
+// ─── Pack Aggro Broadcast ───
+
+function broadcastPackAggro(
+  world: GameWorld,
+  entityId: EntityId,
+  targetEntityId: EntityId,
+  creatureType: string,
+  packRadius: number,
+  pos: PositionComponent,
+): void {
+  const allNPCs = world.ecs.query(ComponentType.AI, ComponentType.NPCType, ComponentType.Position);
+
+  for (const otherId of allNPCs) {
+    if (otherId === entityId) continue;
+
+    const otherNpcType = world.ecs.getComponent<NPCTypeComponent>(otherId, ComponentType.NPCType);
+    if (!otherNpcType || otherNpcType.creatureType !== creatureType) continue;
+
+    const otherPos = world.ecs.getComponent<PositionComponent>(otherId, ComponentType.Position);
+    if (!otherPos) continue;
+
+    const dist = distanceXZ(pos.x, pos.z, otherPos.x, otherPos.z);
+    if (dist > packRadius) continue;
+
+    const otherAi = world.ecs.getComponent<AIComponent>(otherId, ComponentType.AI);
+    if (!otherAi) continue;
+
+    // Only alert idle/roaming pack members
+    if (otherAi.state === AIState.Idle || otherAi.state === AIState.Roaming) {
+      otherAi.targetEntityId = targetEntityId;
+      otherAi.state = AIState.Chasing;
+    }
+  }
+}
+
 // ─── Called when an NPC takes damage (from CombatSystem) ───
 
 export function onNPCDamaged(
@@ -375,5 +455,30 @@ export function onNPCDamaged(
         ai.state = AIState.Chasing;
       }
       break;
+  }
+
+  // Health-percent flee: override to flee if health drops below threshold
+  if (npcType.fleeHealthPercent > 0) {
+    const health = world.ecs.getComponent<HealthComponent>(entityId, ComponentType.Health);
+    if (health && health.current / health.max <= npcType.fleeHealthPercent) {
+      ai.targetEntityId = attackerEntityId;
+      ai.state = AIState.Fleeing;
+      npcType.fleeUntil = now + FLEE_DURATION_S * 1000;
+    }
+  }
+
+  // Pack aggro: alert nearby same-type creatures
+  if (npcType.packRadius > 0 && (ai.state === AIState.Chasing || ai.state === AIState.Attacking)) {
+    const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position);
+    if (pos) {
+      broadcastPackAggro(
+        world,
+        entityId,
+        attackerEntityId,
+        npcType.creatureType,
+        npcType.packRadius,
+        pos,
+      );
+    }
   }
 }

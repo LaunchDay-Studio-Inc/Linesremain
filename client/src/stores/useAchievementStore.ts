@@ -35,6 +35,7 @@ interface AchievementState {
 
   // Customization
   customization: PlayerCustomization;
+  hasChosenBodyType: boolean;
 
   // Tutorial
   tutorialStep: TutorialStep | null;
@@ -48,6 +49,7 @@ interface AchievementState {
   setLevel: (level: number) => void;
   dismissLevelUp: () => void;
   setCustomization: (customization: PlayerCustomization) => void;
+  setHasChosenBodyType: (val: boolean) => void;
   setTutorialStep: (step: TutorialStep | null) => void;
   completeTutorial: () => void;
 }
@@ -68,6 +70,7 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
 
   // Customization
   customization: { ...DEFAULT_CUSTOMIZATION },
+  hasChosenBodyType: false,
 
   // Tutorial
   tutorialStep: 'move' as TutorialStep,
@@ -145,6 +148,8 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
   dismissLevelUp: () => set({ levelUpNotification: null }),
 
   setCustomization: (customization: PlayerCustomization) => set({ customization }),
+
+  setHasChosenBodyType: (val: boolean) => set({ hasChosenBodyType: val }),
 
   setTutorialStep: (step: TutorialStep | null) =>
     set({

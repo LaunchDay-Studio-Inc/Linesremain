@@ -357,6 +357,10 @@ export class GameWorld {
       colliderWidth?: number;
       colliderHeight?: number;
       lootTable?: LootTableEntry[];
+      nightOnly?: boolean;
+      fleeHealthPercent?: number;
+      packRadius?: number;
+      isBoss?: boolean;
     },
   ): EntityId {
     const entityId = this.ecs.createEntity();
@@ -409,6 +413,10 @@ export class GameWorld {
       wanderWaitUntil: 0,
       fleeUntil: 0,
       neutralAggroUntil: 0,
+      nightOnly: config?.nightOnly ?? false,
+      fleeHealthPercent: config?.fleeHealthPercent ?? 0,
+      packRadius: config?.packRadius ?? 0,
+      isBoss: config?.isBoss ?? false,
     });
 
     if (config?.lootTable && config.lootTable.length > 0) {

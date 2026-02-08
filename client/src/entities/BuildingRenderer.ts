@@ -5,6 +5,7 @@
 
 import * as THREE from 'three';
 import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
+import type { LightingSystem } from '../systems/LightingSystem';
 
 // ─── Constants ───
 
@@ -306,9 +307,15 @@ function getGeometryForPiece(pieceType: BuildingPieceType): THREE.BufferGeometry
 export class BuildingRenderer {
   private scene: THREE.Scene;
   private meshes = new Map<number, THREE.Mesh>();
+  private lightingSystem: LightingSystem | null = null;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
+  }
+
+  /** Wire up the lighting system for campfire point lights */
+  setLightingSystem(lightingSystem: LightingSystem): void {
+    this.lightingSystem = lightingSystem;
   }
 
   // ─── Add a building piece to the scene ───
@@ -333,13 +340,22 @@ export class BuildingRenderer {
     mesh.receiveShadow = true;
     mesh.userData = { entityId, pieceType, tier };
 
-    // Campfire: replace material with stone gray and attach warm point light
+    // Campfire: replace material with stone gray and register with lighting system
     if (pieceType === BuildingPieceType.Campfire) {
       mesh.material = new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.9 });
-      const fireLight = new THREE.PointLight(0xff8c00, 1.5, 15, 2);
-      fireLight.position.set(0, 0.5, 0);
-      fireLight.castShadow = false;
-      mesh.add(fireLight);
+      if (this.lightingSystem) {
+        this.lightingSystem.addLight(
+          entityId,
+          new THREE.Vector3(position.x, position.y, position.z),
+          'campfire',
+        );
+      } else {
+        // Fallback: inline point light if no lighting system
+        const fireLight = new THREE.PointLight(0xff8c00, 1.5, 15, 2);
+        fireLight.position.set(0, 0.5, 0);
+        fireLight.castShadow = false;
+        mesh.add(fireLight);
+      }
     }
 
     this.scene.add(mesh);
@@ -364,6 +380,10 @@ export class BuildingRenderer {
     const mesh = this.meshes.get(entityId);
     if (mesh) {
       this.scene.remove(mesh);
+      // Remove associated dynamic light if any
+      if (this.lightingSystem) {
+        this.lightingSystem.removeLight(entityId);
+      }
       // Dispose cloned materials (non-shared) to prevent memory leaks
       const mat = mesh.material as THREE.MeshStandardMaterial;
       const tier = mesh.userData.tier as BuildingTier;

@@ -21,8 +21,9 @@ import {
   type VelocityComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
-import { trackNPCKill, trackPVPKill } from './AchievementSystem.js';
 import type { GameWorld, SystemFn } from '../World.js';
+import { trackNPCKill, trackPVPKill } from './AchievementSystem.js';
+import { onNPCDamaged } from './AISystem.js';
 
 // ─── Constants ───
 
@@ -239,6 +240,11 @@ function processMeleeAttack(
 
   // Apply damage
   targetHealth.current = Math.max(0, targetHealth.current - damage);
+
+  // Notify AI system of damage (triggers flee, aggro, retarget behaviors)
+  if (world.ecs.getComponent(closestTarget, ComponentType.NPCType) !== undefined) {
+    onNPCDamaged(world, closestTarget, request.attackerEntityId);
+  }
 
   // Track kill for achievements
   if (targetHealth.current <= 0) {

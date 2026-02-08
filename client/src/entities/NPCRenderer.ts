@@ -124,6 +124,72 @@ const CREATURE_VISUALS: Record<string, CreatureVisual> = {
     bodyShape: 'tall',
     displayName: 'Crimson Husk',
   },
+  Boar: {
+    bodyColor: '#7a5c3a',
+    eyeColor: '#331100',
+    width: 56,
+    height: 44,
+    legCount: 4,
+    hasHorns: true,
+    hasTail: true,
+    bodyShape: 'wide',
+    displayName: 'Boar',
+  },
+  Wolf: {
+    bodyColor: '#5a5a5a',
+    eyeColor: '#ffcc00',
+    width: 52,
+    height: 48,
+    legCount: 4,
+    hasHorns: false,
+    hasTail: true,
+    bodyShape: 'round',
+    displayName: 'Wolf',
+  },
+  Bear: {
+    bodyColor: '#4a3a2a',
+    eyeColor: '#553311',
+    width: 72,
+    height: 72,
+    legCount: 4,
+    hasHorns: false,
+    hasTail: false,
+    bodyShape: 'hunched',
+    displayName: 'Bear',
+  },
+  Zombie: {
+    bodyColor: '#4a6a4a',
+    eyeColor: '#ccff00',
+    width: 48,
+    height: 72,
+    legCount: 2,
+    hasHorns: false,
+    hasTail: false,
+    bodyShape: 'tall',
+    displayName: 'Zombie',
+  },
+  Bandit: {
+    bodyColor: '#6a5a4a',
+    eyeColor: '#ffffff',
+    width: 48,
+    height: 68,
+    legCount: 2,
+    hasHorns: false,
+    hasTail: false,
+    bodyShape: 'tall',
+    displayName: 'Bandit',
+  },
+  ScrapHulk: {
+    bodyColor: '#5a5a5a',
+    eyeColor: '#ff3300',
+    width: 96,
+    height: 96,
+    legCount: 2,
+    hasHorns: true,
+    hasTail: false,
+    bodyShape: 'hunched',
+    displayName: 'Scrap Hulk',
+  },
 };
 
 // ─── Sprite Generation ───
@@ -366,6 +432,7 @@ interface NPCInstance {
   lastHealth: number;
   healthBarVisible: boolean;
   healthBarTimer: number;
+  isBoss: boolean;
 }
 
 // ─── NPC Renderer ───
@@ -381,7 +448,7 @@ export class NPCRenderer {
 
   // ─── Add / Remove ───
 
-  addNPC(entityId: number, creatureType: string, position: THREE.Vector3): void {
+  addNPC(entityId: number, creatureType: string, position: THREE.Vector3, isBoss = false): void {
     if (this.npcs.has(entityId)) return;
 
     const group = new THREE.Group();
@@ -407,10 +474,15 @@ export class NPCRenderer {
     sprite.renderOrder = 10; // Render above water (renderOrder 1) and terrain
     group.add(sprite);
 
-    // Health bar (hidden by default)
+    // Health bar (hidden by default, but always visible for bosses)
     const healthBar = createHealthBarSprite();
     healthBar.position.y = spriteScale * 1.5 + 0.3;
-    healthBar.visible = false;
+    if (isBoss) {
+      healthBar.visible = true;
+      healthBar.scale.set(2.0, 0.2, 1);
+    } else {
+      healthBar.visible = false;
+    }
     group.add(healthBar);
 
     // Name label (hidden by default, shown when player is within range)
@@ -429,8 +501,9 @@ export class NPCRenderer {
       nameLabel,
       animFrame: Math.random() * 100, // Stagger animations
       lastHealth: 1.0,
-      healthBarVisible: false,
+      healthBarVisible: isBoss,
       healthBarTimer: 0,
+      isBoss,
     });
   }
 
@@ -503,20 +576,26 @@ export class NPCRenderer {
       if (data.health) {
         const healthPercent = data.health.current / data.health.max;
 
-        // Show health bar when damaged
-        if (healthPercent < npc.lastHealth) {
-          npc.healthBarVisible = true;
-          npc.healthBarTimer = 5.0; // Show for 5 seconds
-        }
-        npc.lastHealth = healthPercent;
-
-        if (npc.healthBarVisible) {
-          npc.healthBarTimer -= dt;
-          if (npc.healthBarTimer <= 0 && healthPercent >= 1.0) {
-            npc.healthBarVisible = false;
-          }
-          npc.healthBar.visible = npc.healthBarVisible;
+        if (npc.isBoss) {
+          // Boss: always show health bar with larger scale
+          npc.healthBar.visible = true;
           updateHealthBar(npc.healthBar, healthPercent);
+        } else {
+          // Show health bar when damaged
+          if (healthPercent < npc.lastHealth) {
+            npc.healthBarVisible = true;
+            npc.healthBarTimer = 5.0; // Show for 5 seconds
+          }
+          npc.lastHealth = healthPercent;
+
+          if (npc.healthBarVisible) {
+            npc.healthBarTimer -= dt;
+            if (npc.healthBarTimer <= 0 && healthPercent >= 1.0) {
+              npc.healthBarVisible = false;
+            }
+            npc.healthBar.visible = npc.healthBarVisible;
+            updateHealthBar(npc.healthBar, healthPercent);
+          }
         }
       }
     }

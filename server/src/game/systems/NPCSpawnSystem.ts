@@ -6,6 +6,7 @@
 
 import {
   AIBehavior,
+  BiomeType,
   ComponentType,
   NPCCreatureType,
   type LootTableEntry,
@@ -32,10 +33,10 @@ const SPAWN_RADIUS = 80;
 const MIN_SPAWN_DISTANCE = 30;
 
 /** Maximum passive/neutral NPCs worldwide */
-const MAX_PASSIVE_NPCS = 30;
+const MAX_PASSIVE_NPCS = 35;
 
 /** Maximum hostile NPCs worldwide */
-const MAX_HOSTILE_NPCS = 10;
+const MAX_HOSTILE_NPCS = 15;
 
 /** Maximum total NPCs in the world */
 const MAX_TOTAL_NPCS = MAX_PASSIVE_NPCS + MAX_HOSTILE_NPCS;
@@ -61,6 +62,11 @@ interface CreatureTemplate {
   lootTable: LootTableEntry[];
   weight: number; // relative spawn weight
   groupSize?: { min: number; max: number }; // for group spawning
+  nightOnly?: boolean;
+  fleeHealthPercent?: number;
+  packRadius?: number;
+  isBoss?: boolean;
+  spawnBiomes?: BiomeType[];
 }
 
 const PASSIVE_TEMPLATES: CreatureTemplate[] = [
@@ -151,6 +157,34 @@ const NEUTRAL_TEMPLATES: CreatureTemplate[] = [
     ],
     weight: 8,
   },
+  {
+    creatureType: NPCCreatureType.Boar,
+    behavior: AIBehavior.Neutral,
+    health: 80,
+    damage: 15,
+    walkSpeed: 2.5,
+    runSpeed: 3.5,
+    aggroRange: 8,
+    attackRange: 2.0,
+    attackCooldown: 1.5,
+    wanderRadius: 20,
+    colliderWidth: 0.8,
+    colliderHeight: 0.8,
+    lootTable: [
+      { itemId: 9, quantity: 5, chance: 1.0 }, // Bone
+      { itemId: 6, quantity: 3, chance: 0.8 }, // Cloth
+      { itemId: 53, quantity: 2, chance: 0.6 }, // Raw Meat
+    ],
+    weight: 12,
+    groupSize: { min: 1, max: 3 },
+    fleeHealthPercent: 0.2,
+    spawnBiomes: [
+      BiomeType.DrygrassPlains,
+      BiomeType.Greenhollow,
+      BiomeType.AshwoodForest,
+      BiomeType.Mossreach,
+    ],
+  },
 ];
 
 const HOSTILE_TEMPLATES: CreatureTemplate[] = [
@@ -236,6 +270,115 @@ const HOSTILE_TEMPLATES: CreatureTemplate[] = [
     weight: 8,
     groupSize: { min: 2, max: 3 },
   },
+  {
+    creatureType: NPCCreatureType.Wolf,
+    behavior: AIBehavior.Hostile,
+    health: 120,
+    damage: 25,
+    walkSpeed: 3.0,
+    runSpeed: 5.5,
+    aggroRange: 20,
+    attackRange: 2.0,
+    attackCooldown: 1.2,
+    wanderRadius: 30,
+    colliderWidth: 0.7,
+    colliderHeight: 1.0,
+    lootTable: [
+      { itemId: 53, quantity: 2, chance: 1.0 }, // Raw Meat
+      { itemId: 7, quantity: 2, chance: 0.8 }, // Leather
+      { itemId: 9, quantity: 1, chance: 0.5 }, // Bone
+    ],
+    weight: 10,
+    groupSize: { min: 2, max: 4 },
+    packRadius: 15,
+  },
+  {
+    creatureType: NPCCreatureType.Bear,
+    behavior: AIBehavior.Hostile,
+    health: 400,
+    damage: 60,
+    walkSpeed: 1.8,
+    runSpeed: 4.0,
+    aggroRange: 15,
+    attackRange: 3.0,
+    attackCooldown: 2.0,
+    wanderRadius: 20,
+    colliderWidth: 1.4,
+    colliderHeight: 2.0,
+    lootTable: [
+      { itemId: 53, quantity: 6, chance: 1.0 }, // Raw Meat
+      { itemId: 7, quantity: 4, chance: 0.9 }, // Leather
+      { itemId: 8, quantity: 3, chance: 0.7 }, // Animal Fat
+      { itemId: 9, quantity: 3, chance: 0.6 }, // Bone
+    ],
+    weight: 3,
+  },
+  {
+    creatureType: NPCCreatureType.Zombie,
+    behavior: AIBehavior.Hostile,
+    health: 150,
+    damage: 30,
+    walkSpeed: 1.5,
+    runSpeed: 2.5,
+    aggroRange: 25,
+    attackRange: 2.0,
+    attackCooldown: 1.5,
+    wanderRadius: 20,
+    colliderWidth: 0.8,
+    colliderHeight: 1.8,
+    lootTable: [
+      { itemId: 6, quantity: 3, chance: 0.7 }, // Cloth
+      { itemId: 9, quantity: 2, chance: 0.5 }, // Bone
+      { itemId: 10, quantity: 2, chance: 0.3 }, // Metal Fragments
+    ],
+    weight: 15,
+    groupSize: { min: 2, max: 5 },
+    nightOnly: true,
+  },
+  {
+    creatureType: NPCCreatureType.Bandit,
+    behavior: AIBehavior.Hostile,
+    health: 100,
+    damage: 20,
+    walkSpeed: 2.5,
+    runSpeed: 4.0,
+    aggroRange: 30,
+    attackRange: 10.0,
+    attackCooldown: 1.8,
+    wanderRadius: 25,
+    colliderWidth: 0.6,
+    colliderHeight: 1.8,
+    lootTable: [
+      { itemId: 6, quantity: 5, chance: 0.8 }, // Cloth
+      { itemId: 10, quantity: 3, chance: 0.5 }, // Metal Fragments
+      { itemId: 96, quantity: 5, chance: 0.4 }, // Scrap
+      { itemId: 15, quantity: 2, chance: 0.3 }, // Low Grade Fuel
+    ],
+    weight: 6,
+    fleeHealthPercent: 0.3,
+  },
+  {
+    creatureType: NPCCreatureType.ScrapHulk,
+    behavior: AIBehavior.Hostile,
+    health: 1000,
+    damage: 80,
+    walkSpeed: 1.0,
+    runSpeed: 2.0,
+    aggroRange: 20,
+    attackRange: 4.0,
+    attackCooldown: 2.5,
+    wanderRadius: 15,
+    colliderWidth: 1.6,
+    colliderHeight: 2.5,
+    lootTable: [
+      { itemId: 10, quantity: 20, chance: 1.0 }, // Metal Fragments
+      { itemId: 12, quantity: 5, chance: 0.6 }, // HQM
+      { itemId: 96, quantity: 15, chance: 0.8 }, // Scrap
+      { itemId: 15, quantity: 5, chance: 0.5 }, // Low Grade Fuel
+    ],
+    weight: 1,
+    isBoss: true,
+  },
 ];
 
 const BLOOD_MOON_TEMPLATES: CreatureTemplate[] = [
@@ -269,6 +412,10 @@ const DAYTIME_TOTAL_WEIGHT = DAYTIME_TEMPLATES.reduce((sum, t) => sum + t.weight
 // All templates for nighttime spawning (hostile gets extra weight at night)
 const NIGHTTIME_TEMPLATES = [...PASSIVE_TEMPLATES, ...NEUTRAL_TEMPLATES, ...HOSTILE_TEMPLATES];
 const NIGHTTIME_TOTAL_WEIGHT = NIGHTTIME_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
+
+// Nighttime-only hostile templates filtered out for non-night hostile spawns
+const NON_NIGHT_HOSTILE_TEMPLATES = HOSTILE_TEMPLATES.filter((t) => !t.nightOnly);
+const NON_NIGHT_HOSTILE_WEIGHT = NON_NIGHT_HOSTILE_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
 
 // ─── Tick Counter ───
 
@@ -336,6 +483,12 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
       const spawnPos = findSpawnPosition(world, playerPos);
       if (!spawnPos) continue;
 
+      // Biome filtering: skip if template is restricted to specific biomes
+      if (template.spawnBiomes && template.spawnBiomes.length > 0) {
+        const biome = world.terrainGenerator.biomeManager.getBiome(spawnPos.x, spawnPos.z);
+        if (!template.spawnBiomes.includes(biome)) continue;
+      }
+
       // Group spawning for passive animals
       const groupSize = template.groupSize
         ? template.groupSize.min +
@@ -372,6 +525,10 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
             colliderWidth: template.colliderWidth,
             colliderHeight: template.colliderHeight,
             lootTable: template.lootTable,
+            nightOnly: template.nightOnly,
+            fleeHealthPercent: template.fleeHealthPercent,
+            packRadius: template.packRadius,
+            isBoss: template.isBoss,
           },
         );
 
@@ -483,6 +640,16 @@ function despawnDistantHostiles(world: GameWorld, allNPCs: number[]): void {
   for (const npcId of allNPCs) {
     const npcType = world.ecs.getComponent<NPCTypeComponent>(npcId, ComponentType.NPCType);
     if (!npcType || npcType.behavior !== AIBehavior.Hostile) continue;
+
+    // nightOnly creatures always despawn during daytime regardless of distance
+    if (npcType.nightOnly) {
+      world.ecs.destroyEntity(npcId);
+      logger.debug(
+        { npc: npcId, creature: npcType.creatureType },
+        'Despawned nightOnly NPC (dawn)',
+      );
+      continue;
+    }
 
     const npcPos = world.ecs.getComponent<PositionComponent>(npcId, ComponentType.Position);
     if (!npcPos) continue;

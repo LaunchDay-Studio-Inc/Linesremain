@@ -51,6 +51,7 @@ import { AnimationSystem } from '../../systems/AnimationSystem';
 import { BlockInteraction } from '../../systems/BlockInteraction';
 import { CombatEffects, type EntityHealthState } from '../../systems/CombatEffects';
 import { EntityInterpolation } from '../../systems/EntityInterpolation';
+import { LightingSystem } from '../../systems/LightingSystem';
 import { BiomeParticleSystem } from '../../world/BiomeParticleSystem';
 import { BiomeTracker } from '../../world/BiomeTracker';
 import { ChunkManager } from '../../world/ChunkManager';
@@ -193,6 +194,9 @@ export const GameCanvas: React.FC = () => {
 
     // ── Ambient Synthesizer (procedural audio drones) ──
     const ambientSynth = new AmbientSynthesizer();
+
+    // ── Dynamic Lighting System (flickering campfire/torch point lights) ──
+    const lightingSystem = new LightingSystem(scene);
 
     // ── Supply Drop Renderer (falling crates with smoke trails) ──
     const supplyDropRenderer = new SupplyDropRenderer(scene);
@@ -534,7 +538,7 @@ export const GameCanvas: React.FC = () => {
 
       for (const [entityId, entity] of entities) {
         if (entityId === localPlayerId) continue;
-        const npcType = entity.components['NPCType'] as { creatureType?: string } | undefined;
+        const npcType = entity.components['NPCType'] as { creatureType?: string; isBoss?: boolean } | undefined;
         if (!npcType?.creatureType) continue;
 
         activeNpcIds.add(entityId);
@@ -551,6 +555,7 @@ export const GameCanvas: React.FC = () => {
               entityId,
               npcType.creatureType,
               new THREE.Vector3(entPos.x, entPos.y, entPos.z),
+              npcType.isBoss ?? false,
             );
           }
           npcEntityData.set(entityId, { position: entPos, health: entHealth });
@@ -662,6 +667,9 @@ export const GameCanvas: React.FC = () => {
       musicSystem.setEnabled(settings.musicEnabled);
       musicSystem.update(dt, worldTime, false, buildingActive);
 
+      // Dynamic lighting (flicker, distance culling)
+      lightingSystem.update(dt, new THREE.Vector3(pos.x, pos.y, pos.z));
+
       // Supply drop crates
       supplyDropRenderer.update(dt);
 
@@ -734,6 +742,7 @@ export const GameCanvas: React.FC = () => {
       biomeParticleSystem.dispose();
       biomeTracker.dispose();
       ambientSynth.dispose();
+      lightingSystem.dispose();
       supplyDropRenderer.dispose();
       socketClient.off(ServerMessage.WorldEvent, handleWorldEvent);
       socketClient.off(ServerMessage.JournalFound, handleJournalFound);
@@ -770,6 +779,7 @@ export const GameCanvas: React.FC = () => {
           borderRadius: '4px',
           pointerEvents: 'none',
           zIndex: 9999,
+          display: 'none',
         }}
       >
         <div>Focus: {debugState.hasFocus ? 'CANVAS' : 'OTHER'}</div>

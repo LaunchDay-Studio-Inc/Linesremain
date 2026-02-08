@@ -49,6 +49,7 @@ export const CharacterSelect: React.FC = () => {
       bodyType: selectedType,
       bodyColor: selectedColor,
     });
+    useAchievementStore.getState().setHasChosenBodyType(true);
 
     if (!useGameStore.getState().isOffline) {
       socketClient.emit(ClientMessage.Customize, {
