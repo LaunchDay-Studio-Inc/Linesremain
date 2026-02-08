@@ -88,6 +88,9 @@ export const GameCanvas: React.FC = () => {
   const toggleSettings = useUIStore((s) => s.toggleSettings);
   const closeAll = useUIStore((s) => s.closeAll);
 
+  // Settings
+  const showDebug = useSettingsStore((s) => s.showDebug);
+
   // Endgame panel state
   const codeLockPrompt = useEndgameStore((s) => s.codeLockPrompt);
   const setCodeLockPrompt = useEndgameStore((s) => s.setCodeLockPrompt);
@@ -141,6 +144,8 @@ export const GameCanvas: React.FC = () => {
     const input = InputManager.getInstance();
     // Attach keyboard listeners directly to canvas (critical for iframe environments)
     input.attachToElement(canvas);
+    // Apply persisted keybinds
+    input.setKeybinds(useSettingsStore.getState().keybinds);
 
     // ── Sky Renderer (replaces manual lighting — handles sky dome, sun/moon, ambient, fog) ──
     const skyRenderer = new SkyRenderer(scene);
@@ -215,6 +220,11 @@ export const GameCanvas: React.FC = () => {
     let inputTimer = 0;
     let lastBiomeName = '';
     const INPUT_SEND_INTERVAL = 1 / 20; // Send input 20 times per second
+
+    // ── Adaptive Quality (auto-reduce render distance on low FPS) ──
+    let lowFpsTimer = 0;
+    let fpsFrameCount = 0;
+    let fpsAccum = 0;
 
     // ── Player Sprite & Renderer ──
     const customization = useAchievementStore.getState().customization;
@@ -724,6 +734,33 @@ export const GameCanvas: React.FC = () => {
       musicSystem.setEnabled(settings.musicEnabled);
       musicSystem.update(dt, worldTime, false, buildingActive);
 
+      // Apply FOV from settings
+      if (camera.fov !== settings.fov) {
+        camera.fov = settings.fov;
+        camera.updateProjectionMatrix();
+      }
+
+      // Adaptive quality: auto-reduce render distance when FPS stays below 25
+      fpsFrameCount++;
+      fpsAccum += 1 / dt;
+      if (fpsFrameCount >= 60) {
+        const avgFps = fpsAccum / fpsFrameCount;
+        if (avgFps < 25) {
+          lowFpsTimer++;
+          if (lowFpsTimer >= 5) {
+            const current = settings.renderDistance;
+            if (current > 3) {
+              useSettingsStore.getState().setRenderDistance(current - 1);
+            }
+            lowFpsTimer = 0;
+          }
+        } else {
+          lowFpsTimer = 0;
+        }
+        fpsFrameCount = 0;
+        fpsAccum = 0;
+      }
+
       // Dynamic lighting (flicker, distance culling)
       lightingSystem.update(dt, new THREE.Vector3(pos.x, pos.y, pos.z));
 
@@ -827,29 +864,30 @@ export const GameCanvas: React.FC = () => {
       />
 
       {/* Debug overlay for input diagnostics */}
-      <div
-        style={{
-          position: 'fixed',
-          top: 10,
-          left: 10,
-          background: 'rgba(0, 0, 0, 0.7)',
-          color: '#0f0',
-          fontFamily: 'monospace',
-          fontSize: '12px',
-          padding: '8px',
-          borderRadius: '4px',
-          pointerEvents: 'none',
-          zIndex: 9999,
-          display: 'none',
-        }}
-      >
-        <div>Focus: {debugState.hasFocus ? 'CANVAS' : 'OTHER'}</div>
-        <div>PtrLock: {debugState.pointerLocked ? 'YES' : 'NO'}</div>
-        <div>LastKey: {debugState.lastKey || 'none'}</div>
-      </div>
+      {showDebug && (
+        <div
+          style={{
+            position: 'fixed',
+            top: 10,
+            left: 10,
+            background: 'rgba(0, 0, 0, 0.7)',
+            color: '#0f0',
+            fontFamily: 'monospace',
+            fontSize: '12px',
+            padding: '8px',
+            borderRadius: '4px',
+            pointerEvents: 'none',
+            zIndex: 9999,
+          }}
+        >
+          <div>Focus: {debugState.hasFocus ? 'CANVAS' : 'OTHER'}</div>
+          <div>PtrLock: {debugState.pointerLocked ? 'YES' : 'NO'}</div>
+          <div>LastKey: {debugState.lastKey || 'none'}</div>
+        </div>
+      )}
 
       {/* Debug overlay */}
-      <FPSCounter getRenderer={getRenderer} />
+      <FPSCounter getRenderer={getRenderer} visible={showDebug} />
 
       {/* Cinematic text overlay */}
       <CinematicText

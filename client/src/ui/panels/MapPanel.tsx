@@ -388,7 +388,7 @@ export const MapPanel: React.FC = () => {
           <span
             style={{
               fontSize: '11px',
-              color: 'rgba(255,255,255,0.4)',
+              color: 'var(--text-muted)',
               fontFamily: 'monospace',
               marginLeft: 'auto',
               marginRight: '12px',

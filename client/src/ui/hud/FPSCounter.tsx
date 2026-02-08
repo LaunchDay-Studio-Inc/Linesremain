@@ -12,15 +12,18 @@ interface DebugStats {
  * Lightweight FPS counter that reads renderer.info each second.
  * Displayed as a fixed overlay in the top-left corner.
  */
-export const FPSCounter: React.FC<{ getRenderer: () => THREE.WebGLRenderer | null }> = ({
-  getRenderer,
-}) => {
+export const FPSCounter: React.FC<{
+  getRenderer: () => THREE.WebGLRenderer | null;
+  visible?: boolean;
+}> = ({ getRenderer, visible = true }) => {
   const [stats, setStats] = useState<DebugStats>({ fps: 0, drawCalls: 0, triangles: 0 });
   const frameCountRef = useRef(0);
   const lastTimeRef = useRef(performance.now());
   const rafRef = useRef(0);
 
   useEffect(() => {
+    if (!visible) return;
+
     const tick = () => {
       frameCountRef.current++;
       const now = performance.now();
@@ -41,7 +44,9 @@ export const FPSCounter: React.FC<{ getRenderer: () => THREE.WebGLRenderer | nul
 
     rafRef.current = requestAnimationFrame(tick);
     return () => cancelAnimationFrame(rafRef.current);
-  }, [getRenderer]);
+  }, [getRenderer, visible]);
+
+  if (!visible) return null;
 
   return (
     <div

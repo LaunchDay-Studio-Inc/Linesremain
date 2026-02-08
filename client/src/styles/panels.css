@@ -1176,3 +1176,36 @@
 .modal-backdrop {
   backdrop-filter: blur(4px);
 }
+
+/* ─── Keybind Button ─── */
+.settings-keybind {
+  min-width: 80px;
+  padding: 4px 14px;
+  border-radius: 4px;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  background: rgba(255, 255, 255, 0.06);
+  color: var(--text-primary);
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all 0.15s ease;
+  font-family: var(--font-ui);
+  text-align: center;
+}
+
+.settings-keybind:hover {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.settings-keybind--listening {
+  background: rgba(240, 165, 0, 0.15);
+  border-color: var(--accent);
+  color: var(--accent);
+  animation: keybind-pulse 1s ease-in-out infinite;
+}
+
+@keyframes keybind-pulse {
+  0%, 100% { box-shadow: 0 0 4px rgba(240, 165, 0, 0.2); }
+  50% { box-shadow: 0 0 12px rgba(240, 165, 0, 0.4); }
+}

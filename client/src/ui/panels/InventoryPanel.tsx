@@ -10,8 +10,8 @@ import { usePlayerStore } from '../../stores/usePlayerStore';
 import { useUIStore } from '../../stores/useUIStore';
 import '../../styles/panels.css';
 import { getItemIconName } from '../../utils/itemIcons';
-import { GameIcon } from '../common/GameIcon';
 import { DragDropProvider, useDragDrop } from '../common/DragDrop';
+import { GameIcon } from '../common/GameIcon';
 import { Tooltip, useTooltip } from '../common/Tooltip';
 
 const EQUIP_SLOTS: { slot: EquipSlot; label: string }[] = [
@@ -95,9 +95,7 @@ const InventoryContent: React.FC = () => {
               {item ? (
                 <GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} />
               ) : (
-                <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
-                  {label.charAt(0)}
-                </span>
+                <span style={{ fontSize: 10, color: 'var(--text-muted)' }}>{label.charAt(0)}</span>
               )}
               <span className="equip-slot__label">{label}</span>
             </div>
@@ -132,7 +130,9 @@ const InventoryContent: React.FC = () => {
               >
                 {item && (
                   <>
-                    <span className="inv-slot__icon"><GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} /></span>
+                    <span className="inv-slot__icon">
+                      <GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} />
+                    </span>
                     {item.quantity > 1 && <span className="inv-slot__qty">{item.quantity}</span>}
                     {def?.durability != null && item.durability != null && (
                       <div className="inv-slot__durability">
@@ -150,11 +150,11 @@ const InventoryContent: React.FC = () => {
         </div>
 
         {/* Hotbar */}
-        <div style={{ borderTop: '1px solid rgba(255,255,255,0.08)', paddingTop: 8 }}>
+        <div style={{ borderTop: '1px solid var(--border-subtle)', paddingTop: 8 }}>
           <div
             style={{
               fontSize: 10,
-              color: 'rgba(255,255,255,0.3)',
+              color: 'var(--text-muted)',
               marginBottom: 4,
               letterSpacing: 1,
               textTransform: 'uppercase',
@@ -188,7 +188,9 @@ const InventoryContent: React.FC = () => {
                 >
                   {item && (
                     <>
-                      <span className="inv-slot__icon"><GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} /></span>
+                      <span className="inv-slot__icon">
+                        <GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} />
+                      </span>
                       {item.quantity > 1 && <span className="inv-slot__qty">{item.quantity}</span>}
                     </>
                   )}

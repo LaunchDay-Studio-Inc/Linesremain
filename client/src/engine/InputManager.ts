@@ -17,7 +17,7 @@ export interface KeybindMap {
   reload: string;
 }
 
-const DEFAULT_KEYBINDS: KeybindMap = {
+export const DEFAULT_KEYBINDS: KeybindMap = {
   moveForward: 'KeyW',
   moveBackward: 'KeyS',
   moveLeft: 'KeyA',
@@ -43,6 +43,17 @@ const PREVENT_DEFAULT_KEYS = new Set<string>([
   'ArrowRight',
 ]);
 
+function rebuildPreventDefaultKeys(keybinds: KeybindMap): void {
+  PREVENT_DEFAULT_KEYS.clear();
+  for (const code of Object.values(keybinds)) {
+    PREVENT_DEFAULT_KEYS.add(code);
+  }
+  PREVENT_DEFAULT_KEYS.add('ArrowUp');
+  PREVENT_DEFAULT_KEYS.add('ArrowDown');
+  PREVENT_DEFAULT_KEYS.add('ArrowLeft');
+  PREVENT_DEFAULT_KEYS.add('ArrowRight');
+}
+
 export class InputManager {
   private static instance: InputManager | null = null;
   private static refCount = 0;
@@ -62,6 +73,12 @@ export class InputManager {
 
   // Keybinds
   keybinds: KeybindMap = { ...DEFAULT_KEYBINDS };
+
+  /** Apply custom keybinds and rebuild the prevent-default key set. */
+  setKeybinds(binds: KeybindMap): void {
+    this.keybinds = { ...binds };
+    rebuildPreventDefaultKeys(this.keybinds);
+  }
 
   // Element-level keyboard attachment (for iframe focus issues)
   private attachedElement: HTMLElement | null = null;

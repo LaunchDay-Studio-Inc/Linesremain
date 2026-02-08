@@ -1,58 +1,27 @@
 // ─── Loading Screen ───
-// Professional loading experience with progress bar and tips.
+// Shows real loading progress driven by connection and snapshot events.
 
 import { LOADING_TIPS } from '@shared/constants/monetization';
 import React, { useEffect, useRef, useState } from 'react';
 import { useGameStore } from '../../stores/useGameStore';
 
-// ─── Loading Stages ───
-
-const STAGES = [
-  { label: 'Connecting to server...', threshold: 0 },
-  { label: 'Authenticating...', threshold: 20 },
-  { label: 'Generating terrain...', threshold: 30 },
-  { label: 'Loading entities...', threshold: 60 },
-  { label: 'Preparing your line...', threshold: 80 },
-  { label: 'Ready.', threshold: 95 },
-];
-
-function getStageLabel(progress: number): string {
-  let label = STAGES[0]!.label;
-  for (const stage of STAGES) {
-    if (progress >= stage.threshold) label = stage.label;
-  }
-  return label;
-}
-
 // ─── Component ───
 
 export const LoadingScreen: React.FC = () => {
   const setScreen = useGameStore((s) => s.setScreen);
-  const [progress, setProgress] = useState(0);
+  const loadingProgress = useGameStore((s) => s.loadingProgress);
+  const loadingStage = useGameStore((s) => s.loadingStage);
+  const isOffline = useGameStore((s) => s.isOffline);
   const [tipIndex, setTipIndex] = useState(() => Math.floor(Math.random() * LOADING_TIPS.length));
-  const intervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const tipIntervalRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const doneRef = useRef(false);
 
-  // Progress simulation
+  // Offline mode: auto-complete loading
   useEffect(() => {
-    doneRef.current = false;
-    intervalRef.current = setInterval(() => {
-      setProgress((prev) => {
-        if (prev >= 100) {
-          if (intervalRef.current) {
-            clearInterval(intervalRef.current);
-            intervalRef.current = null;
-          }
-          return 100;
-        }
-        return Math.min(prev + Math.random() * 12 + 3, 100);
-      });
-    }, 200);
-    return () => {
-      if (intervalRef.current) clearInterval(intervalRef.current);
-    };
-  }, []);
+    if (isOffline) {
+      useGameStore.getState().setLoadingProgress(100, 'Ready.');
+    }
+  }, [isOffline]);
 
   // Rotate tips
   useEffect(() => {
@@ -64,16 +33,16 @@ export const LoadingScreen: React.FC = () => {
     };
   }, []);
 
-  // Transition when done
+  // Transition when progress hits 100
   useEffect(() => {
-    if (progress >= 100 && !doneRef.current) {
+    if (loadingProgress >= 100 && !doneRef.current) {
       doneRef.current = true;
       const timeout = setTimeout(() => setScreen('playing'), 500);
       return () => clearTimeout(timeout);
     }
-  }, [progress, setScreen]);
+  }, [loadingProgress, setScreen]);
 
-  const displayProgress = Math.min(Math.round(progress), 100);
+  const displayProgress = Math.min(Math.round(loadingProgress), 100);
 
   return (
     <div
@@ -133,7 +102,7 @@ export const LoadingScreen: React.FC = () => {
             textTransform: 'uppercase',
           }}
         >
-          {getStageLabel(displayProgress)}
+          {loadingStage}
         </p>
 
         {/* Progress bar */}

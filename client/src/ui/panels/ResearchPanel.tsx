@@ -145,7 +145,7 @@ export const ResearchPanel: React.FC<ResearchPanelProps> = ({ isOpen, onClose, e
               style={{
                 width: 64,
                 height: 64,
-                border: '2px solid rgba(255, 255, 255, 0.1)',
+                border: '2px solid var(--border-medium)',
                 borderRadius: 8,
                 background: 'rgba(0, 0, 0, 0.3)',
                 display: 'flex',
@@ -218,13 +218,9 @@ export const ResearchPanel: React.FC<ResearchPanelProps> = ({ isOpen, onClose, e
 
                 {/* Cancel button */}
                 <button
-                  className="craft-btn"
+                  className="btn btn--danger"
                   onClick={handleCancelResearch}
-                  style={{
-                    background: 'rgba(231, 76, 60, 0.2)',
-                    border: '1px solid rgba(231, 76, 60, 0.4)',
-                    color: 'var(--danger-light)',
-                  }}
+                  style={{ width: '100%', marginTop: 8 }}
                 >
                   Cancel
                 </button>

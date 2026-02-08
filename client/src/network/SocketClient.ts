@@ -58,6 +58,7 @@ class SocketClient {
     this.socket.on('connect', () => {
       debugLog.log('[SocketClient] Connected to server');
       useGameStore.getState().setConnected(true);
+      useGameStore.getState().setLoadingProgress(25, 'Connected.');
     });
 
     this.socket.on('disconnect', (reason) => {

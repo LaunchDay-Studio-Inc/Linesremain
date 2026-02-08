@@ -14,6 +14,8 @@ interface GameState {
   hasSleepingBag: boolean;
   lineage: { generation: number; ancestors: AncestorRecord[] } | null;
   legacyData: LineagePayload | null;
+  loadingProgress: number;
+  loadingStage: string;
 
   setScreen: (screen: Screen) => void;
   setConnected: (connected: boolean) => void;
@@ -22,6 +24,7 @@ interface GameState {
   setHasSleepingBag: (has: boolean) => void;
   setLineage: (lineage: { generation: number; ancestors: AncestorRecord[] } | null) => void;
   setLegacyData: (data: LineagePayload | null) => void;
+  setLoadingProgress: (progress: number, stage: string) => void;
   logout: () => void;
 }
 
@@ -34,6 +37,8 @@ export const useGameStore = create<GameState>((set) => ({
   hasSleepingBag: false,
   lineage: null,
   legacyData: null,
+  loadingProgress: 0,
+  loadingStage: 'Connecting to server...',
 
   setScreen: (screen) => set({ screen }),
   setConnected: (connected) => set({ isConnected: connected }),
@@ -42,6 +47,7 @@ export const useGameStore = create<GameState>((set) => ({
   setHasSleepingBag: (has) => set({ hasSleepingBag: has }),
   setLineage: (lineage) => set({ lineage }),
   setLegacyData: (data) => set({ legacyData: data }),
+  setLoadingProgress: (progress, stage) => set({ loadingProgress: progress, loadingStage: stage }),
   logout: () =>
     set({
       screen: 'menu',
@@ -52,5 +58,7 @@ export const useGameStore = create<GameState>((set) => ({
       hasSleepingBag: false,
       lineage: null,
       legacyData: null,
+      loadingProgress: 0,
+      loadingStage: 'Connecting to server...',
     }),
 }));

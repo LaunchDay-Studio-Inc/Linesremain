@@ -18,6 +18,7 @@ import {
   TERMINAL_VELOCITY,
 } from '@shared/constants/game';
 import { BlockType } from '@shared/types/blocks';
+import { useSettingsStore } from '../stores/useSettingsStore';
 import * as THREE from 'three';
 import type { AnimationName } from '../assets/SpriteGenerator';
 import { CameraController } from '../engine/Camera';
@@ -159,9 +160,11 @@ export class LocalPlayerController {
     if (!this.input.isPointerLocked()) return;
 
     const delta = this.input.getMouseDelta();
+    const invertY = useSettingsStore.getState().invertY;
+    const yMultiplier = invertY ? -1 : 1;
     // Orbit camera with mouse when pointer is locked
     this.cameraController.rotateAzimuth(-delta.x * MOUSE_SENSITIVITY);
-    this.cameraController.rotateElevation(delta.y * MOUSE_SENSITIVITY);
+    this.cameraController.rotateElevation(delta.y * MOUSE_SENSITIVITY * yMultiplier);
   }
 
   // ─── Arrow Key Camera Control ───

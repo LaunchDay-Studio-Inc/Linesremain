@@ -295,6 +295,7 @@ function handleSnapshot(snapshot: SnapshotPayload): void {
   }
 
   // Transition to playing screen
+  useGameStore.getState().setLoadingProgress(100, 'Ready.');
   useGameStore.getState().setScreen('playing');
 }
 
@@ -302,6 +303,12 @@ function handleSnapshot(snapshot: SnapshotPayload): void {
 
 function handleDelta(delta: DeltaPayload): void {
   lastServerTick = delta.tick;
+
+  // Update loading progress on first world data
+  const store = useGameStore.getState();
+  if (store.loadingProgress < 50) {
+    store.setLoadingProgress(50, 'Receiving world data...');
+  }
 
   // Process created entities
   for (const created of delta.created) {
