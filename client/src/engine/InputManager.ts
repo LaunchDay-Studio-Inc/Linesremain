@@ -131,6 +131,12 @@ export class InputManager {
     return this.keysPressed.has(code);
   }
 
+  /** Returns the last key that is currently pressed (for debugging) */
+  getLastPressedKey(): string {
+    const keys = Array.from(this.keysDown);
+    return keys.length > 0 ? keys[keys.length - 1]! : '';
+  }
+
   // ── Mouse Queries ──
 
   getMouseDelta(): { x: number; y: number } {

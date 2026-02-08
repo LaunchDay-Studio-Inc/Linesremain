@@ -449,7 +449,7 @@ export const GameCanvas: React.FC = () => {
       setDebugState({
         hasFocus: document.activeElement === canvas,
         pointerLocked: input.isPointerLocked(),
-        lastKey: Array.from(input['keysDown']).pop() || '',
+        lastKey: input.getLastPressedKey(),
       });
 
       // Player update
