@@ -44,8 +44,8 @@ function isWaterBlock(blockId: number): boolean {
 
 // ─── Constants ───
 
-const WATER_GRAVITY = -5.0;
-const BUOYANCY_FORCE = 4.0;
+const WATER_BUOYANCY = 3.0; // net upward force in water (counteracts gravity + lift)
+const WATER_DRAG_FACTOR = 3.0; // exponential drag coefficient for water
 
 // ─── System ───
 
@@ -61,11 +61,17 @@ export function physicsSystem(world: GameWorld, dt: number): void {
     if (collider?.isStatic) continue;
 
     const halfHeight = collider ? collider.height / 2 : 0.9;
+    const halfW = collider ? collider.width / 2 : 0.3;
+    const halfD = collider ? collider.depth / 2 : 0.3;
 
-    // ── Ground Detection ──
+    // ── Ground Detection (4-corner + center) ──
     const feetY = pos.y - 0.01;
-    const blockBelow = getBlockAt(world, pos.x, feetY, pos.z);
-    const grounded = isSolidBlock(blockBelow);
+    const grounded =
+      isSolidBlock(getBlockAt(world, pos.x, feetY, pos.z)) ||
+      isSolidBlock(getBlockAt(world, pos.x - halfW, feetY, pos.z - halfD)) ||
+      isSolidBlock(getBlockAt(world, pos.x + halfW, feetY, pos.z - halfD)) ||
+      isSolidBlock(getBlockAt(world, pos.x - halfW, feetY, pos.z + halfD)) ||
+      isSolidBlock(getBlockAt(world, pos.x + halfW, feetY, pos.z + halfD));
 
     // ── Water Detection ──
     const blockAtCenter = getBlockAt(world, pos.x, pos.y + halfHeight, pos.z);
@@ -73,11 +79,9 @@ export function physicsSystem(world: GameWorld, dt: number): void {
 
     // ── Apply Gravity ──
     if (inWater) {
-      // Reduced gravity + buoyancy in water
-      vel.vy += WATER_GRAVITY * dt;
-      if (vel.vy < -2.0) {
-        vel.vy += BUOYANCY_FORCE * dt;
-      }
+      // Water: apply normal gravity + buoyancy for net upward force
+      vel.vy += GRAVITY * dt;
+      vel.vy += WATER_BUOYANCY * dt;
     } else if (!grounded) {
       vel.vy += GRAVITY * dt;
     }
@@ -85,10 +89,10 @@ export function physicsSystem(world: GameWorld, dt: number): void {
     // ── Ground Clamping ──
     if (grounded && vel.vy < 0) {
       vel.vy = 0;
-      // Snap to ground level
-      const groundY = Math.floor(pos.y);
-      if (pos.y - groundY < 0.05) {
-        pos.y = groundY;
+      // Snap to ground level — use round to handle both 0.99 and 1.01 cases
+      const snappedY = Math.round(pos.y);
+      if (Math.abs(pos.y - snappedY) < 0.1) {
+        pos.y = snappedY;
       }
     }
 
@@ -97,10 +101,11 @@ export function physicsSystem(world: GameWorld, dt: number): void {
       vel.vy = TERMINAL_VELOCITY;
     }
 
-    // ── Drag in water ──
+    // ── Drag in water (frame-rate independent exponential decay) ──
     if (inWater) {
-      vel.vx *= 1 - 3.0 * dt;
-      vel.vz *= 1 - 3.0 * dt;
+      const dragFactor = Math.exp(-WATER_DRAG_FACTOR * dt);
+      vel.vx *= dragFactor;
+      vel.vz *= dragFactor;
     }
   }
 }

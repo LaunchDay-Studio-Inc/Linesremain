@@ -7,8 +7,11 @@ import type { AncestorRecord } from '@lineremain/shared';
 import {
   ComponentType,
   type HealthComponent,
+  type HungerComponent,
   type LootableComponent,
   type PositionComponent,
+  type TemperatureComponent,
+  type ThirstComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
 import type { GameWorld } from '../World.js';
@@ -99,19 +102,8 @@ export function deathSystem(world: GameWorld, _dt: number): void {
 // ─── Cause of Death Heuristic ───
 
 function determineCauseOfDeath(world: GameWorld, entityId: number): string {
-  const hunger = world.ecs.getComponent<import('@lineremain/shared').HungerComponent>(
-    entityId,
-    ComponentType.Hunger,
-  );
-  if (hunger && hunger.current <= 0) return 'hunger';
-
-  const thirst = world.ecs.getComponent<import('@lineremain/shared').ThirstComponent>(
-    entityId,
-    ComponentType.Thirst,
-  );
-  if (thirst && thirst.current <= 0) return 'thirst';
-
-  const temp = world.ecs.getComponent<import('@lineremain/shared').TemperatureComponent>(
+  // Check environmental extremes first (most specific causes)
+  const temp = world.ecs.getComponent<TemperatureComponent>(
     entityId,
     ComponentType.Temperature,
   );
@@ -120,5 +112,19 @@ function determineCauseOfDeath(world: GameWorld, entityId: number): string {
     if (temp.current > 50) return 'heat';
   }
 
-  return 'unknown';
+  // Check survival deprivation (only if reserves are fully depleted)
+  const hunger = world.ecs.getComponent<HungerComponent>(
+    entityId,
+    ComponentType.Hunger,
+  );
+  if (hunger && hunger.current <= 0) return 'hunger';
+
+  const thirst = world.ecs.getComponent<ThirstComponent>(
+    entityId,
+    ComponentType.Thirst,
+  );
+  if (thirst && thirst.current <= 0) return 'thirst';
+
+  // Default: combat damage (most common cause)
+  return 'combat';
 }

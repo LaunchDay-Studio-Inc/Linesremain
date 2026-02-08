@@ -2,18 +2,21 @@
 // Applies velocity to position with axis-separated block collision resolution.
 
 import {
-  BlockType,
   CHUNK_SIZE_X,
   CHUNK_SIZE_Y,
   CHUNK_SIZE_Z,
   ComponentType,
+  FALL_DAMAGE_PER_BLOCK,
+  FALL_DAMAGE_THRESHOLD,
   type ColliderComponent,
+  type HealthComponent,
   type PositionComponent,
   type VelocityComponent,
 } from '@lineremain/shared';
 import type { GameWorld } from '../World.js';
+import { isSolidBlock } from './PhysicsSystem.js';
 
-// ─── Block Query ───
+// ─── Block Query (Movement-specific: unloaded chunks → solid) ───
 
 function getBlockAt(world: GameWorld, x: number, y: number, z: number): number {
   if (y < 0 || y >= CHUNK_SIZE_Y) return 0;
@@ -30,10 +33,6 @@ function getBlockAt(world: GameWorld, x: number, y: number, z: number): number {
 
   const index = localX + localZ * CHUNK_SIZE_X + localY * CHUNK_SIZE_X * CHUNK_SIZE_Z;
   return chunk[index] ?? 0;
-}
-
-function isSolid(blockId: number): boolean {
-  return blockId > 0 && blockId !== BlockType.Water;
 }
 
 // ─── AABB Collision Check ───
@@ -62,19 +61,8 @@ function checkBlockCollision(
   for (let bx = minBx; bx <= maxBx; bx++) {
     for (let by = minBy; by <= maxBy; by++) {
       for (let bz = minBz; bz <= maxBz; bz++) {
-        if (isSolid(getBlockAt(world, bx, by, bz))) {
-          // Block AABB: [bx, bx+1] x [by, by+1] x [bz, bz+1]
-          // Entity AABB: [cx-halfW, cx+halfW] x [baseY, baseY+height] x [cz-halfD, cz+halfD]
-          if (
-            cx + halfW > bx &&
-            cx - halfW < bx + 1 &&
-            baseY + height > by &&
-            baseY < by + 1 &&
-            cz + halfD > bz &&
-            cz - halfD < bz + 1
-          ) {
-            return true;
-          }
+        if (isSolidBlock(getBlockAt(world, bx, by, bz))) {
+          return true;
         }
       }
     }
@@ -118,6 +106,7 @@ export function movementSystem(world: GameWorld, dt: number): void {
     }
 
     // ── Y Axis ──
+    const prevVy = vel.vy;
     const newY = pos.y + vel.vy * dt;
     if (!checkBlockCollision(world, pos.x, newY, pos.z, halfW, height, halfD)) {
       pos.y = newY;
@@ -125,6 +114,17 @@ export function movementSystem(world: GameWorld, dt: number): void {
       if (vel.vy < 0) {
         // Falling — land on top of block
         pos.y = Math.floor(newY) + 1;
+
+        // Fall damage based on impact velocity (Issue 112)
+        const fallSpeed = -prevVy; // prevVy is negative when falling
+        const fallBlocks = (fallSpeed * fallSpeed) / (2 * 9.81); // approximate blocks fallen
+        if (fallBlocks > FALL_DAMAGE_THRESHOLD) {
+          const damage = (fallBlocks - FALL_DAMAGE_THRESHOLD) * FALL_DAMAGE_PER_BLOCK;
+          const health = world.ecs.getComponent<HealthComponent>(entityId, ComponentType.Health);
+          if (health) {
+            health.current = Math.max(0, health.current - damage);
+          }
+        }
       } else {
         // Jumping — hit ceiling
         pos.y = Math.ceil(newY + height) - height - 0.001;

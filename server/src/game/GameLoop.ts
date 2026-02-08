@@ -9,6 +9,7 @@ import {
   PLAYER_SPRINT_SPEED,
   PLAYER_WALK_SPEED,
   TICK_RATE,
+  type ColliderComponent,
   type InputPayload,
   type PositionComponent,
   type VelocityComponent,
@@ -37,7 +38,7 @@ import { lootDespawnSystem } from './systems/LootDespawnSystem.js';
 import { lootSpawnSystem } from './systems/LootSpawnSystem.js';
 import { movementSystem } from './systems/MovementSystem.js';
 import { npcSpawnSystem } from './systems/NPCSpawnSystem.js';
-import { physicsSystem } from './systems/PhysicsSystem.js';
+import { getBlockAt, isSolidBlock, physicsSystem } from './systems/PhysicsSystem.js';
 import { projectileSystem } from './systems/ProjectileSystem.js';
 import { raidingSystem } from './systems/RaidingSystem.js';
 import { resourceRespawnSystem } from './systems/ResourceRespawnSystem.js';
@@ -52,7 +53,6 @@ import { worldEventSystem } from './systems/WorldEventSystem.js';
 export interface QueuedInput {
   playerId: string;
   input: InputPayload;
-  receivedAt: number;
 }
 
 // ─── Game Loop Class ───
@@ -163,7 +163,6 @@ export class GameLoop {
     this.inputQueue.push({
       playerId,
       input,
-      receivedAt: Date.now(),
     });
   }
 
@@ -256,19 +255,24 @@ export class GameLoop {
   // ─── Process Queued Inputs ───
 
   private processInputs(): void {
-    const inputs = this.inputQueue;
-    this.inputQueue = [];
+    // Dedup: keep only the latest input per player (Issue 104)
+    const latestPerPlayer = new Map<string, InputPayload>();
+    for (let i = 0; i < this.inputQueue.length; i++) {
+      const queued = this.inputQueue[i]!;
+      latestPerPlayer.set(queued.playerId, queued.input);
+    }
 
-    for (const queued of inputs) {
-      const entityId = this.world.getPlayerEntity(queued.playerId);
+    // Reuse array instead of allocating a new one (Issue 101)
+    this.inputQueue.length = 0;
+
+    for (const [playerId, input] of latestPerPlayer) {
+      const entityId = this.world.getPlayerEntity(playerId);
       if (entityId === undefined) continue;
 
       const vel = this.world.ecs.getComponent<VelocityComponent>(entityId, ComponentType.Velocity);
       const pos = this.world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position);
 
       if (!vel || !pos) continue;
-
-      const input = queued.input;
 
       // Apply rotation
       pos.rotation = input.rotation;
@@ -289,12 +293,43 @@ export class GameLoop {
       }
 
       // Transform input direction by rotation
-      vel.vx = (moveX * cos - moveZ * sin) * speed;
-      vel.vz = (moveX * sin + moveZ * cos) * speed;
+      const desiredVx = (moveX * cos - moveZ * sin) * speed;
+      const desiredVz = (moveX * sin + moveZ * cos) * speed;
 
-      // Jump — use epsilon for ground check to handle floating-point drift
-      // TODO: replace with grounded flag from PhysicsSystem
-      if (input.jump && Math.abs(vel.vy) < 0.01) {
+      // Ground detection for jump gating (Issue 102)
+      const collider = this.world.ecs.getComponent<ColliderComponent>(
+        entityId,
+        ComponentType.Collider,
+      );
+      const feetY = pos.y - 0.01;
+      const halfW = collider ? collider.width / 2 : 0.3;
+      const halfD = collider ? collider.depth / 2 : 0.3;
+      // Check 4 corners + center for reliable ground detection
+      const grounded =
+        isSolidBlock(getBlockAt(this.world, pos.x, feetY, pos.z)) ||
+        isSolidBlock(getBlockAt(this.world, pos.x - halfW, feetY, pos.z - halfD)) ||
+        isSolidBlock(getBlockAt(this.world, pos.x + halfW, feetY, pos.z - halfD)) ||
+        isSolidBlock(getBlockAt(this.world, pos.x - halfW, feetY, pos.z + halfD)) ||
+        isSolidBlock(getBlockAt(this.world, pos.x + halfW, feetY, pos.z + halfD));
+
+      if (grounded) {
+        // On ground: apply full desired movement
+        vel.vx = desiredVx;
+        vel.vz = desiredVz;
+      } else {
+        // Airborne: cap horizontal speed to prevent bunny-hop accel (Issue 103)
+        vel.vx = desiredVx;
+        vel.vz = desiredVz;
+        const airSpeed = Math.sqrt(vel.vx * vel.vx + vel.vz * vel.vz);
+        if (airSpeed > PLAYER_SPRINT_SPEED) {
+          const scale = PLAYER_SPRINT_SPEED / airSpeed;
+          vel.vx *= scale;
+          vel.vz *= scale;
+        }
+      }
+
+      // Jump — only allow when grounded (Issue 102)
+      if (input.jump && grounded) {
         vel.vy = PLAYER_JUMP_VELOCITY;
       }
     }

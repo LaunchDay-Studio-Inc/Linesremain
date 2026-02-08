@@ -44,6 +44,9 @@ export const decaySystem: SystemFn = (world: GameWorld, dt: number): void => {
 
   const toDestroy: EntityId[] = [];
 
+  // Hoist Date.now() outside per-building loop to avoid redundant syscalls
+  const now = Date.now();
+
   for (const entityId of decayEntities) {
     const decay = world.ecs.getComponent<DecayComponent>(entityId, ComponentType.Decay)!;
     const health = world.ecs.getComponent<HealthComponent>(entityId, ComponentType.Health)!;
@@ -58,14 +61,13 @@ export const decaySystem: SystemFn = (world: GameWorld, dt: number): void => {
       // TC covers this building — only protect if upkeep was paid
       if (!didTCFailUpkeep(world, coveringTC)) {
         // Upkeep succeeded — reset decay timer, building is protected
-        decay.lastInteractionTime = Date.now();
+        decay.lastInteractionTime = now;
         continue;
       }
       // Upkeep failed — fall through and let decay proceed normally
     }
 
     // No TC coverage — check if decay delay has elapsed
-    const now = Date.now();
     const timeSinceInteraction = (now - decay.lastInteractionTime) / 1000; // convert ms → s
 
     if (timeSinceInteraction < decay.decayStartDelay) {

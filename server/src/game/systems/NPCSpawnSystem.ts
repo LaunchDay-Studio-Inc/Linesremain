@@ -7,6 +7,7 @@
 import {
   AIBehavior,
   BiomeType,
+  CHUNK_SIZE_Y,
   ComponentType,
   NPCCreatureType,
   type LootTableEntry,
@@ -435,15 +436,19 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
   tickCounter++;
   if (tickCounter % SPAWN_CHECK_INTERVAL !== 0) return;
 
-  const allNPCs = world.ecs.query(ComponentType.NPCType);
+  let allNPCs = world.ecs.query(ComponentType.NPCType);
   const daytime = isDaytime(world);
 
   // ── Despawn distant hostiles during daytime ──
   if (daytime) {
     despawnDistantHostiles(world, allNPCs);
+    // Re-query after despawn to get accurate count (destroyed entities are stale)
+    allNPCs = world.ecs.query(ComponentType.NPCType);
   }
 
   // Count total NPCs and split by behavior
+  // Note: neutral creatures are counted as passive — intentional since they
+  // share the passive population cap and only become hostile when provoked.
   let passiveCount = 0;
   let hostileCount = 0;
   for (const npcId of allNPCs) {
@@ -621,11 +626,13 @@ function findSpawnPosition(
 }
 
 function findSurfaceY(world: GameWorld, worldX: number, worldZ: number): number | null {
-  // Scan downward from a reasonable height to find solid ground
-  for (let y = 63; y >= 1; y--) {
+  // Scan downward from world height limit to find solid ground
+  for (let y = CHUNK_SIZE_Y - 1; y >= 1; y--) {
     const block = world.chunkStore.getBlock(worldX, y, worldZ);
     if (block !== null && block !== 0 && block !== 14) {
-      // Found solid, non-water block
+      // Found solid, non-water block — check that block above isn't water (Issue 117)
+      const blockAbove = world.chunkStore.getBlock(worldX, y + 1, worldZ);
+      if (blockAbove === 14) continue; // underwater — skip
       return y;
     }
   }
