@@ -56,7 +56,6 @@ export const GameCanvas: React.FC = () => {
   const buildingPreviewRef = useRef<BuildingPreview | null>(null);
   const chunkManagerRef = useRef<ChunkManager | null>(null);
   const playerControllerRef = useRef<LocalPlayerController | null>(null);
-  const isOffline = useGameStore((s) => s.isOffline);
   const setCursorLocked = useUIStore((s) => s.setCursorLocked);
   const toggleInventory = useUIStore((s) => s.toggleInventory);
   const toggleCrafting = useUIStore((s) => s.toggleCrafting);
@@ -265,7 +264,7 @@ export const GameCanvas: React.FC = () => {
         // Place building piece
         const data = buildingPreview.getPlacementData();
         if (data) {
-          if (!isOffline) {
+          if (!useGameStore.getState().isOffline) {
             socketClient.emit(ClientMessage.BuildPlace, {
               pieceType: data.pieceType,
               tier: data.tier,
@@ -313,7 +312,7 @@ export const GameCanvas: React.FC = () => {
     };
 
     // Only register socket event listeners when not in offline mode
-    if (!isOffline) {
+    if (!useGameStore.getState().isOffline) {
       socketClient.on(ServerMessage.WorldEvent, handleWorldEvent);
       socketClient.on(ServerMessage.JournalFound, handleJournalFound);
       socketClient.on(ServerMessage.CinematicText, handleCinematicText);
@@ -504,7 +503,7 @@ export const GameCanvas: React.FC = () => {
           secondaryAction: false,
           selectedSlot: 0,
         };
-        if (!isOffline) {
+        if (!useGameStore.getState().isOffline) {
           socketClient.emit(ClientMessage.Input, inputPayload);
         }
       }
@@ -596,7 +595,7 @@ export const GameCanvas: React.FC = () => {
           isOpen={true}
           onClose={() => {
             setContainerOpen(null);
-            if (!isOffline) {
+            if (!useGameStore.getState().isOffline) {
               socketClient.emit(ClientMessage.ContainerClose);
             }
           }}
