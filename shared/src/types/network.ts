@@ -25,6 +25,9 @@ export enum ClientMessage {
   TeamLeave = 'c:team_leave',
   TeamKick = 'c:team_kick',
   Respawn = 'c:respawn',
+  Customize = 'c:customize',
+  TutorialAdvance = 'c:tutorial:advance',
+  TutorialSkip = 'c:tutorial:skip',
 }
 
 // ─── Server → Client Messages ───
@@ -46,6 +49,12 @@ export enum ServerMessage {
   WorldEvent = 's:world_event',
   JournalFound = 's:journal_found',
   CinematicText = 's:cinematic_text',
+  Achievement = 's:achievement',
+  LevelUp = 's:level_up',
+  XpGain = 's:xp_gain',
+  CustomizationUpdated = 's:customization:updated',
+  TutorialStep = 's:tutorial:step',
+  PlayerProfile = 's:player:profile',
 }
 
 // ─── Client Payload Interfaces ───
@@ -152,6 +161,20 @@ export interface RespawnPayload {
   spawnOption?: 'random' | 'bag'; // sleeping bag or random
   bagEntityId?: number;
 }
+
+export interface CustomizePayload {
+  bodyColor?: string;
+  accessory?: string | null;
+  trail?: string | null;
+  deathEffect?: string | null;
+  title?: string | null;
+}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TutorialAdvancePayload {}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface TutorialSkipPayload {}
 
 // ─── Server Payload Interfaces ───
 
@@ -268,4 +291,55 @@ export interface CinematicTextPayload {
   text: string;
   subtitle?: string;
   duration: number; // ms
+}
+
+// ─── Progression Payload Interfaces ───
+
+export interface AchievementPayload {
+  achievementId: string;
+  name: string;
+  description: string;
+  icon: string;
+  xpReward: number;
+}
+
+export interface LevelUpPayload {
+  newLevel: number;
+  rewards: { type: string; id: string; name: string }[];
+}
+
+export interface XpGainPayload {
+  amount: number;
+  totalXP: number;
+  source: string; // 'kill', 'craft', 'gather', 'achievement', etc.
+}
+
+export interface CustomizationUpdatedPayload {
+  bodyColor: string;
+  accessory: string | null;
+  trail: string | null;
+  deathEffect: string | null;
+  title: string | null;
+}
+
+export interface TutorialStepPayload {
+  step: string; // 'move' | 'gather' | 'craft' | 'build' | 'complete'
+}
+
+export interface PlayerProfilePayload {
+  username: string;
+  level: number;
+  xp: number;
+  title: string | null;
+  achievements: string[]; // achievement IDs
+  stats: {
+    totalKills: number;
+    totalDeaths: number;
+    totalPlaytime: number;
+    totalGathered: number;
+    totalCrafted: number;
+    totalBuildings: number;
+    biomesVisited: number;
+    journalsFound: number;
+  };
 }

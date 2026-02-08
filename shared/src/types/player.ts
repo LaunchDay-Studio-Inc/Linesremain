@@ -18,19 +18,6 @@ export interface PlayerState {
   };
 }
 
-export enum HeadAccessory {
-  None = 'none',
-  Bandana = 'bandana',
-  Cap = 'cap',
-  Helmet = 'helmet',
-  Hood = 'hood',
-}
-
-export interface PlayerCustomization {
-  bodyColor: string; // hex color e.g. '#a0522d'
-  headAccessory: HeadAccessory;
-}
-
 export interface PlayerStats {
   totalPlaytime: number; // seconds
   totalKills: number;

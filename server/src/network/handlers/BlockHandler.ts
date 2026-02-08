@@ -3,26 +3,27 @@
 // All requests are validated server-side: distance checks, block validity,
 // rate limiting, and state consistency before mutating the chunk store.
 
-import type { Server, Socket } from 'socket.io';
-import type { GameWorld } from '../../game/World.js';
 import {
-  ClientMessage,
-  ServerMessage,
-  ComponentType,
   BLOCK_REGISTRY,
-  ITEM_REGISTRY,
   BlockType,
+  ClientMessage,
+  ComponentType,
+  ITEM_REGISTRY,
+  ServerMessage,
   worldToChunk,
   worldToLocal,
   type BlockBreakPayload,
   type BlockPlacePayload,
   type ChunkUpdatePayload,
-  type PositionComponent,
   type EquipmentComponent,
   type ItemStack,
+  type PositionComponent,
 } from '@lineremain/shared';
-import { RateLimiter } from '../RateLimiter.js';
+import type { Server, Socket } from 'socket.io';
+import type { GameWorld } from '../../game/World.js';
 import { logger } from '../../utils/logger.js';
+import { trackBlockPlace, trackGather } from '../../game/systems/AchievementSystem.js';
+import { RateLimiter } from '../RateLimiter.js';
 
 // ─── Constants ───
 
@@ -38,9 +39,12 @@ function isValidBlockBreakPayload(payload: unknown): payload is BlockBreakPayloa
   if (!payload || typeof payload !== 'object') return false;
   const p = payload as Record<string, unknown>;
   return (
-    typeof p.x === 'number' && Number.isInteger(p.x) &&
-    typeof p.y === 'number' && Number.isInteger(p.y) &&
-    typeof p.z === 'number' && Number.isInteger(p.z)
+    typeof p.x === 'number' &&
+    Number.isInteger(p.x) &&
+    typeof p.y === 'number' &&
+    Number.isInteger(p.y) &&
+    typeof p.z === 'number' &&
+    Number.isInteger(p.z)
   );
 }
 
@@ -48,10 +52,14 @@ function isValidBlockPlacePayload(payload: unknown): payload is BlockPlacePayloa
   if (!payload || typeof payload !== 'object') return false;
   const p = payload as Record<string, unknown>;
   return (
-    typeof p.x === 'number' && Number.isInteger(p.x) &&
-    typeof p.y === 'number' && Number.isInteger(p.y) &&
-    typeof p.z === 'number' && Number.isInteger(p.z) &&
-    typeof p.blockType === 'number' && Number.isInteger(p.blockType)
+    typeof p.x === 'number' &&
+    Number.isInteger(p.x) &&
+    typeof p.y === 'number' &&
+    Number.isInteger(p.y) &&
+    typeof p.z === 'number' &&
+    Number.isInteger(p.z) &&
+    typeof p.blockType === 'number' &&
+    Number.isInteger(p.blockType)
   );
 }
 
@@ -137,6 +145,9 @@ export function registerBlockHandlers(
     const success = world.chunkStore.setBlock(x, y, z, BlockType.Air);
     if (!success) return;
 
+    // Track block break for achievements
+    trackGather(playerId);
+
     // Drop items based on block registry
     const blockDef = BLOCK_REGISTRY[currentBlock];
     if (blockDef && blockDef.dropItemId !== undefined && blockDef.dropQuantity !== undefined) {
@@ -221,6 +232,9 @@ export function registerBlockHandlers(
     // Set the block
     const success = world.chunkStore.setBlock(x, y, z, blockType);
     if (!success) return;
+
+    // Track block place for achievements
+    trackBlockPlace(playerId);
 
     // Broadcast chunk update to all clients
     broadcastChunkUpdate(io, x, y, z, blockType);

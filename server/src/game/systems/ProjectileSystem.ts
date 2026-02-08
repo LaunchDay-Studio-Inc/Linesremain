@@ -2,18 +2,18 @@
 // Per-tick projectile movement with gravity, terrain/entity collision,
 // hitzone damage, max range (200 blocks) and lifetime (10s) limits.
 
-import type { GameWorld } from '../World.js';
-import type { SystemFn } from '../World.js';
 import {
   ComponentType,
   GRAVITY,
-  type PositionComponent,
-  type VelocityComponent,
-  type ProjectileComponent,
   type ColliderComponent,
+  type PositionComponent,
+  type ProjectileComponent,
+  type VelocityComponent,
 } from '@lineremain/shared';
-import { applyProjectileDamage } from './CombatSystem.js';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld, SystemFn } from '../World.js';
+import { trackNPCKill, trackPVPKill } from './AchievementSystem.js';
+import { applyProjectileDamage } from './CombatSystem.js';
 
 // ─── Constants ───
 
@@ -24,25 +24,41 @@ const MAX_PROJECTILE_RANGE = 200;
 // ─── AABB Collision Check ───
 
 function aabbOverlap(
-  px: number, py: number, pz: number,
-  tx: number, ty: number, tz: number,
-  tw: number, th: number, td: number,
+  px: number,
+  py: number,
+  pz: number,
+  tx: number,
+  ty: number,
+  tz: number,
+  tw: number,
+  th: number,
+  td: number,
 ): boolean {
   return (
-    px >= tx - tw / 2 && px <= tx + tw / 2 &&
-    py >= ty && py <= ty + th &&
-    pz >= tz - td / 2 && pz <= tz + td / 2
+    px >= tx - tw / 2 &&
+    px <= tx + tw / 2 &&
+    py >= ty &&
+    py <= ty + th &&
+    pz >= tz - td / 2 &&
+    pz <= tz + td / 2
   );
 }
 
 // ─── Projectile System ───
 
 export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void => {
-  const projectiles = world.ecs.query(ComponentType.Projectile, ComponentType.Position, ComponentType.Velocity);
+  const projectiles = world.ecs.query(
+    ComponentType.Projectile,
+    ComponentType.Position,
+    ComponentType.Velocity,
+  );
   const now = Date.now();
 
   for (const projectileId of projectiles) {
-    const proj = world.ecs.getComponent<ProjectileComponent>(projectileId, ComponentType.Projectile)!;
+    const proj = world.ecs.getComponent<ProjectileComponent>(
+      projectileId,
+      ComponentType.Projectile,
+    )!;
     const pos = world.ecs.getComponent<PositionComponent>(projectileId, ComponentType.Position)!;
     const vel = world.ecs.getComponent<VelocityComponent>(projectileId, ComponentType.Velocity)!;
 
@@ -92,7 +108,11 @@ export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void =
     }
 
     // Check entity collision
-    const targets = world.ecs.query(ComponentType.Position, ComponentType.Health, ComponentType.Collider);
+    const targets = world.ecs.query(
+      ComponentType.Position,
+      ComponentType.Health,
+      ComponentType.Collider,
+    );
     let hitTarget = false;
 
     for (const targetId of targets) {
@@ -101,32 +121,63 @@ export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void =
       // Don't hit other projectiles
       if (world.ecs.hasComponent(targetId, ComponentType.Projectile)) continue;
 
-      const targetPos = world.ecs.getComponent<PositionComponent>(targetId, ComponentType.Position)!;
-      const targetCollider = world.ecs.getComponent<ColliderComponent>(targetId, ComponentType.Collider)!;
+      const targetPos = world.ecs.getComponent<PositionComponent>(
+        targetId,
+        ComponentType.Position,
+      )!;
+      const targetCollider = world.ecs.getComponent<ColliderComponent>(
+        targetId,
+        ComponentType.Collider,
+      )!;
 
       // AABB overlap check
-      if (aabbOverlap(
-        pos.x, pos.y, pos.z,
-        targetPos.x, targetPos.y, targetPos.z,
-        targetCollider.width, targetCollider.height, targetCollider.depth,
-      )) {
+      if (
+        aabbOverlap(
+          pos.x,
+          pos.y,
+          pos.z,
+          targetPos.x,
+          targetPos.y,
+          targetPos.z,
+          targetCollider.width,
+          targetCollider.height,
+          targetCollider.depth,
+        )
+      ) {
         // Hit! Apply damage
-        const result = applyProjectileDamage(
-          world,
-          targetId,
-          proj.damage,
-          proj.weaponId,
-          pos,
-          { x: pos.x - dx, y: pos.y - dy, z: pos.z - dz, rotation: 0 },
+        const result = applyProjectileDamage(world, targetId, proj.damage, proj.weaponId, pos, {
+          x: pos.x - dx,
+          y: pos.y - dy,
+          z: pos.z - dz,
+          rotation: 0,
+        });
+
+        logger.debug(
+          {
+            projectile: projectileId,
+            target: targetId,
+            hitZone: result.hitZone,
+            damage: result.finalDamage,
+            source: proj.sourcePlayerId,
+          },
+          'Projectile hit entity',
         );
 
-        logger.debug({
-          projectile: projectileId,
-          target: targetId,
-          hitZone: result.hitZone,
-          damage: result.finalDamage,
-          source: proj.sourcePlayerId,
-        }, 'Projectile hit entity');
+        // Track kill for achievements
+        if (result.finalDamage > 0) {
+          const targetHealth = world.ecs.getComponent<import('@lineremain/shared').HealthComponent>(
+            targetId,
+            ComponentType.Health,
+          );
+          if (targetHealth && targetHealth.current <= 0) {
+            const isNPC = world.ecs.getComponent(targetId, ComponentType.NPCType) !== undefined;
+            if (isNPC) {
+              trackNPCKill(proj.sourcePlayerId);
+            } else {
+              trackPVPKill(proj.sourcePlayerId);
+            }
+          }
+        }
 
         // Destroy projectile on hit
         world.ecs.destroyEntity(projectileId);

@@ -1,19 +1,19 @@
 // ─── Database Schema ───
 
+import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
+import { relations } from 'drizzle-orm';
 import {
-  pgTable,
-  uuid,
-  varchar,
+  customType,
+  index,
   integer,
+  jsonb,
+  pgTable,
+  primaryKey,
   real,
   timestamp,
-  jsonb,
-  customType,
-  primaryKey,
-  index,
+  uuid,
+  varchar,
 } from 'drizzle-orm/pg-core';
-import { relations } from 'drizzle-orm';
-import type { InferSelectModel, InferInsertModel } from 'drizzle-orm';
 
 // ─── Custom Types ───
 
@@ -41,6 +41,25 @@ export const players = pgTable(
     totalDeaths: integer('total_deaths').default(0).notNull(),
     customization: jsonb('customization').default({}).notNull(),
     learnedBlueprints: jsonb('learned_blueprints').default([]).notNull(),
+    // Progression fields
+    xp: integer('xp').default(0).notNull(),
+    level: integer('level').default(1).notNull(),
+    totalGathered: integer('total_gathered').default(0).notNull(),
+    totalCrafted: integer('total_crafted').default(0).notNull(),
+    totalKillsNpc: integer('total_kills_npc').default(0).notNull(),
+    totalKillsPvp: integer('total_kills_pvp').default(0).notNull(),
+    totalBuildings: integer('total_buildings').default(0).notNull(),
+    biomesVisited: integer('biomes_visited').default(0).notNull(),
+    journalsFound: integer('journals_found').default(0).notNull(),
+    tutorialStep: varchar('tutorial_step', { length: 16 }).default('move').notNull(),
+    // Extended stat tracking
+    totalEaten: integer('total_eaten').default(0).notNull(),
+    totalChats: integer('total_chats').default(0).notNull(),
+    teamsJoined: integer('teams_joined').default(0).notNull(),
+    totalDrops: integer('total_drops').default(0).notNull(),
+    nightsSurvived: integer('nights_survived').default(0).notNull(),
+    bloodMoonsSurvived: integer('blood_moons_survived').default(0).notNull(),
+    biomesVisitedSet: jsonb('biomes_visited_set').default([]).notNull(),
   },
   (table) => ({
     emailIdx: index('players_email_idx').on(table.email),
@@ -56,10 +75,44 @@ export const playersRelations = relations(players, ({ one, many }) => ({
   refreshTokens: many(refreshTokens),
   buildings: many(buildings),
   clanMemberships: many(clanMembers),
+  achievements: many(playerAchievements),
 }));
 
 export type Player = InferSelectModel<typeof players>;
 export type NewPlayer = InferInsertModel<typeof players>;
+
+// ═══════════════════════════════════════
+// PLAYER ACHIEVEMENTS
+// ═══════════════════════════════════════
+
+export const playerAchievements = pgTable(
+  'player_achievements',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    playerId: uuid('player_id')
+      .notNull()
+      .references(() => players.id, { onDelete: 'cascade' }),
+    achievementId: varchar('achievement_id', { length: 64 }).notNull(),
+    unlockedAt: timestamp('unlocked_at', { withTimezone: true }).defaultNow().notNull(),
+  },
+  (table) => ({
+    playerIdx: index('player_achievements_player_idx').on(table.playerId),
+    uniqueAchievement: index('player_achievements_unique_idx').on(
+      table.playerId,
+      table.achievementId,
+    ),
+  }),
+);
+
+export const playerAchievementsRelations = relations(playerAchievements, ({ one }) => ({
+  player: one(players, {
+    fields: [playerAchievements.playerId],
+    references: [players.id],
+  }),
+}));
+
+export type PlayerAchievement = InferSelectModel<typeof playerAchievements>;
+export type NewPlayerAchievement = InferInsertModel<typeof playerAchievements>;
 
 // ═══════════════════════════════════════
 // PLAYER STATES

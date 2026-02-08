@@ -2,15 +2,16 @@
 // Processes craft queues each tick: advances progress timers,
 // completes items when ready, and delivers results to player inventories.
 
-import type { GameWorld, SystemFn } from '../World.js';
 import {
   ComponentType,
-  RECIPE_REGISTRY,
   ITEM_REGISTRY,
+  RECIPE_REGISTRY,
   type CraftQueueComponent,
   type InventoryComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld, SystemFn } from '../World.js';
+import { trackCraft } from './AchievementSystem.js';
 
 // ─── System ───
 
@@ -93,10 +94,15 @@ export const craftingSystem: SystemFn = (world: GameWorld, dt: number): void => 
       // Remove completed item from queue
       craftQueue.queue.shift();
 
-      logger.debug(
-        { entityId, recipeId: recipe.id, recipeName: recipe.name },
-        'Craft completed',
-      );
+      // Track craft completion for achievements
+      for (const [pid, eid] of world.getPlayerEntityMap()) {
+        if (eid === entityId) {
+          trackCraft(pid);
+          break;
+        }
+      }
+
+      logger.debug({ entityId, recipeId: recipe.id, recipeName: recipe.name }, 'Craft completed');
     }
   }
 };

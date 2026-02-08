@@ -9,23 +9,31 @@ import {
   SNAPSHOT_SEND_RATE,
   TICK_RATE,
   VIEW_DISTANCE_CHUNKS,
+  type AchievementPayload,
   type DeathPayload,
   type DeltaPayload,
   type EntitySnapshot,
   type JournalFoundPayload,
   type HealthComponent,
   type HungerComponent,
+  type LevelUpPayload,
   type PlayerStatsPayload,
   type PositionComponent,
   type TemperatureComponent,
   type ThirstComponent,
   type WorldEventPayload,
   type WorldTimePayload,
+  type XpGainPayload,
 } from '@lineremain/shared';
 import { gameLoop } from '../game/GameLoop.js';
 import { drainDeathNotifications } from '../game/systems/DeathSystem.js';
 import { drainJournalFinds } from '../game/systems/JournalSystem.js';
 import { drainWorldEvents } from '../game/systems/WorldEventSystem.js';
+import {
+  drainAchievementNotifications,
+  drainLevelUpNotifications,
+  drainXpGainNotifications,
+} from '../game/systems/AchievementSystem.js';
 import type { GameWorld } from '../game/World.js';
 import type { SocketServer } from './SocketServer.js';
 
@@ -96,6 +104,9 @@ export class StateBroadcaster {
 
     // Broadcast journal finds (every tick — pickups should be immediate)
     this.broadcastJournalFinds();
+
+    // Broadcast progression notifications (every tick — immediate feedback)
+    this.broadcastProgressionNotifications();
 
     // Delta broadcast at configured interval
     if (tick % DELTA_INTERVAL === 0) {
@@ -365,6 +376,44 @@ export class StateBroadcaster {
       };
 
       this.socketServer.emitToPlayer(find.playerId, ServerMessage.JournalFound, payload);
+    }
+  }
+
+  // ─── Progression Notification Broadcast ───
+
+  private broadcastProgressionNotifications(): void {
+    // Achievement unlocks
+    const achievements = drainAchievementNotifications();
+    for (const notif of achievements) {
+      const payload: AchievementPayload = {
+        achievementId: notif.achievementId,
+        name: notif.name,
+        description: notif.description,
+        icon: notif.icon,
+        xpReward: notif.xpReward,
+      };
+      this.socketServer.emitToPlayer(notif.playerId, ServerMessage.Achievement, payload);
+    }
+
+    // Level ups
+    const levelUps = drainLevelUpNotifications();
+    for (const notif of levelUps) {
+      const payload: LevelUpPayload = {
+        newLevel: notif.newLevel,
+        rewards: notif.rewards,
+      };
+      this.socketServer.emitToPlayer(notif.playerId, ServerMessage.LevelUp, payload);
+    }
+
+    // XP gains
+    const xpGains = drainXpGainNotifications();
+    for (const notif of xpGains) {
+      const payload: XpGainPayload = {
+        amount: notif.amount,
+        totalXP: notif.totalXP,
+        source: notif.source,
+      };
+      this.socketServer.emitToPlayer(notif.playerId, ServerMessage.XpGain, payload);
     }
   }
 }

@@ -39,6 +39,7 @@ import { thirstSystem } from './systems/ThirstSystem.js';
 import { toolCupboardSystem } from './systems/ToolCupboardSystem.js';
 import { worldEventSystem } from './systems/WorldEventSystem.js';
 import { journalSystem } from './systems/JournalSystem.js';
+import { achievementSystem } from './systems/AchievementSystem.js';
 
 // ─── Input Queue ───
 
@@ -134,7 +135,10 @@ export class GameLoop {
     // 13. Journal system (event-driven journal fragment tracking)
     this.world.addSystem(journalSystem);
 
-    logger.info({ systemCount: 20 }, 'GameLoop initialized with all systems');
+    // 14. Achievement system (periodic stats flush)
+    this.world.addSystem(achievementSystem);
+
+    logger.info({ systemCount: 21 }, 'GameLoop initialized with all systems');
   }
 
   // ─── Input Queue ───

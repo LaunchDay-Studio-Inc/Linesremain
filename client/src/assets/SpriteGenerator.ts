@@ -55,12 +55,7 @@ function drawLine(
   ctx.stroke();
 }
 
-function drawCircle(
-  ctx: CanvasRenderingContext2D,
-  x: number,
-  y: number,
-  radius: number,
-): void {
+function drawCircle(ctx: CanvasRenderingContext2D, x: number, y: number, radius: number): void {
   ctx.beginPath();
   ctx.arc(x, y, radius, 0, Math.PI * 2);
   ctx.stroke();
@@ -259,6 +254,83 @@ const POSE_GENERATORS: Record<AnimationName, PoseGenerator> = {
   die: getDiePose,
 };
 
+// ─── Accessory Drawing ───
+
+function drawAccessory(
+  ctx: CanvasRenderingContext2D,
+  offsetX: number,
+  offsetY: number,
+  pose: StickmanPose,
+  accessory: string,
+): void {
+  const crouch = pose.crouchFactor ?? 0;
+  const headYPos = HEAD_Y + (pose.headOffset?.y ?? 0) + crouch * 8;
+  const headXPos = CENTER_X + (pose.headOffset?.x ?? 0);
+
+  ctx.save();
+  ctx.translate(offsetX, offsetY);
+  ctx.lineWidth = 2;
+  ctx.lineCap = 'round';
+
+  switch (accessory) {
+    case 'crown': {
+      ctx.strokeStyle = '#FFD700';
+      ctx.fillStyle = '#FFD700';
+      const crownY = headYPos - HEAD_RADIUS - 4;
+      ctx.beginPath();
+      ctx.moveTo(headXPos - 6, crownY + 4);
+      ctx.lineTo(headXPos - 6, crownY);
+      ctx.lineTo(headXPos - 3, crownY + 2);
+      ctx.lineTo(headXPos, crownY - 1);
+      ctx.lineTo(headXPos + 3, crownY + 2);
+      ctx.lineTo(headXPos + 6, crownY);
+      ctx.lineTo(headXPos + 6, crownY + 4);
+      ctx.closePath();
+      ctx.fill();
+      ctx.stroke();
+      break;
+    }
+    case 'halo': {
+      ctx.strokeStyle = '#FFE066';
+      ctx.lineWidth = 1.5;
+      const haloY = headYPos - HEAD_RADIUS - 5;
+      ctx.beginPath();
+      ctx.ellipse(headXPos, haloY, 8, 3, 0, 0, Math.PI * 2);
+      ctx.stroke();
+      break;
+    }
+    case 'horns': {
+      ctx.strokeStyle = '#CC3333';
+      ctx.lineWidth = 2;
+      const hornBase = headYPos - HEAD_RADIUS;
+      drawLine(ctx, headXPos - 5, hornBase, headXPos - 8, hornBase - 7);
+      drawLine(ctx, headXPos + 5, hornBase, headXPos + 8, hornBase - 7);
+      break;
+    }
+    case 'antenna': {
+      ctx.strokeStyle = '#66FF66';
+      ctx.lineWidth = 1.5;
+      const antY = headYPos - HEAD_RADIUS;
+      drawLine(ctx, headXPos, antY, headXPos, antY - 8);
+      ctx.fillStyle = '#66FF66';
+      ctx.beginPath();
+      ctx.arc(headXPos, antY - 8, 2, 0, Math.PI * 2);
+      ctx.fill();
+      break;
+    }
+    case 'bandana': {
+      ctx.strokeStyle = '#E74C3C';
+      ctx.lineWidth = 2.5;
+      const bandY = headYPos - 1;
+      drawLine(ctx, headXPos - HEAD_RADIUS, bandY, headXPos + HEAD_RADIUS, bandY);
+      drawLine(ctx, headXPos + HEAD_RADIUS, bandY, headXPos + HEAD_RADIUS + 4, bandY + 3);
+      break;
+    }
+  }
+
+  ctx.restore();
+}
+
 // ─── Public API ───
 
 /**
@@ -266,9 +338,10 @@ const POSE_GENERATORS: Record<AnimationName, PoseGenerator> = {
  * Layout: rows = animations, columns = frames.
  * Returns the canvas and the config describing the layout.
  */
-export function generateSpriteSheet(
-  color = '#ffffff',
-): { canvas: HTMLCanvasElement; config: SpriteSheetConfig } {
+export function generateSpriteSheet(color = '#ffffff', accessory = 'none'): {
+  canvas: HTMLCanvasElement;
+  config: SpriteSheetConfig;
+} {
   const canvas = document.createElement('canvas');
   canvas.width = FRAME_W * MAX_FRAMES;
   canvas.height = FRAME_H * NUM_ROWS;
@@ -287,6 +360,9 @@ export function generateSpriteSheet(
       const offsetX = f * FRAME_W;
       const offsetY = animConfig.row * FRAME_H;
       drawStickman(ctx, offsetX, offsetY, pose, color);
+      if (accessory !== 'none') {
+        drawAccessory(ctx, offsetX, offsetY, pose, accessory);
+      }
     }
   }
 

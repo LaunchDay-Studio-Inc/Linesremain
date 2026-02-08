@@ -9,6 +9,9 @@ interface UIState {
   chatOpen: boolean;
   buildingMode: boolean;
   settingsOpen: boolean;
+  achievementsOpen: boolean;
+  customizationOpen: boolean;
+  leaderboardOpen: boolean;
   cursorLocked: boolean;
 
   toggleInventory: () => void;
@@ -17,9 +20,23 @@ interface UIState {
   toggleChat: () => void;
   toggleBuildingMode: () => void;
   toggleSettings: () => void;
+  toggleAchievements: () => void;
+  toggleCustomization: () => void;
+  toggleLeaderboard: () => void;
   setCursorLocked: (locked: boolean) => void;
   closeAll: () => void;
 }
+
+const CLOSE_PANELS = {
+  inventoryOpen: false,
+  craftingOpen: false,
+  mapOpen: false,
+  chatOpen: false,
+  settingsOpen: false,
+  achievementsOpen: false,
+  customizationOpen: false,
+  leaderboardOpen: false,
+};
 
 export const useUIStore = create<UIState>((set) => ({
   inventoryOpen: false,
@@ -28,64 +45,62 @@ export const useUIStore = create<UIState>((set) => ({
   chatOpen: false,
   buildingMode: false,
   settingsOpen: false,
+  achievementsOpen: false,
+  customizationOpen: false,
+  leaderboardOpen: false,
   cursorLocked: false,
 
   toggleInventory: () =>
     set((s) => ({
+      ...CLOSE_PANELS,
       inventoryOpen: !s.inventoryOpen,
-      craftingOpen: false,
-      mapOpen: false,
-      chatOpen: false,
-      settingsOpen: false,
     })),
 
   toggleCrafting: () =>
     set((s) => ({
+      ...CLOSE_PANELS,
       craftingOpen: !s.craftingOpen,
-      inventoryOpen: false,
-      mapOpen: false,
-      chatOpen: false,
-      settingsOpen: false,
     })),
 
   toggleMap: () =>
     set((s) => ({
+      ...CLOSE_PANELS,
       mapOpen: !s.mapOpen,
-      inventoryOpen: false,
-      craftingOpen: false,
-      chatOpen: false,
-      settingsOpen: false,
     })),
 
   toggleChat: () =>
     set((s) => ({
+      ...CLOSE_PANELS,
       chatOpen: !s.chatOpen,
-      inventoryOpen: false,
-      craftingOpen: false,
-      mapOpen: false,
-      settingsOpen: false,
     })),
 
-  toggleBuildingMode: () =>
-    set((s) => ({ buildingMode: !s.buildingMode })),
+  toggleBuildingMode: () => set((s) => ({ buildingMode: !s.buildingMode })),
 
   toggleSettings: () =>
     set((s) => ({
+      ...CLOSE_PANELS,
       settingsOpen: !s.settingsOpen,
-      inventoryOpen: false,
-      craftingOpen: false,
-      mapOpen: false,
-      chatOpen: false,
+    })),
+
+  toggleAchievements: () =>
+    set((s) => ({
+      ...CLOSE_PANELS,
+      achievementsOpen: !s.achievementsOpen,
+    })),
+
+  toggleCustomization: () =>
+    set((s) => ({
+      ...CLOSE_PANELS,
+      customizationOpen: !s.customizationOpen,
+    })),
+
+  toggleLeaderboard: () =>
+    set((s) => ({
+      ...CLOSE_PANELS,
+      leaderboardOpen: !s.leaderboardOpen,
     })),
 
   setCursorLocked: (locked) => set({ cursorLocked: locked }),
 
-  closeAll: () =>
-    set({
-      inventoryOpen: false,
-      craftingOpen: false,
-      mapOpen: false,
-      chatOpen: false,
-      settingsOpen: false,
-    }),
+  closeAll: () => set(CLOSE_PANELS),
 }));

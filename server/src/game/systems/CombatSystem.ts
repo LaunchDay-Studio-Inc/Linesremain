@@ -2,27 +2,27 @@
 // Processes melee attacks with cone detection, hitzone determination,
 // damage calculation with armor reduction, and ranged projectile creation.
 
-import type { GameWorld } from '../World.js';
-import type { SystemFn } from '../World.js';
 import {
-  ComponentType,
-  WEAPON_STATS,
-  ARMOR_STATS,
-  HEADSHOT_MULT,
-  TORSO_MULT,
-  LEG_MULT,
   ARM_MULT,
+  ARMOR_STATS,
+  ComponentType,
+  HEADSHOT_MULT,
+  LEG_MULT,
   MELEE_KNOCKBACK_FORCE,
   PLAYER_EYE_HEIGHT,
+  TORSO_MULT,
+  WEAPON_STATS,
+  type ColliderComponent,
   type EntityId,
+  type EquipmentComponent,
+  type HealthComponent,
+  type InventoryComponent,
   type PositionComponent,
   type VelocityComponent,
-  type HealthComponent,
-  type EquipmentComponent,
-  type InventoryComponent,
-  type ColliderComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
+import { trackNPCKill, trackPVPKill } from './AchievementSystem.js';
+import type { GameWorld, SystemFn } from '../World.js';
 
 // ─── Constants ───
 
@@ -85,17 +85,24 @@ function determineHitZone(
 
 function getHitZoneMultiplier(zone: HitZone): number {
   switch (zone) {
-    case 'head': return HEADSHOT_MULT;
-    case 'torso': return TORSO_MULT;
-    case 'legs': return LEG_MULT;
-    case 'arm': return ARM_MULT;
+    case 'head':
+      return HEADSHOT_MULT;
+    case 'torso':
+      return TORSO_MULT;
+    case 'legs':
+      return LEG_MULT;
+    case 'arm':
+      return ARM_MULT;
   }
 }
 
 // ─── Armor Damage Reduction ───
 
 function calculateArmorReduction(world: GameWorld, targetEntityId: EntityId): number {
-  const equipment = world.ecs.getComponent<EquipmentComponent>(targetEntityId, ComponentType.Equipment);
+  const equipment = world.ecs.getComponent<EquipmentComponent>(
+    targetEntityId,
+    ComponentType.Equipment,
+  );
   if (!equipment) return 0;
 
   let totalReduction = 0;
@@ -138,10 +145,7 @@ function distance3D(a: PositionComponent, b: PositionComponent): number {
 
 // ─── Angle Between Vectors (XZ plane) ───
 
-function angleBetweenXZ(
-  dir: { x: number; z: number },
-  toTarget: { x: number; z: number },
-): number {
+function angleBetweenXZ(dir: { x: number; z: number }, toTarget: { x: number; z: number }): number {
   const dot = dir.x * toTarget.x + dir.z * toTarget.z;
   const magA = Math.sqrt(dir.x * dir.x + dir.z * dir.z);
   const magB = Math.sqrt(toTarget.x * toTarget.x + toTarget.z * toTarget.z);
@@ -157,14 +161,19 @@ function processMeleeAttack(
   weaponStats: (typeof WEAPON_STATS)[number],
 ): void {
   const attackerPos = world.ecs.getComponent<PositionComponent>(
-    request.attackerEntityId, ComponentType.Position,
+    request.attackerEntityId,
+    ComponentType.Position,
   );
   if (!attackerPos) return;
 
   const range = weaponStats.range;
 
   // Find all entities with Position + Health + Collider (potential targets)
-  const targets = world.ecs.query(ComponentType.Position, ComponentType.Health, ComponentType.Collider);
+  const targets = world.ecs.query(
+    ComponentType.Position,
+    ComponentType.Health,
+    ComponentType.Collider,
+  );
 
   let closestTarget: EntityId | null = null;
   let closestDist = Infinity;
@@ -173,7 +182,10 @@ function processMeleeAttack(
     if (targetId === request.attackerEntityId) continue;
 
     const targetPos = world.ecs.getComponent<PositionComponent>(targetId, ComponentType.Position)!;
-    const targetCollider = world.ecs.getComponent<ColliderComponent>(targetId, ComponentType.Collider)!;
+    const targetCollider = world.ecs.getComponent<ColliderComponent>(
+      targetId,
+      ComponentType.Collider,
+    )!;
 
     // Distance check
     const dist = distance3D(attackerPos, targetPos);
@@ -184,10 +196,7 @@ function processMeleeAttack(
       x: targetPos.x - attackerPos.x,
       z: targetPos.z - attackerPos.z,
     };
-    const angle = angleBetweenXZ(
-      { x: request.direction.x, z: request.direction.z },
-      toTarget,
-    );
+    const angle = angleBetweenXZ({ x: request.direction.x, z: request.direction.z }, toTarget);
     if (angle > HALF_CONE) continue;
 
     // Pick closest target in cone
@@ -199,12 +208,26 @@ function processMeleeAttack(
 
   if (closestTarget === null) return;
 
-  const targetPos = world.ecs.getComponent<PositionComponent>(closestTarget, ComponentType.Position)!;
-  const targetHealth = world.ecs.getComponent<HealthComponent>(closestTarget, ComponentType.Health)!;
-  const targetCollider = world.ecs.getComponent<ColliderComponent>(closestTarget, ComponentType.Collider)!;
+  const targetPos = world.ecs.getComponent<PositionComponent>(
+    closestTarget,
+    ComponentType.Position,
+  )!;
+  const targetHealth = world.ecs.getComponent<HealthComponent>(
+    closestTarget,
+    ComponentType.Health,
+  )!;
+  const targetCollider = world.ecs.getComponent<ColliderComponent>(
+    closestTarget,
+    ComponentType.Collider,
+  )!;
 
   // Determine hit zone
-  const hitZone = determineHitZone(attackerPos, request.direction, targetPos, targetCollider.height);
+  const hitZone = determineHitZone(
+    attackerPos,
+    request.direction,
+    targetPos,
+    targetCollider.height,
+  );
   const zoneMult = weaponStats.headshotCapable ? getHitZoneMultiplier(hitZone) : TORSO_MULT;
 
   // Calculate damage
@@ -217,8 +240,21 @@ function processMeleeAttack(
   // Apply damage
   targetHealth.current = Math.max(0, targetHealth.current - damage);
 
+  // Track kill for achievements
+  if (targetHealth.current <= 0) {
+    const isNPC = world.ecs.getComponent(closestTarget, ComponentType.NPCType) !== undefined;
+    if (isNPC) {
+      trackNPCKill(request.attackerPlayerId);
+    } else {
+      trackPVPKill(request.attackerPlayerId);
+    }
+  }
+
   // Knockback
-  const targetVel = world.ecs.getComponent<VelocityComponent>(closestTarget, ComponentType.Velocity);
+  const targetVel = world.ecs.getComponent<VelocityComponent>(
+    closestTarget,
+    ComponentType.Velocity,
+  );
   if (targetVel) {
     const knockDir = {
       x: targetPos.x - attackerPos.x,
@@ -234,13 +270,16 @@ function processMeleeAttack(
   // Reduce weapon durability
   reduceWeaponDurability(world, request.attackerEntityId);
 
-  logger.debug({
-    attacker: request.attackerPlayerId,
-    target: closestTarget,
-    damage,
-    hitZone,
-    remaining: targetHealth.current,
-  }, 'Melee hit');
+  logger.debug(
+    {
+      attacker: request.attackerPlayerId,
+      target: closestTarget,
+      damage,
+      hitZone,
+      remaining: targetHealth.current,
+    },
+    'Melee hit',
+  );
 }
 
 // ─── Process Ranged Attack (Create Projectile) ───
@@ -251,14 +290,16 @@ function processRangedAttack(
   weaponStats: (typeof WEAPON_STATS)[number],
 ): void {
   const attackerPos = world.ecs.getComponent<PositionComponent>(
-    request.attackerEntityId, ComponentType.Position,
+    request.attackerEntityId,
+    ComponentType.Position,
   );
   if (!attackerPos) return;
 
   // Check ammo
   if (weaponStats.ammoItemId !== undefined) {
     const inventory = world.ecs.getComponent<InventoryComponent>(
-      request.attackerEntityId, ComponentType.Inventory,
+      request.attackerEntityId,
+      ComponentType.Inventory,
     );
     if (!inventory) return;
 
@@ -324,10 +365,13 @@ function processRangedAttack(
   // Reduce weapon durability
   reduceWeaponDurability(world, request.attackerEntityId);
 
-  logger.debug({
-    attacker: request.attackerPlayerId,
-    weapon: weaponStats.itemId,
-  }, 'Projectile fired');
+  logger.debug(
+    {
+      attacker: request.attackerPlayerId,
+      weapon: weaponStats.itemId,
+    },
+    'Projectile fired',
+  );
 }
 
 // ─── Combat System (run each tick) ───
@@ -339,7 +383,8 @@ export const combatSystem: SystemFn = (world: GameWorld, _dt: number): void => {
 
     // Get attacker's held weapon
     const equipment = world.ecs.getComponent<EquipmentComponent>(
-      request.attackerEntityId, ComponentType.Equipment,
+      request.attackerEntityId,
+      ComponentType.Equipment,
     );
     const heldItem = equipment?.held;
     const weaponId = heldItem?.itemId ?? 21; // default to Rock (id 21)
@@ -369,9 +414,18 @@ export function applyProjectileDamage(
   hitPosition: PositionComponent,
   _sourcePosition: PositionComponent,
 ): { hitZone: HitZone; finalDamage: number } {
-  const targetHealth = world.ecs.getComponent<HealthComponent>(targetEntityId, ComponentType.Health);
-  const targetCollider = world.ecs.getComponent<ColliderComponent>(targetEntityId, ComponentType.Collider);
-  const targetPos = world.ecs.getComponent<PositionComponent>(targetEntityId, ComponentType.Position);
+  const targetHealth = world.ecs.getComponent<HealthComponent>(
+    targetEntityId,
+    ComponentType.Health,
+  );
+  const targetCollider = world.ecs.getComponent<ColliderComponent>(
+    targetEntityId,
+    ComponentType.Collider,
+  );
+  const targetPos = world.ecs.getComponent<PositionComponent>(
+    targetEntityId,
+    ComponentType.Position,
+  );
   if (!targetHealth || !targetCollider || !targetPos) {
     return { hitZone: 'torso', finalDamage: 0 };
   }

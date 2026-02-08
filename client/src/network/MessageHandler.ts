@@ -1,24 +1,31 @@
 // ─── Message Handler ───
 // Routes incoming server messages to the appropriate client stores and systems.
 
-import { socketClient } from './SocketClient';
-import { useGameStore } from '../stores/useGameStore';
-import { usePlayerStore } from '../stores/usePlayerStore';
-import { useChatStore } from '../stores/useChatStore';
+import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '@shared/constants/game';
+import type { TutorialStep } from '@shared/types/customization';
 import type { ItemStack } from '@shared/types/items';
 import {
   ServerMessage,
-  type SnapshotPayload,
-  type DeltaPayload,
-  type PlayerStatsPayload,
-  type DeathPayload,
-  type ServerChatPayload,
-  type NotificationPayload,
-  type WorldTimePayload,
-  type InventoryUpdatePayload,
+  type AchievementPayload,
   type ChunkUpdatePayload,
+  type CustomizationUpdatedPayload,
+  type DeathPayload,
+  type DeltaPayload,
+  type InventoryUpdatePayload,
+  type LevelUpPayload,
+  type NotificationPayload,
+  type PlayerStatsPayload,
+  type ServerChatPayload,
+  type SnapshotPayload,
+  type TutorialStepPayload,
+  type WorldTimePayload,
+  type XpGainPayload,
 } from '@shared/types/network';
-import { CHUNK_SIZE_X, CHUNK_SIZE_Z } from '@shared/constants/game';
+import { useAchievementStore } from '../stores/useAchievementStore';
+import { useChatStore } from '../stores/useChatStore';
+import { useGameStore } from '../stores/useGameStore';
+import { usePlayerStore } from '../stores/usePlayerStore';
+import { socketClient } from './SocketClient';
 
 // ─── Entity Store (client-side entity cache) ───
 
@@ -34,7 +41,12 @@ let lastServerTick = 0;
 
 // ─── Block Update Callback ───
 
-type BlockChangedCallback = (worldX: number, worldY: number, worldZ: number, blockType: number) => void;
+type BlockChangedCallback = (
+  worldX: number,
+  worldY: number,
+  worldZ: number,
+  blockType: number,
+) => void;
 let onBlockChangedCallback: BlockChangedCallback | null = null;
 
 /** Register a callback for server-authoritative block changes (used by ChunkManager). */
@@ -98,6 +110,42 @@ export function initializeMessageHandlers(): void {
     const update = data as ChunkUpdatePayload;
     handleChunkUpdate(update);
   });
+
+  // Achievement unlocked
+  socketClient.on(ServerMessage.Achievement, (data) => {
+    const payload = data as AchievementPayload;
+    useAchievementStore.getState().unlockAchievement(payload.achievementId);
+  });
+
+  // Level up
+  socketClient.on(ServerMessage.LevelUp, (data) => {
+    const payload = data as LevelUpPayload;
+    useAchievementStore.getState().setLevel(payload.newLevel);
+  });
+
+  // XP gain
+  socketClient.on(ServerMessage.XpGain, (data) => {
+    const payload = data as XpGainPayload;
+    useAchievementStore.getState().addXP(payload.amount, payload.source);
+  });
+
+  // Customization updated
+  socketClient.on(ServerMessage.CustomizationUpdated, (data) => {
+    const payload = data as CustomizationUpdatedPayload;
+    useAchievementStore.getState().setCustomization({
+      bodyColor: payload.bodyColor,
+      accessory: payload.accessory ?? 'none',
+      trail: payload.trail ?? 'none',
+      deathEffect: payload.deathEffect ?? 'none',
+      title: payload.title ?? 'none',
+    });
+  });
+
+  // Tutorial step
+  socketClient.on(ServerMessage.TutorialStep, (data) => {
+    const payload = data as TutorialStepPayload;
+    useAchievementStore.getState().setTutorialStep(payload.step as TutorialStep | null);
+  });
 }
 
 // ─── Snapshot Handler ───
@@ -119,7 +167,9 @@ function handleSnapshot(snapshot: SnapshotPayload): void {
   // Update local player position from snapshot
   const playerEntity = entities.get(snapshot.playerEntityId);
   if (playerEntity) {
-    const pos = playerEntity.components['Position'] as { x: number; y: number; z: number } | undefined;
+    const pos = playerEntity.components['Position'] as
+      | { x: number; y: number; z: number }
+      | undefined;
     if (pos) {
       usePlayerStore.getState().setPosition(pos.x, pos.y, pos.z);
     }
@@ -168,7 +218,9 @@ function handleDelta(delta: DeltaPayload): void {
   if (localPlayerEntityId !== null) {
     const playerEntity = entities.get(localPlayerEntityId);
     if (playerEntity) {
-      const pos = playerEntity.components['Position'] as { x: number; y: number; z: number } | undefined;
+      const pos = playerEntity.components['Position'] as
+        | { x: number; y: number; z: number }
+        | undefined;
       if (pos) {
         usePlayerStore.getState().setPosition(pos.x, pos.y, pos.z);
       }

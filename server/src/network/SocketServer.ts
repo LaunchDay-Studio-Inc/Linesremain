@@ -2,37 +2,43 @@
 // Full Socket.IO server setup: connection/disconnection handling, player entity
 // lifecycle, grace period for reconnections, and combat-log protection.
 
-import type { Server as SocketIOServer, Socket } from 'socket.io';
-import { gameLoop } from '../game/GameLoop.js';
-import { playerRepository } from '../database/repositories/PlayerRepository.js';
-import { logger } from '../utils/logger.js';
-import { config } from '../config.js';
 import {
+  CHUNK_SIZE_X,
   ClientMessage,
+  ComponentType,
   ServerMessage,
   VIEW_DISTANCE_CHUNKS,
-  CHUNK_SIZE_X,
-  ComponentType,
-  type PositionComponent,
+  type EntitySnapshot,
+  type EquipmentComponent,
   type HealthComponent,
   type HungerComponent,
-  type ThirstComponent,
   type InventoryComponent,
-  type EquipmentComponent,
+  type PositionComponent,
   type SnapshotPayload,
-  type EntitySnapshot,
+  type ThirstComponent,
 } from '@lineremain/shared';
+import type { Socket, Server as SocketIOServer } from 'socket.io';
+import { config } from '../config.js';
+import { playerRepository } from '../database/repositories/PlayerRepository.js';
+import { gameLoop } from '../game/GameLoop.js';
+import { logger } from '../utils/logger.js';
 
 // ─── Handler Imports ───
-import { registerPlayerInputHandlers } from './handlers/PlayerInputHandler.js';
+import { loadPlayerStats, unloadPlayerStats } from '../game/systems/AchievementSystem.js';
+import { processRespawn } from '../game/systems/RespawnSystem.js';
+import { registerBlockHandlers } from './handlers/BlockHandler.js';
+import { registerBuildingHandlers } from './handlers/BuildingHandler.js';
 import { registerChatHandlers } from './handlers/ChatHandler.js';
 import { registerChunkRequestHandlers } from './handlers/ChunkRequestHandler.js';
 import { registerCraftingHandlers } from './handlers/CraftingHandler.js';
+import { registerCustomizationHandlers } from './handlers/CustomizationHandler.js';
 import { registerInventoryHandlers } from './handlers/InventoryHandler.js';
-import { registerBuildingHandlers } from './handlers/BuildingHandler.js';
-import { registerTeamHandlers, handlePlayerDisconnect, handlePlayerConnect } from './handlers/TeamHandler.js';
-import { registerBlockHandlers } from './handlers/BlockHandler.js';
-import { processRespawn } from '../game/systems/RespawnSystem.js';
+import { registerPlayerInputHandlers } from './handlers/PlayerInputHandler.js';
+import {
+  handlePlayerConnect,
+  handlePlayerDisconnect,
+  registerTeamHandlers,
+} from './handlers/TeamHandler.js';
 
 // ─── Types ───
 
@@ -141,8 +147,19 @@ export class SocketServer {
     // Notify team system of connection
     handlePlayerConnect(this.io, playerId);
 
+    // Load achievement/progression stats into memory
+    loadPlayerStats(playerId).catch((err) => {
+      logger.error({ err, playerId }, 'Failed to load player stats');
+    });
+
     logger.info(
-      { playerId, username, entityId, socketId: socket.id, totalPlayers: this.connectedPlayers.size },
+      {
+        playerId,
+        username,
+        entityId,
+        socketId: socket.id,
+        totalPlayers: this.connectedPlayers.size,
+      },
       'Player connected to game',
     );
   }
@@ -157,7 +174,11 @@ export class SocketServer {
     let state: { health?: number; hunger?: number; thirst?: number } | undefined;
 
     if (savedState) {
-      if (savedState.positionX != null && savedState.positionY != null && savedState.positionZ != null) {
+      if (
+        savedState.positionX != null &&
+        savedState.positionY != null &&
+        savedState.positionZ != null
+      ) {
         position = {
           x: savedState.positionX,
           y: savedState.positionY,
@@ -274,6 +295,7 @@ export class SocketServer {
     registerBuildingHandlers(this.io, socket, world, getPlayerId);
     registerTeamHandlers(this.io, socket, world, getPlayerId, getPlayerName);
     registerBlockHandlers(this.io, socket, world, getPlayerId);
+    registerCustomizationHandlers(this.io, socket, world, getPlayerId);
 
     // Respawn handler — creates fresh entity via RespawnSystem
     socket.on(ClientMessage.Respawn, () => {
@@ -281,7 +303,10 @@ export class SocketServer {
       const existingEntity = world.getPlayerEntity(player.playerId);
       if (existingEntity !== undefined) {
         // Entity still exists — check if actually dead
-        const health = world.ecs.getComponent<HealthComponent>(existingEntity, ComponentType.Health);
+        const health = world.ecs.getComponent<HealthComponent>(
+          existingEntity,
+          ComponentType.Health,
+        );
         if (!health || health.current > 0) return; // not dead
       }
 
@@ -343,6 +368,11 @@ export class SocketServer {
     gameLoop.world.removePlayerEntity(playerId);
     this.disconnectedPlayers.delete(playerId);
     this.gracePeriodTimers.delete(playerId);
+
+    // Flush and unload achievement stats from memory
+    unloadPlayerStats(playerId).catch((err) => {
+      logger.error({ err, playerId }, 'Failed to unload player stats');
+    });
 
     logger.info({ playerId }, 'Player entity removed after grace period');
   }

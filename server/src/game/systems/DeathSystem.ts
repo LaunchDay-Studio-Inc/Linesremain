@@ -3,16 +3,17 @@
 // Players: creates loot bags via RespawnSystem, queues death notifications.
 // NPCs: rolls loot from loot tables, creates item drops, destroys entity.
 
-import type { GameWorld } from '../World.js';
 import {
   ComponentType,
   type HealthComponent,
-  type PositionComponent,
-  type LootableComponent,
   type ItemStack,
+  type LootableComponent,
+  type PositionComponent,
 } from '@lineremain/shared';
-import { checkPlayerDeath, processPlayerDeaths } from './RespawnSystem.js';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld } from '../World.js';
+import { trackDeath } from './AchievementSystem.js';
+import { checkPlayerDeath, processPlayerDeaths } from './RespawnSystem.js';
 
 // ─── Death Notification Queue ───
 
@@ -45,6 +46,7 @@ export function deathSystem(world: GameWorld, _dt: number): void {
 
     const cause = determineCauseOfDeath(world, entityId);
     deathNotificationQueue.push({ playerId, cause });
+    trackDeath(playerId);
     logger.info({ playerId, cause }, 'Player death detected');
   }
 

@@ -2,26 +2,31 @@
 // Socket event handlers for chat messages across global, team, and local channels.
 // Includes basic chat commands (/kill, /ping, /players, /clan).
 
-import type { Server, Socket } from 'socket.io';
-import type { GameWorld } from '../../game/World.js';
 import {
   ClientMessage,
-  ServerMessage,
-  MAX_CHAT_MESSAGE_LENGTH,
-  type ChatPayload,
-  type ServerChatPayload,
   ComponentType,
+  MAX_CHAT_MESSAGE_LENGTH,
+  ServerMessage,
+  type ChatPayload,
   type HealthComponent,
+  type ServerChatPayload,
 } from '@lineremain/shared';
-import { chatRateLimiter } from '../RateLimiter.js';
+import type { Server, Socket } from 'socket.io';
+import type { GameWorld } from '../../game/World.js';
 import { logger } from '../../utils/logger.js';
+import { trackChat } from '../../game/systems/AchievementSystem.js';
+import { chatRateLimiter } from '../RateLimiter.js';
 
 // ─── Validation ───
 
 function isValidChatPayload(payload: unknown): payload is ChatPayload {
   if (!payload || typeof payload !== 'object') return false;
   const p = payload as Record<string, unknown>;
-  return typeof p.message === 'string' && p.message.length > 0 && p.message.length <= MAX_CHAT_MESSAGE_LENGTH;
+  return (
+    typeof p.message === 'string' &&
+    p.message.length > 0 &&
+    p.message.length <= MAX_CHAT_MESSAGE_LENGTH
+  );
 }
 
 // ─── Chat Command Processing ───
@@ -68,7 +73,10 @@ function processChatCommand(
       const timeOfDay = world.worldTime;
       const hours = Math.floor(timeOfDay * 24);
       const minutes = Math.floor((timeOfDay * 24 - hours) * 60);
-      sendSystemMessage(socket, `Server time: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`);
+      sendSystemMessage(
+        socket,
+        `Server time: ${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`,
+      );
       return true;
     }
 
@@ -174,6 +182,9 @@ export function registerChatHandlers(
         break;
       }
     }
+
+    // Track chat message for achievements
+    trackChat(playerId);
 
     logger.debug({ playerId, channel, messageLength: cleanMessage.length }, 'Chat message sent');
   });

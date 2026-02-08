@@ -40,5 +40,34 @@
   },
   "[json]": {
     "editor.defaultFormatter": "esbenp.prettier-vscode"
-  }
+  },
+  "inlineChat.notebookAgent": true,
+  "chat.useNestedAgentsMdFiles": true,
+  "chat.tools.terminal.autoReplyToPrompts": true,
+  "chat.tips.enabled": true,
+  "chat.restoreLastPanelSession": true,
+  "chat.mcp.gallery.enabled": true,
+  "chat.mcp.discovery.enabled": {
+    "claude-desktop": true
+  },
+  "chat.mcp.assisted.nuget.enabled": true,
+  "chat.includeReferencedInstructions": true,
+  "chat.experimental.useSkillAdherencePrompt": true,
+  "chat.editing.explainChanges.enabled": true,
+  "chat.customAgentInSubagent.enabled": true,
+  "chat.checkpoints.showFileChanges": true,
+  "chat.agentSessionProjection.enabled": true,
+  "inlineChat.defaultModel": "Claude Opus 4.5 (copilot)",
+  "inlineChat.enableV2": true,
+  "inlineChat.affordance": "editor",
+  "chat.viewProgressBadge.enabled": true,
+  "chat.tools.terminal.outputLocation": "chat",
+  "chat.tools.terminal.blockDetectedFileWrites": "never",
+  "chat.agent.codeBlockProgress": false,
+  "chat.agent.maxRequests": 10000,
+  "chat.editing.autoAcceptDelay": 5,
+  "chat.notifyWindowOnConfirmation": false,
+  "chat.notifyWindowOnResponseReceived": false,
+  "chat.tools.terminal.ignoreDefaultAutoApproveRules": true,
+  "chat.tools.global.autoApprove": true
 }
