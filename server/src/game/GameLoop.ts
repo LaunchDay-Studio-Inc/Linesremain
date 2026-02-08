@@ -19,33 +19,33 @@ import { GameWorld } from './World.js';
 
 // ─── Import Systems ───
 import { aiSystem } from './systems/AISystem.js';
+import { achievementSystem } from './systems/AchievementSystem.js';
+import { blueprintSystem } from './systems/BlueprintSystem.js';
 import { buildingPlacementSystem } from './systems/BuildingPlacementSystem.js';
 import { combatSystem } from './systems/CombatSystem.js';
+import { containerSystem } from './systems/ContainerSystem.js';
 import { craftingSystem } from './systems/CraftingSystem.js';
-import { dayNightSystem } from './systems/DayNightSystem.js';
+import { dayNightSystem, resetDayNightCounter } from './systems/DayNightSystem.js';
 import { deathSystem } from './systems/DeathSystem.js';
 import { decaySystem } from './systems/DecaySystem.js';
+import { defenseSystem } from './systems/DefenseSystem.js';
+import { doorSystem } from './systems/DoorSystem.js';
 import { hungerSystem } from './systems/HungerSystem.js';
 import { itemPickupSystem } from './systems/ItemPickupSystem.js';
+import { journalSystem } from './systems/JournalSystem.js';
 import { lootDespawnSystem } from './systems/LootDespawnSystem.js';
 import { lootSpawnSystem } from './systems/LootSpawnSystem.js';
 import { movementSystem } from './systems/MovementSystem.js';
 import { npcSpawnSystem } from './systems/NPCSpawnSystem.js';
 import { physicsSystem } from './systems/PhysicsSystem.js';
 import { projectileSystem } from './systems/ProjectileSystem.js';
+import { raidingSystem } from './systems/RaidingSystem.js';
 import { resourceRespawnSystem } from './systems/ResourceRespawnSystem.js';
 import { temperatureSystem } from './systems/TemperatureSystem.js';
 import { thirstSystem } from './systems/ThirstSystem.js';
 import { toolCupboardSystem } from './systems/ToolCupboardSystem.js';
-import { worldEventSystem } from './systems/WorldEventSystem.js';
-import { journalSystem } from './systems/JournalSystem.js';
-import { achievementSystem } from './systems/AchievementSystem.js';
-import { blueprintSystem } from './systems/BlueprintSystem.js';
-import { containerSystem } from './systems/ContainerSystem.js';
-import { defenseSystem } from './systems/DefenseSystem.js';
-import { doorSystem } from './systems/DoorSystem.js';
-import { raidingSystem } from './systems/RaidingSystem.js';
 import { wipeSystem } from './systems/WipeSystem.js';
+import { worldEventSystem } from './systems/WorldEventSystem.js';
 
 // ─── Input Queue ───
 
@@ -64,7 +64,6 @@ export class GameLoop {
   private saveInterval: ReturnType<typeof setInterval> | null = null;
   private running = false;
   private tickCount = 0;
-  private lastTickTime = 0;
 
   /** Queued player inputs to process next tick */
   private inputQueue: QueuedInput[] = [];
@@ -75,9 +74,11 @@ export class GameLoop {
   /** Callback for saving world state */
   private saveCallback: (() => Promise<void>) | null = null;
 
-  /** Performance monitoring */
-  private tickDurations: number[] = [];
-  private readonly PERF_WINDOW = 100; // track last 100 ticks
+  /** Performance monitoring — ring buffer to avoid shift() O(n) */
+  private readonly PERF_WINDOW = 100;
+  private tickDurations = new Float64Array(100);
+  private tickDurIdx = 0;
+  private tickDurCount = 0;
 
   constructor() {
     this.world = new GameWorld();
@@ -87,64 +88,65 @@ export class GameLoop {
 
   initialize(): void {
     this.world.initialize(config.WORLD_SEED);
+    resetDayNightCounter();
 
     // Register systems in execution order
 
     // 1. Day/night cycle (time progression)
     this.world.addSystem(dayNightSystem);
 
-    // 1b. World events (blood moon, fog, supply drops)
+    // 2. World events (blood moon, fog, supply drops)
     this.world.addSystem(worldEventSystem);
 
-    // 2. AI (NPC state machine: wander, chase, attack, flee)
+    // 3. AI (NPC state machine: wander, chase, attack, flee)
     this.world.addSystem(aiSystem);
 
-    // 3. Combat (melee attacks, damage resolution)
+    // 4. Combat (melee attacks, damage resolution)
     this.world.addSystem(combatSystem);
 
-    // 4. Projectiles (arrow/bullet flight, collision)
+    // 5. Projectiles (arrow/bullet flight, collision)
     this.world.addSystem(projectileSystem);
 
-    // 5. Physics (gravity, ground detection, water)
+    // 6. Physics (gravity, ground detection, water)
     this.world.addSystem(physicsSystem);
 
-    // 6. Movement (collision resolution)
+    // 7. Movement (collision resolution)
     this.world.addSystem(movementSystem);
 
-    // 7. Survival systems
+    // 8. Survival systems
     this.world.addSystem(hungerSystem);
     this.world.addSystem(thirstSystem);
     this.world.addSystem(temperatureSystem);
 
-    // 8. Crafting (process craft queues)
+    // 9. Crafting (process craft queues)
     this.world.addSystem(craftingSystem);
 
-    // 9. Death detection (loot bag creation, death notifications)
+    // 10. Death detection (loot bag creation, death notifications)
     this.world.addSystem(deathSystem);
 
-    // 10. Item auto-pickup (proximity collection)
+    // 11. Item auto-pickup (proximity collection)
     this.world.addSystem(itemPickupSystem);
 
-    // 10. Building systems
+    // 12. Building systems
     this.world.addSystem(buildingPlacementSystem);
     this.world.addSystem(toolCupboardSystem);
     this.world.addSystem(decaySystem);
 
-    // 11. World maintenance
+    // 13. World maintenance
     this.world.addSystem(resourceRespawnSystem);
     this.world.addSystem(lootSpawnSystem);
     this.world.addSystem(lootDespawnSystem);
 
-    // 12. NPC spawning (proximity-based creature population)
+    // 14. NPC spawning (proximity-based creature population)
     this.world.addSystem(npcSpawnSystem);
 
-    // 13. Journal system (event-driven journal fragment tracking)
+    // 15. Journal system (event-driven journal fragment tracking)
     this.world.addSystem(journalSystem);
 
-    // 14. Achievement system (periodic stats flush)
+    // 16. Achievement system (periodic stats flush)
     this.world.addSystem(achievementSystem);
 
-    // 15. Endgame systems
+    // 17. Endgame systems
     this.world.addSystem(raidingSystem);
     this.world.addSystem(doorSystem);
     this.world.addSystem(containerSystem);
@@ -180,7 +182,6 @@ export class GameLoop {
   start(): void {
     if (this.running) return;
     this.running = true;
-    this.lastTickTime = performance.now();
 
     const tickIntervalMs = 1000 / TICK_RATE;
 
@@ -236,12 +237,11 @@ export class GameLoop {
       cb(this.world, this.tickCount);
     }
 
-    // ── Performance tracking ──
+    // ── Performance tracking (ring buffer) ──
     const tickDuration = performance.now() - tickStart;
-    this.tickDurations.push(tickDuration);
-    if (this.tickDurations.length > this.PERF_WINDOW) {
-      this.tickDurations.shift();
-    }
+    this.tickDurations[this.tickDurIdx] = tickDuration;
+    this.tickDurIdx = (this.tickDurIdx + 1) % this.PERF_WINDOW;
+    if (this.tickDurCount < this.PERF_WINDOW) this.tickDurCount++;
 
     // Warn if tick took too long (>80% of budget)
     const budget = 1000 / TICK_RATE;
@@ -280,17 +280,21 @@ export class GameLoop {
       const moveX = input.right;
       const moveZ = input.forward;
 
-      // Base speed
+      // Base speed — sprint takes priority; crouch overrides if not sprinting
       let speed = PLAYER_WALK_SPEED;
-      if (input.sprint) speed = PLAYER_SPRINT_SPEED;
-      if (input.crouch) speed = PLAYER_CROUCH_SPEED;
+      if (input.sprint && !input.crouch) {
+        speed = PLAYER_SPRINT_SPEED;
+      } else if (input.crouch) {
+        speed = PLAYER_CROUCH_SPEED;
+      }
 
       // Transform input direction by rotation
       vel.vx = (moveX * cos - moveZ * sin) * speed;
       vel.vz = (moveX * sin + moveZ * cos) * speed;
 
-      // Jump
-      if (input.jump && vel.vy === 0) {
+      // Jump — use epsilon for ground check to handle floating-point drift
+      // TODO: replace with grounded flag from PhysicsSystem
+      if (input.jump && Math.abs(vel.vy) < 0.01) {
         vel.vy = PLAYER_JUMP_VELOCITY;
       }
     }
@@ -324,13 +328,18 @@ export class GameLoop {
     maxTickMs: number;
     tickCount: number;
   } {
-    if (this.tickDurations.length === 0) {
+    if (this.tickDurCount === 0) {
       return { avgTickMs: 0, maxTickMs: 0, tickCount: this.tickCount };
     }
 
-    const sum = this.tickDurations.reduce((a, b) => a + b, 0);
-    const avg = sum / this.tickDurations.length;
-    const max = Math.max(...this.tickDurations);
+    let sum = 0;
+    let max = 0;
+    for (let i = 0; i < this.tickDurCount; i++) {
+      const v = this.tickDurations[i]!;
+      sum += v;
+      if (v > max) max = v;
+    }
+    const avg = sum / this.tickDurCount;
 
     return {
       avgTickMs: Math.round(avg * 100) / 100,

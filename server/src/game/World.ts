@@ -61,6 +61,9 @@ export class GameWorld {
   /** Day/night cycle progress: 0 = dawn, 0.5 = dusk, 0.75 = midnight */
   worldTime = 0;
 
+  /** Day counter (starts at 1, increments each full day cycle) */
+  dayCount = 1;
+
   /** Ordered list of systems to run each tick */
   private systems: SystemFn[] = [];
 

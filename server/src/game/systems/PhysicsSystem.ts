@@ -1,18 +1,19 @@
 // ─── Physics System ───
 // Applies gravity, ground detection, water buoyancy, and terminal velocity.
 
-import type { GameWorld } from '../World.js';
 import {
-  ComponentType,
-  GRAVITY,
-  TERMINAL_VELOCITY,
+  BlockType,
   CHUNK_SIZE_X,
   CHUNK_SIZE_Y,
   CHUNK_SIZE_Z,
+  ComponentType,
+  GRAVITY,
+  TERMINAL_VELOCITY,
+  type ColliderComponent,
   type PositionComponent,
   type VelocityComponent,
-  type ColliderComponent,
 } from '@lineremain/shared';
+import type { GameWorld } from '../World.js';
 
 // ─── Block Query Helper ───
 
@@ -34,12 +35,11 @@ function getBlockAt(world: GameWorld, x: number, y: number, z: number): number {
 }
 
 function isSolidBlock(blockId: number): boolean {
-  // 0 = air, block IDs 1+ are solid (water handled separately)
-  return blockId > 0 && blockId !== 9; // 9 = water (convention)
+  return blockId > 0 && blockId !== BlockType.Water;
 }
 
 function isWaterBlock(blockId: number): boolean {
-  return blockId === 9;
+  return blockId === BlockType.Water;
 }
 
 // ─── Constants ───
@@ -99,8 +99,8 @@ export function physicsSystem(world: GameWorld, dt: number): void {
 
     // ── Drag in water ──
     if (inWater) {
-      vel.vx *= (1 - 3.0 * dt);
-      vel.vz *= (1 - 3.0 * dt);
+      vel.vx *= 1 - 3.0 * dt;
+      vel.vz *= 1 - 3.0 * dt;
     }
   }
 }

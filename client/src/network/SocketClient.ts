@@ -16,6 +16,7 @@ class SocketClient {
   private socket: Socket | null = null;
   private handlers = new Map<string, MessageHandler[]>();
   private serverUrl = '';
+  private pendingEmits: Array<{ event: string; data?: unknown }> = [];
 
   // ─── Connect ───
 
@@ -59,6 +60,12 @@ class SocketClient {
       debugLog.log('[SocketClient] Connected to server');
       useGameStore.getState().setConnected(true);
       useGameStore.getState().setLoadingProgress(25, 'Connected.');
+
+      // Flush pending messages queued during disconnection
+      for (const pending of this.pendingEmits) {
+        this.socket!.emit(pending.event, pending.data);
+      }
+      this.pendingEmits.length = 0;
     });
 
     this.socket.on('disconnect', (reason) => {
@@ -94,6 +101,8 @@ class SocketClient {
 
   on(event: string, handler: MessageHandler): void {
     const existing = this.handlers.get(event) ?? [];
+    // Prevent duplicate registration of the same handler reference (e.g. React StrictMode)
+    if (existing.includes(handler)) return;
     existing.push(handler);
     this.handlers.set(event, existing);
   }
@@ -115,6 +124,9 @@ class SocketClient {
   emit(event: string, data?: unknown): void {
     if (this.socket?.connected) {
       this.socket.emit(event, data);
+    } else if (event !== 'input') {
+      // Queue non-input messages for resend on reconnect (input is time-sensitive)
+      this.pendingEmits.push({ event, data });
     }
   }
 

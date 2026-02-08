@@ -2,18 +2,17 @@
 // Applies building decay over time. Buildings without TC coverage decay after
 // a delay. Buildings with TC coverage only decay if upkeep is not maintained.
 
-import type { GameWorld } from '../World.js';
-import type { SystemFn } from '../World.js';
 import {
   ComponentType,
-  type EntityId,
-  type PositionComponent,
-  type HealthComponent,
-  type DecayComponent,
   type BuildingComponent,
+  type DecayComponent,
+  type EntityId,
+  type HealthComponent,
+  type PositionComponent,
 } from '@lineremain/shared';
-import { findCoveringTC, didTCFailUpkeep } from './ToolCupboardSystem.js';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld, SystemFn } from '../World.js';
+import { didTCFailUpkeep, findCoveringTC } from './ToolCupboardSystem.js';
 
 // ─── Decay Processing Interval ───
 
@@ -33,7 +32,7 @@ export const decaySystem: SystemFn = (world: GameWorld, dt: number): void => {
   }
 
   const elapsed = timer;
-  decayTimers.set(world, 0);
+  decayTimers.set(world, elapsed - Math.floor(elapsed / DECAY_TICK_INTERVAL) * DECAY_TICK_INTERVAL);
 
   // Query all entities with Decay + Health + Building + Position
   const decayEntities = world.ecs.query(
@@ -51,6 +50,8 @@ export const decaySystem: SystemFn = (world: GameWorld, dt: number): void => {
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position)!;
 
     // Check if building is within a TC zone
+    // TODO: findCoveringTC runs per-building per-decay-tick. Consider caching TC coverage
+    // zones or using a spatial hash to reduce O(buildings × TCs) to O(buildings).
     const coveringTC = findCoveringTC(world, pos);
 
     if (coveringTC !== null) {
@@ -72,8 +73,8 @@ export const decaySystem: SystemFn = (world: GameWorld, dt: number): void => {
       continue;
     }
 
-    // Apply decay damage
-    const decayDamage = decay.decayRate * elapsed;
+    // Apply decay damage (use intended interval, not accumulated timer drift)
+    const decayDamage = decay.decayRate * DECAY_TICK_INTERVAL;
     health.current -= decayDamage;
 
     if (health.current <= 0) {

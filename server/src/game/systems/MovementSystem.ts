@@ -1,16 +1,17 @@
 // ─── Movement System ───
 // Applies velocity to position with axis-separated block collision resolution.
 
-import type { GameWorld } from '../World.js';
 import {
-  ComponentType,
+  BlockType,
   CHUNK_SIZE_X,
   CHUNK_SIZE_Y,
   CHUNK_SIZE_Z,
+  ComponentType,
+  type ColliderComponent,
   type PositionComponent,
   type VelocityComponent,
-  type ColliderComponent,
 } from '@lineremain/shared';
+import type { GameWorld } from '../World.js';
 
 // ─── Block Query ───
 
@@ -21,7 +22,7 @@ function getBlockAt(world: GameWorld, x: number, y: number, z: number): number {
   const chunkZ = Math.floor(z / CHUNK_SIZE_Z);
 
   const chunk = world.chunkStore.getChunk(chunkX, chunkZ);
-  if (!chunk) return 0;
+  if (!chunk) return 1; // Treat unloaded chunks as solid — prevents falling through world
 
   const localX = ((Math.floor(x) % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
   const localY = Math.floor(y);
@@ -32,7 +33,7 @@ function getBlockAt(world: GameWorld, x: number, y: number, z: number): number {
 }
 
 function isSolid(blockId: number): boolean {
-  return blockId > 0 && blockId !== 9; // 9 = water
+  return blockId > 0 && blockId !== BlockType.Water;
 }
 
 // ─── AABB Collision Check ───
@@ -144,9 +145,9 @@ export function movementSystem(world: GameWorld, dt: number): void {
       vel.vz = 0;
     }
 
-    // ── Floor Clamp ──
-    if (pos.y < 0) {
-      pos.y = 0;
+    // ── Floor Clamp (above bedrock) ──
+    if (pos.y < 1) {
+      pos.y = 1;
       vel.vy = 0;
     }
   }

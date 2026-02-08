@@ -2,14 +2,13 @@
 // Runs every 30 seconds, tracks depleted resource node respawn timers.
 // Trees respawn after 1200s, ore/stone nodes after 900s.
 
-import type { GameWorld } from '../World.js';
-import type { SystemFn } from '../World.js';
 import {
   ComponentType,
-  type ResourceNodeComponent,
   type HealthComponent,
+  type ResourceNodeComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld, SystemFn } from '../World.js';
 
 // ─── Constants ───
 
@@ -27,13 +26,17 @@ export const resourceRespawnSystem: SystemFn = (world: GameWorld, dt: number): v
   const resourceNodes = world.ecs.query(ComponentType.ResourceNode, ComponentType.Health);
 
   for (const entityId of resourceNodes) {
-    const node = world.ecs.getComponent<ResourceNodeComponent>(entityId, ComponentType.ResourceNode)!;
+    const node = world.ecs.getComponent<ResourceNodeComponent>(
+      entityId,
+      ComponentType.ResourceNode,
+    )!;
     const health = world.ecs.getComponent<HealthComponent>(entityId, ComponentType.Health)!;
 
     // Check if depleted
     if (node.amountRemaining <= 0 || health.current <= 0) {
       // Mark depletion time if not already set
-      if (node.lastDepletedTime === null) {
+      if (node.lastDepletedTime == null) {
+        // Matches both null and undefined
         node.lastDepletedTime = now;
         continue;
       }
@@ -46,11 +49,14 @@ export const resourceRespawnSystem: SystemFn = (world: GameWorld, dt: number): v
         health.current = health.max;
         node.lastDepletedTime = null;
 
-        logger.debug({
-          entityId,
-          resourceItemId: node.resourceItemId,
-          amount: node.maxAmount,
-        }, 'Resource node respawned');
+        logger.debug(
+          {
+            entityId,
+            resourceItemId: node.resourceItemId,
+            amount: node.maxAmount,
+          },
+          'Resource node respawned',
+        );
       }
     }
   }

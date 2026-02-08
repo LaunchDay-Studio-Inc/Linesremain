@@ -13,16 +13,17 @@ import { getDayNumber, isDaytime } from './DayNightSystem.js';
 
 // ─── State ───
 
+const FOG_DURATION = 300; // 5 minutes
+const FOG_COOLDOWN = 1800; // 30 minutes
+const SUPPLY_DROP_INTERVAL = 2700; // 45 minutes
+
 let bloodMoonActive = false;
 let lastBloodMoonDay = 0;
 let fogActive = false;
 let fogTimer = 0;
-const FOG_DURATION = 300; // 5 minutes
-let fogCooldownTimer = 0;
-const FOG_COOLDOWN = 1800; // 30 minutes
+let fogCooldownTimer = FOG_COOLDOWN; // Start with full cooldown to prevent immediate trigger
 
-let supplyDropTimer = 0;
-const SUPPLY_DROP_INTERVAL = 2700; // 45 minutes
+let supplyDropTimer = SUPPLY_DROP_INTERVAL; // Start with full cooldown to prevent immediate trigger
 
 /** Pending events to broadcast to clients */
 const pendingEvents: Array<{
@@ -99,10 +100,20 @@ function updateSupplyDrop(world: GameWorld, dt: number): void {
   const playerMap = world.getPlayerEntityMap();
   if (playerMap.size === 0) return;
 
-  const playerEntries = Array.from(playerMap.entries());
-  const randomPlayer = playerEntries[Math.floor(Math.random() * playerEntries.length)]!;
+  // Pick a random player without Array.from() allocation
+  const targetIndex = Math.floor(Math.random() * playerMap.size);
+  let idx = 0;
+  let randomEntityId: number | undefined;
+  for (const [, entityId] of playerMap) {
+    if (idx === targetIndex) {
+      randomEntityId = entityId;
+      break;
+    }
+    idx++;
+  }
+  if (randomEntityId === undefined) return;
   const playerPos = world.ecs.getComponent<PositionComponent>(
-    randomPlayer[1],
+    randomEntityId,
     ComponentType.Position,
   );
   if (!playerPos) return;
@@ -112,7 +123,16 @@ function updateSupplyDrop(world: GameWorld, dt: number): void {
   const distance = 50 + Math.random() * 100;
   const dropX = Math.max(10, Math.min(WORLD_SIZE - 10, playerPos.x + Math.cos(angle) * distance));
   const dropZ = Math.max(10, Math.min(WORLD_SIZE - 10, playerPos.z + Math.sin(angle) * distance));
-  const dropY = 60; // Will be at surface eventually
+
+  // Find actual surface Y at drop position
+  let dropY = 60;
+  for (let y = 63; y >= 1; y--) {
+    const block = world.chunkStore.getBlock(Math.floor(dropX), y, Math.floor(dropZ));
+    if (block !== null && block !== 0 && block !== 14) { // solid, non-water
+      dropY = y + 1;
+      break;
+    }
+  }
 
   // Create a loot entity at the drop location (Tier 2-3 items)
   const lootTable = [

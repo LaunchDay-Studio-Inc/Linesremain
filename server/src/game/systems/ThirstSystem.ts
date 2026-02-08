@@ -1,12 +1,8 @@
 // ─── Thirst System ───
 // Drains thirst over time, applies dehydration damage.
 
+import { ComponentType, type HealthComponent, type ThirstComponent } from '@lineremain/shared';
 import type { GameWorld } from '../World.js';
-import {
-  ComponentType,
-  type ThirstComponent,
-  type HealthComponent,
-} from '@lineremain/shared';
 
 // ─── Constants ───
 
@@ -29,9 +25,20 @@ export function thirstSystem(world: GameWorld, _dt: number): void {
   tickCounter++;
   if (tickCounter % THIRST_CHECK_INTERVAL !== 0) return;
 
+  // Only drain player entities — NPCs should not dehydrate
+  const playerMap = world.getPlayerEntityMap();
   const entities = world.ecs.query(ComponentType.Thirst);
 
   for (const entityId of entities) {
+    // Skip non-player entities
+    let isPlayer = false;
+    for (const [, eid] of playerMap) {
+      if (eid === entityId) {
+        isPlayer = true;
+        break;
+      }
+    }
+    if (!isPlayer) continue;
     const thirst = world.ecs.getComponent<ThirstComponent>(entityId, ComponentType.Thirst)!;
 
     // Drain thirst

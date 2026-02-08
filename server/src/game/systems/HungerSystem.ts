@@ -1,13 +1,13 @@
 // ─── Hunger System ───
 // Drains hunger based on activity level, applies starvation damage and health regen.
 
-import type { GameWorld } from '../World.js';
 import {
   ComponentType,
+  type HealthComponent,
   type HungerComponent,
   type VelocityComponent,
-  type HealthComponent,
 } from '@lineremain/shared';
+import type { GameWorld } from '../World.js';
 
 // ─── Constants ───
 
@@ -38,9 +38,20 @@ export function hungerSystem(world: GameWorld, _dt: number): void {
   tickCounter++;
   if (tickCounter % HUNGER_CHECK_INTERVAL !== 0) return;
 
+  // Only drain player entities — NPCs should not starve
+  const playerMap = world.getPlayerEntityMap();
   const entities = world.ecs.query(ComponentType.Hunger);
 
   for (const entityId of entities) {
+    // Skip non-player entities
+    let isPlayer = false;
+    for (const [, eid] of playerMap) {
+      if (eid === entityId) {
+        isPlayer = true;
+        break;
+      }
+    }
+    if (!isPlayer) continue;
     const hunger = world.ecs.getComponent<HungerComponent>(entityId, ComponentType.Hunger)!;
 
     // Determine activity level from velocity

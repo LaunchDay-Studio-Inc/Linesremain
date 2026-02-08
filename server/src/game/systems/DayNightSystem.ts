@@ -1,13 +1,12 @@
 // ─── Day/Night Cycle System ───
 // Advances worldTime each tick and periodically broadcasts to clients.
 
-import type { GameWorld } from '../World.js';
 import { DAY_LENGTH_SECONDS } from '@lineremain/shared';
+import type { GameWorld } from '../World.js';
 
 // ─── State ───
 
 let tickCounter = 0;
-let dayCount = 1;
 
 // ─── System ───
 
@@ -16,7 +15,7 @@ export function dayNightSystem(world: GameWorld, dt: number): void {
   world.worldTime += dt / DAY_LENGTH_SECONDS;
   if (world.worldTime >= 1) {
     world.worldTime -= 1;
-    dayCount++;
+    world.dayCount++;
   }
 
   tickCounter++;
@@ -38,8 +37,8 @@ export function isDaytime(world: GameWorld): boolean {
 /**
  * Get the current day number (starts at 1, increments each full day cycle).
  */
-export function getDayNumber(_world: GameWorld): number {
-  return dayCount;
+export function getDayNumber(world: GameWorld): number {
+  return world.dayCount;
 }
 
 /**

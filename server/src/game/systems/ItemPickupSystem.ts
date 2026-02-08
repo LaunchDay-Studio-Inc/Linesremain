@@ -3,23 +3,33 @@
 // Runs each tick, checks proximity between all players and item drops,
 // transfers items to player inventories, and destroys collected drops.
 
-import type { GameWorld, SystemFn } from '../World.js';
 import {
   ComponentType,
   ITEM_REGISTRY,
   PICKUP_RANGE,
-  type PositionComponent,
   type InventoryComponent,
+  type PositionComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld, SystemFn } from '../World.js';
 
 // ─── Constants ───
 
 const PICKUP_RANGE_SQ = PICKUP_RANGE * PICKUP_RANGE;
+const PICKUP_CHECK_INTERVAL = 3; // every 3 ticks (~150ms at 20 TPS)
+let tickCounter = 0;
+
+// ─── Module-level reusable containers ───
+
+const playerEntityIds = new Set<number>();
+const playerEntries: { entityId: number; pos: PositionComponent; inv: InventoryComponent }[] = [];
 
 // ─── System ───
 
 export const itemPickupSystem: SystemFn = (world: GameWorld, _dt: number): void => {
+  tickCounter++;
+  if (tickCounter % PICKUP_CHECK_INTERVAL !== 0) return;
+
   const playerMap = world.getPlayerEntityMap();
   if (playerMap.size === 0) return;
 
@@ -27,9 +37,9 @@ export const itemPickupSystem: SystemFn = (world: GameWorld, _dt: number): void 
   const candidates = world.ecs.query(ComponentType.Position, ComponentType.Inventory);
   if (candidates.length === 0) return;
 
-  // Build set of player entity IDs for quick exclusion
-  const playerEntityIds = new Set<number>();
-  const playerEntries: { entityId: number; pos: PositionComponent; inv: InventoryComponent }[] = [];
+  // Clear and reuse module-level containers
+  playerEntityIds.clear();
+  playerEntries.length = 0;
 
   for (const [, entityId] of playerMap) {
     playerEntityIds.add(entityId);

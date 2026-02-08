@@ -7,13 +7,13 @@ import type { AncestorRecord } from '@lineremain/shared';
 import {
   ComponentType,
   type HealthComponent,
-  type ItemStack,
   type LootableComponent,
   type PositionComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
 import type { GameWorld } from '../World.js';
 import { trackDeath } from './AchievementSystem.js';
+import { rollLootTable } from './LootSpawnSystem.js';
 import { checkPlayerDeath, playerHasSleepingBag, processPlayerDeaths } from './RespawnSystem.js';
 
 // ─── Death Notification Queue ───
@@ -31,12 +31,12 @@ export interface DeathNotification {
   };
 }
 
-const deathNotificationQueue: DeathNotification[] = [];
+let deathNotificationQueue: DeathNotification[] = [];
 
 /** Drain all pending death notifications (called by StateBroadcaster or SocketServer) */
 export function drainDeathNotifications(): DeathNotification[] {
-  const notifications = [...deathNotificationQueue];
-  deathNotificationQueue.length = 0;
+  const notifications = deathNotificationQueue;
+  deathNotificationQueue = [];
   return notifications;
 }
 
@@ -78,19 +78,15 @@ export function deathSystem(world: GameWorld, _dt: number): void {
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position);
     const lootable = world.ecs.getComponent<LootableComponent>(entityId, ComponentType.Lootable);
 
-    // Roll loot drops
+    // Roll loot drops using shared randomization logic
     if (pos && lootable && !lootable.isLooted && lootable.lootTable.length > 0) {
-      for (const entry of lootable.lootTable) {
-        if (Math.random() <= entry.chance) {
-          if (entry.quantity > 0) {
-            const itemStack: ItemStack = { itemId: entry.itemId, quantity: entry.quantity };
-            world.createItemDropEntity(itemStack, {
-              x: pos.x + (Math.random() - 0.5),
-              y: pos.y + 0.5,
-              z: pos.z + (Math.random() - 0.5),
-            });
-          }
-        }
+      const items = rollLootTable(lootable.lootTable);
+      for (const item of items) {
+        world.createItemDropEntity(item, {
+          x: pos.x + (Math.random() - 0.5),
+          y: pos.y + 0.5,
+          z: pos.z + (Math.random() - 0.5),
+        });
       }
       lootable.isLooted = true;
     }
@@ -124,5 +120,5 @@ function determineCauseOfDeath(world: GameWorld, entityId: number): string {
     if (temp.current > 50) return 'heat';
   }
 
-  return 'player';
+  return 'unknown';
 }
