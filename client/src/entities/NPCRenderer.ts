@@ -327,6 +327,25 @@ function darkenColor(hex: string, amount: number): string {
   return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
 }
 
+// ─── Sprite Generation Cache ───
+
+const spriteCache = new Map<string, HTMLCanvasElement>();
+
+function getCachedSprite(creatureType: string, frameIndex: number): HTMLCanvasElement {
+  const key = `${creatureType}_${frameIndex}`;
+  let cached = spriteCache.get(key);
+  if (!cached) {
+    cached = generateCreatureSprite(creatureType, frameIndex);
+    spriteCache.set(key, cached);
+    // Limit cache size to prevent unbounded growth
+    if (spriteCache.size > 200) {
+      const firstKey = spriteCache.keys().next().value;
+      if (firstKey) spriteCache.delete(firstKey);
+    }
+  }
+  return cached;
+}
+
 // ─── Name Label ───
 
 function createNameLabelSprite(displayName: string): THREE.Sprite {
@@ -429,6 +448,7 @@ interface NPCInstance {
   healthBar: THREE.Sprite;
   nameLabel: THREE.Sprite;
   animFrame: number;
+  _lastFrameIdx: number;
   lastHealth: number;
   healthBarVisible: boolean;
   healthBarTimer: number;
@@ -500,6 +520,7 @@ export class NPCRenderer {
       healthBar,
       nameLabel,
       animFrame: Math.random() * 100, // Stagger animations
+      _lastFrameIdx: -1,
       lastHealth: 1.0,
       healthBarVisible: isBoss,
       healthBarTimer: 0,
@@ -549,16 +570,22 @@ export class NPCRenderer {
       // Update position
       npc.group.position.set(data.position.x, data.position.y, data.position.z);
 
-      // Animation
-      npc.animFrame += dt * 60; // 60fps animation speed
-      const canvas = generateCreatureSprite(npc.creatureType, npc.animFrame);
-      const spriteMat = npc.sprite.material as THREE.SpriteMaterial;
-      const texture = spriteMat.map as THREE.CanvasTexture;
-      const oldCanvas = texture.image as HTMLCanvasElement;
-      const destCtx = oldCanvas.getContext('2d')!;
-      destCtx.clearRect(0, 0, oldCanvas.width, oldCanvas.height);
-      destCtx.drawImage(canvas, 0, 0);
-      texture.needsUpdate = true;
+      // Animation — use cached sprites with integer frame indices
+      npc.animFrame += dt * 8; // 8 fps animation speed (not 60)
+      const frameIdx = Math.floor(npc.animFrame) % 8;
+
+      // Only update texture if frame actually changed
+      if (frameIdx !== npc._lastFrameIdx) {
+        npc._lastFrameIdx = frameIdx;
+        const cachedCanvas = getCachedSprite(npc.creatureType, frameIdx);
+        const spriteMat = npc.sprite.material as THREE.SpriteMaterial;
+        const texture = spriteMat.map as THREE.CanvasTexture;
+        const destCanvas = texture.image as HTMLCanvasElement;
+        const destCtx = destCanvas.getContext('2d')!;
+        destCtx.clearRect(0, 0, destCanvas.width, destCanvas.height);
+        destCtx.drawImage(cachedCanvas, 0, 0);
+        texture.needsUpdate = true;
+      }
 
       // Billboard — face camera
       npc.sprite.lookAt(camera.position);

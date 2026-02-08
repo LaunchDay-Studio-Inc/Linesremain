@@ -110,10 +110,12 @@ export class EntityInterpolation {
           const t = (renderTime - from.timestamp) / duration;
           const clampedT = Math.min(t, 1); // don't extrapolate too far
           // Extrapolate: position = from + (from - prev) * t
-          entity.currentPosition.copy(from.position).addScaledVector(
-            _extrapolationVelocity.copy(from.position).sub(prev.position),
-            clampedT,
-          );
+          entity.currentPosition
+            .copy(from.position)
+            .addScaledVector(
+              _extrapolationVelocity.copy(from.position).sub(prev.position),
+              clampedT,
+            );
           entity.currentYaw = from.yaw + (from.yaw - prev.yaw) * clampedT;
         }
       } else {
@@ -153,7 +155,7 @@ export class EntityInterpolation {
 
   getPosition(entityId: string): THREE.Vector3 | null {
     const entity = this.entities.get(entityId);
-    return entity ? entity.currentPosition.clone() : null;
+    return entity ? entity.currentPosition : null;
   }
 
   getYaw(entityId: string): number | null {

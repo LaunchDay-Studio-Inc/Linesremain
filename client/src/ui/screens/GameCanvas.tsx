@@ -226,6 +226,36 @@ export const GameCanvas: React.FC = () => {
     let fpsFrameCount = 0;
     let fpsAccum = 0;
 
+    // ── Reusable vectors (zero-allocation per frame) ──
+    const _playerVec = new THREE.Vector3();
+    const _lightingVec = new THREE.Vector3();
+    const _biomeParticleVec = new THREE.Vector3();
+    const _npcVec = new THREE.Vector3();
+    const _interpVec = new THREE.Vector3();
+
+    // ── Reusable collections (avoid per-frame allocation) ──
+    const _activeNpcIds = new Set<number>();
+    const _activeBuildingIds = new Set<number>();
+    const _activeRemotePlayerIds = new Set<number>();
+    const _healthStates: EntityHealthState[] = [];
+    const _npcEntityData = new Map<
+      number,
+      {
+        position: { x: number; y: number; z: number };
+        health?: { current: number; max: number };
+      }
+    >();
+
+    // ── Throttle counters ──
+    let debugThrottleCounter = 0;
+    let _lastSentYaw = 0;
+    let _settingsCacheCounter = 0;
+    let _cachedSettings = useSettingsStore.getState();
+    const isOffline = useGameStore.getState().isOffline;
+
+    // ── View distance squared for entity culling ──
+    const VIEW_DIST_SQ = (4 * CHUNK_SIZE_X) * (4 * CHUNK_SIZE_X);
+
     // ── Player Sprite & Renderer ──
     const customization = useAchievementStore.getState().customization;
     const { canvas: spriteCanvas, config: spriteConfig } = generateSpriteSheet(
@@ -479,12 +509,16 @@ export const GameCanvas: React.FC = () => {
         }
       }
 
-      // Update debug state for diagnostics overlay
-      setDebugState({
-        hasFocus: document.activeElement === canvas,
-        pointerLocked: input.isPointerLocked(),
-        lastKey: input.getLastPressedKey(),
-      });
+      // Update debug state for diagnostics overlay (throttled to ~1/sec)
+      debugThrottleCounter++;
+      if (debugThrottleCounter >= 60) {
+        debugThrottleCounter = 0;
+        setDebugState({
+          hasFocus: document.activeElement === canvas,
+          pointerLocked: input.isPointerLocked(),
+          lastKey: input.getLastPressedKey(),
+        });
+      }
 
       // Player update
       playerController.update(dt);
@@ -494,7 +528,6 @@ export const GameCanvas: React.FC = () => {
       chunkManager.update(pos.x, pos.z);
 
       // Offline tutorial step detection
-      const isOffline = useGameStore.getState().isOffline;
       if (isOffline) {
         const achStore = useAchievementStore.getState();
         if (!achStore.tutorialComplete) {
@@ -518,120 +551,100 @@ export const GameCanvas: React.FC = () => {
       // Animation system
       animationSystem.update(dt);
 
-      // NPC rendering — sync NPC entities from server with renderer
+      // ── Single-pass entity processing ──
       const entities = getEntities();
       const localPlayerId = getLocalPlayerEntityId();
+      const camPos = camera.position;
 
-      // Feed entity interpolation snapshots when new server tick arrives
+      // Clear reusable collections
+      _activeNpcIds.clear();
+      _activeBuildingIds.clear();
+      _activeRemotePlayerIds.clear();
+      _healthStates.length = 0;
+      _npcEntityData.clear();
+
+      // Determine if we should feed interpolation this frame
       const currentTick = getLastServerTick();
-      if (currentTick > lastFedTick) {
+      const feedInterpolation = currentTick > lastFedTick;
+      let interpNow = 0;
+      if (feedInterpolation) {
         lastFedTick = currentTick;
-        const now = Date.now();
-        for (const [entityId, entity] of entities) {
-          if (entityId === localPlayerId) continue;
-          const entPos = entity.components['Position'] as
-            | { x: number; y: number; z: number }
-            | undefined;
-          if (entPos) {
-            const rot = entity.components['Rotation'] as { yaw?: number } | undefined;
-            entityInterpolation.addSnapshot(
-              String(entityId),
-              now,
-              new THREE.Vector3(entPos.x, entPos.y, entPos.z),
-              rot?.yaw ?? 0,
-            );
-          }
-        }
+        interpNow = Date.now();
       }
-      entityInterpolation.update(Date.now());
-
-      const npcEntityData = new Map<
-        number,
-        {
-          position: { x: number; y: number; z: number };
-          health?: { current: number; max: number };
-        }
-      >();
-      const activeNpcIds = new Set<number>();
 
       for (const [entityId, entity] of entities) {
-        if (entityId === localPlayerId) continue;
-        const npcType = entity.components['NPCType'] as { creatureType?: string; isBoss?: boolean } | undefined;
-        if (!npcType?.creatureType) continue;
-
-        activeNpcIds.add(entityId);
         const entPos = entity.components['Position'] as
           | { x: number; y: number; z: number }
           | undefined;
+        if (!entPos) continue;
+
+        const isLocalPlayer = entityId === localPlayerId;
+        const npcType = entity.components['NPCType'] as
+          | { creatureType?: string; isBoss?: boolean }
+          | undefined;
+        const isNPC = !!npcType?.creatureType;
         const entHealth = entity.components['Health'] as
           | { current: number; max: number }
           | undefined;
 
-        if (entPos) {
-          if (!npcRenderer.hasNPC(entityId)) {
-            npcRenderer.addNPC(
-              entityId,
-              npcType.creatureType,
-              new THREE.Vector3(entPos.x, entPos.y, entPos.z),
-              npcType.isBoss ?? false,
-            );
-          }
-          npcEntityData.set(entityId, { position: entPos, health: entHealth });
+        // Health tracking (for combat effects)
+        if (entHealth) {
+          _healthStates.push({
+            entityId,
+            position: entPos,
+            health: entHealth,
+            isNPC,
+            isPlayer: !isNPC,
+          });
         }
-      }
 
-      // Remove NPCs that are no longer in the entity list
-      npcRenderer.syncActiveEntities(activeNpcIds);
+        if (isLocalPlayer) continue;
 
-      npcRenderer.update(dt, camera, npcEntityData);
+        // Skip entities beyond view distance
+        const dx = entPos.x - camPos.x;
+        const dz = entPos.z - camPos.z;
+        const distSq = dx * dx + dz * dz;
+        if (distSq > VIEW_DIST_SQ) continue;
 
-      // Building rendering — sync building entities from server with renderer
-      const activeBuildingIds = new Set<number>();
-      for (const [entityId, entity] of entities) {
+        // Interpolation snapshots
+        if (feedInterpolation) {
+          const rot = entity.components['Rotation'] as { yaw?: number } | undefined;
+          _interpVec.set(entPos.x, entPos.y, entPos.z);
+          entityInterpolation.addSnapshot(String(entityId), interpNow, _interpVec, rot?.yaw ?? 0);
+        }
+
+        // NPC processing
+        if (isNPC) {
+          _activeNpcIds.add(entityId);
+          if (!npcRenderer.hasNPC(entityId)) {
+            _npcVec.set(entPos.x, entPos.y, entPos.z);
+            npcRenderer.addNPC(entityId, npcType!.creatureType!, _npcVec, npcType!.isBoss ?? false);
+          }
+          _npcEntityData.set(entityId, { position: entPos, health: entHealth });
+          continue;
+        }
+
+        // Building processing
         const building = entity.components['Building'] as
           | { pieceType: string; tier: string }
           | undefined;
-        if (!building) continue;
-
-        const entPos = entity.components['Position'] as
-          | { x: number; y: number; z: number }
-          | undefined;
-        if (!entPos) continue;
-
-        activeBuildingIds.add(entityId);
-
-        if (!buildingRenderer.getMesh(entityId)) {
-          const rotation = (entPos as { rotation?: number }).rotation ?? 0;
-          buildingRenderer.addBuilding(
-            entityId,
-            building.pieceType as BuildingPieceType,
-            building.tier as unknown as BuildingTier,
-            entPos,
-            rotation,
-          );
+        if (building) {
+          _activeBuildingIds.add(entityId);
+          if (!buildingRenderer.getMesh(entityId)) {
+            const rotation = (entPos as { rotation?: number }).rotation ?? 0;
+            buildingRenderer.addBuilding(
+              entityId,
+              building.pieceType as BuildingPieceType,
+              building.tier as unknown as BuildingTier,
+              entPos,
+              rotation,
+            );
+          }
+          continue;
         }
-      }
 
-      // Remove buildings that are no longer in the entity list
-      for (const [eid] of entities) {
-        if (!activeBuildingIds.has(eid) && buildingRenderer.getMesh(eid)) {
-          buildingRenderer.removeBuilding(eid);
-        }
-      }
-
-      // Remote player rendering — sync remote player entities with renderers
-      const activeRemotePlayerIds = new Set<number>();
-      for (const [entityId, entity] of entities) {
-        if (entityId === localPlayerId) continue;
-        if (entity.components['NPCType']) continue;
-        const entPos = entity.components['Position'] as
-          | { x: number; y: number; z: number }
-          | undefined;
-        if (!entPos) continue;
-
-        activeRemotePlayerIds.add(entityId);
-
-        // Create renderer for new remote players
+        // Remote player processing
+        _activeRemotePlayerIds.add(entityId);
         if (!remotePlayerRenderers.has(entityId)) {
           const hue = (entityId * 137) % 360;
           const color = `hsl(${hue}, 70%, 60%)`;
@@ -641,8 +654,6 @@ export const GameCanvas: React.FC = () => {
           animationSystem.register(String(entityId), rRenderer);
           remotePlayerRenderers.set(entityId, rRenderer);
         }
-
-        // Update position (prefer interpolated)
         const renderer = remotePlayerRenderers.get(entityId)!;
         const interpPos = entityInterpolation.getPosition(String(entityId));
         if (interpPos) {
@@ -652,45 +663,40 @@ export const GameCanvas: React.FC = () => {
         }
       }
 
+      entityInterpolation.update(Date.now());
+
+      // Sync NPC renderer
+      npcRenderer.syncActiveEntities(_activeNpcIds);
+      npcRenderer.update(dt, camera, _npcEntityData);
+
+      // Remove stale buildings (iterate tracked meshes, not all entities)
+      for (const eid of buildingRenderer.getAllMeshIds()) {
+        if (!_activeBuildingIds.has(eid)) {
+          buildingRenderer.removeBuilding(eid);
+        }
+      }
+
       // Remove departed remote players
-      for (const [eid, renderer] of remotePlayerRenderers) {
-        if (!activeRemotePlayerIds.has(eid)) {
-          renderer.removeFromScene(scene);
-          renderer.dispose();
+      for (const [eid, rRenderer] of remotePlayerRenderers) {
+        if (!_activeRemotePlayerIds.has(eid)) {
+          rRenderer.removeFromScene(scene);
+          rRenderer.dispose();
           animationSystem.unregister(String(eid));
           entityInterpolation.removeEntity(String(eid));
           remotePlayerRenderers.delete(eid);
         }
       }
 
-      // Combat effects — detect health changes and spawn damage numbers / blood
-      const healthStates: EntityHealthState[] = [];
-      for (const [entityId, entity] of entities) {
-        const entPos = entity.components['Position'] as
-          | { x: number; y: number; z: number }
-          | undefined;
-        const entHealth = entity.components['Health'] as
-          | { current: number; max: number }
-          | undefined;
-        if (entPos && entHealth) {
-          healthStates.push({
-            entityId,
-            position: entPos,
-            health: entHealth,
-            isNPC: !!entity.components['NPCType'],
-            isPlayer: !entity.components['NPCType'],
-          });
-        }
-      }
-      combatEffects.processEntityStates(healthStates);
+      // Combat effects
+      combatEffects.processEntityStates(_healthStates);
       combatEffects.update(dt);
 
       // Block interaction (raycast, breaking, placing)
       blockInteraction.update(dt);
 
-      // Building preview (ghost mesh follows camera)
-      const playerVec = new THREE.Vector3(pos.x, pos.y, pos.z);
-      buildingPreview.update(chunkManager.getChunkMeshes(), playerVec);
+      // Building preview (ghost mesh follows camera) — reuse vector
+      _playerVec.set(pos.x, pos.y, pos.z);
+      buildingPreview.update(chunkManager.getChunkMeshes(), _playerVec);
 
       // Particles
       particleSystem.update(dt);
@@ -714,10 +720,11 @@ export const GameCanvas: React.FC = () => {
         usePlayerStore.getState().setCurrentBiome(biomeName);
       }
 
-      // Biome-specific ambient particles
+      // Biome-specific ambient particles — reuse vector
+      _biomeParticleVec.set(pos.x, pos.y, pos.z);
       biomeParticleSystem.update(
         dt,
-        new THREE.Vector3(pos.x, pos.y, pos.z),
+        _biomeParticleVec,
         atmosphere.particleType,
         atmosphere.particleDensity,
         worldTime,
@@ -727,8 +734,13 @@ export const GameCanvas: React.FC = () => {
       ambientSynth.update(dt);
       ambientSynth.setMood(atmosphere.mood);
 
-      // Procedural music system
-      const settings = useSettingsStore.getState();
+      // Procedural music system — use cached settings (re-read once per second)
+      _settingsCacheCounter++;
+      if (_settingsCacheCounter >= 60) {
+        _settingsCacheCounter = 0;
+        _cachedSettings = useSettingsStore.getState();
+      }
+      const settings = _cachedSettings;
       const buildingActive = buildingPreview.active;
       musicSystem.setVolume(settings.musicVolume / 100);
       musicSystem.setEnabled(settings.musicEnabled);
@@ -747,22 +759,26 @@ export const GameCanvas: React.FC = () => {
         const avgFps = fpsAccum / fpsFrameCount;
         if (avgFps < 25) {
           lowFpsTimer++;
-          if (lowFpsTimer >= 5) {
+          if (lowFpsTimer >= 3) {
             const current = settings.renderDistance;
             if (current > 3) {
               useSettingsStore.getState().setRenderDistance(current - 1);
+            } else {
+              // Already at min render distance — reduce pixel ratio
+              engine.getRenderer().setPixelRatio(1);
             }
             lowFpsTimer = 0;
           }
-        } else {
+        } else if (avgFps > 55) {
           lowFpsTimer = 0;
         }
         fpsFrameCount = 0;
         fpsAccum = 0;
       }
 
-      // Dynamic lighting (flicker, distance culling)
-      lightingSystem.update(dt, new THREE.Vector3(pos.x, pos.y, pos.z));
+      // Dynamic lighting (flicker, distance culling) — reuse vector
+      _lightingVec.set(pos.x, pos.y, pos.z);
+      lightingSystem.update(dt, _lightingVec);
 
       // Supply drop crates
       supplyDropRenderer.update(dt);
@@ -770,8 +786,12 @@ export const GameCanvas: React.FC = () => {
       // Camera
       cameraController.update(dt);
 
-      // Sync camera azimuth to store for minimap/compass
-      usePlayerStore.getState().setYaw(cameraController.getAzimuth());
+      // Sync camera azimuth to store for minimap/compass (throttled — only on significant change)
+      const newYaw = cameraController.getAzimuth();
+      if (Math.abs(newYaw - _lastSentYaw) > 0.017) {
+        _lastSentYaw = newYaw;
+        usePlayerStore.getState().setYaw(newYaw);
+      }
 
       // Send player input to server at fixed rate
       inputTimer += dt;
@@ -795,7 +815,7 @@ export const GameCanvas: React.FC = () => {
           secondaryAction: false,
           selectedSlot: 0,
         };
-        if (!useGameStore.getState().isOffline) {
+        if (!isOffline) {
           socketClient.emit(ClientMessage.Input, inputPayload);
         }
       }

@@ -431,6 +431,11 @@ export class BuildingRenderer {
     return this.meshes.get(entityId);
   }
 
+  /** Return all tracked building entity IDs */
+  getAllMeshIds(): IterableIterator<number> {
+    return this.meshes.keys();
+  }
+
   // ─── Update health-based damage visual ───
 
   updateDamageVisual(entityId: number, healthPercent: number): void {
