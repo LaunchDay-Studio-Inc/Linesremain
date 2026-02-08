@@ -1,0 +1,15 @@
+{
+  "recommendations": [
+    "dbaeumer.vscode-eslint",
+    "esbenp.prettier-vscode",
+    "ms-vscode.vscode-typescript-next",
+    "ms-azuretools.vscode-docker",
+    "eamodio.vscode-gitlens",
+    "usernamehw.errorlens",
+    "christian-kohler.path-intellisense",
+    "christian-kohler.npm-intellisense",
+    "naumovs.color-highlight",
+    "PKief.material-icon-theme",
+    "GitHub.copilot"
+  ]
+}
