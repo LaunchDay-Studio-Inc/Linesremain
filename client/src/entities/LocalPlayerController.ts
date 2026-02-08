@@ -93,6 +93,9 @@ export class LocalPlayerController {
   private readonly right = new THREE.Vector3();
   private readonly moveDir = new THREE.Vector3();
 
+  // Debug: throttle movement logging to avoid spam
+  private lastMovementLog = 0;
+
   // Store sync: only push to React when position changes meaningfully
   private lastSyncX = NaN;
   private lastSyncY = NaN;
@@ -207,6 +210,13 @@ export class LocalPlayerController {
       this.moveDir.normalize();
       // Update player yaw to face movement direction (for sprite orientation)
       this.yaw = Math.atan2(this.moveDir.x, this.moveDir.z);
+
+      // Debug: Log movement (throttled to once per second)
+      const now = Date.now();
+      if (now - this.lastMovementLog > 1000) {
+        console.log('Moving:', this.moveDir.x.toFixed(2), this.moveDir.z.toFixed(2));
+        this.lastMovementLog = now;
+      }
     }
 
     // Apply horizontal velocity
