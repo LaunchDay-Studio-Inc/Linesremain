@@ -733,6 +733,9 @@ export const GameCanvas: React.FC = () => {
       // Camera
       cameraController.update(dt);
 
+      // Sync camera azimuth to store for minimap/compass
+      usePlayerStore.getState().setYaw(cameraController.getAzimuth());
+
       // Send player input to server at fixed rate
       inputTimer += dt;
       if (inputTimer >= INPUT_SEND_INTERVAL) {

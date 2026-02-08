@@ -349,6 +349,9 @@ function handlePlayerStats(stats: PlayerStatsPayload): void {
 // ─── Death Handler ───
 
 function handleDeath(death: DeathPayload): void {
+  // Capture death position before switching to death screen
+  const pos = usePlayerStore.getState().position;
+  usePlayerStore.getState().setDeathPosition({ x: pos.x, y: pos.y, z: pos.z });
   useGameStore.getState().setHasSleepingBag(death.hasSleepingBag ?? false);
   useGameStore.getState().setScreen('dead');
 }

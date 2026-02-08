@@ -9,6 +9,7 @@ import { LeaderboardPanel } from '../panels/LeaderboardPanel';
 import { AchievementToast } from './AchievementToast';
 import { BiomeIndicator } from './BiomeIndicator';
 import { ChatBox } from './ChatBox';
+import { Compass } from './Compass';
 import { Crosshair } from './Crosshair';
 import { DamageIndicator } from './DamageIndicator';
 import { HealthBar } from './HealthBar';
@@ -32,6 +33,7 @@ export const HUD: React.FC = () => {
       <XPBar />
       <Minimap />
       <Crosshair />
+      <Compass />
       <BiomeIndicator />
       <ChatBox />
       <StatusEffects />
