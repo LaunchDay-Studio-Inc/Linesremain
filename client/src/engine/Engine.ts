@@ -89,13 +89,21 @@ export class Engine {
 
     // Fixed-timestep updates
     while (this.accumulator >= FIXED_DT) {
-      this.onUpdateCb?.(FIXED_DT);
+      try {
+        this.onUpdateCb?.(FIXED_DT);
+      } catch (err) {
+        console.error('[Engine] Error in update callback:', err);
+      }
       this.accumulator -= FIXED_DT;
     }
 
     // Render with interpolation
     const interpolation = this.accumulator / FIXED_DT;
-    this.onRenderCb?.(interpolation);
+    try {
+      this.onRenderCb?.(interpolation);
+    } catch (err) {
+      console.error('[Engine] Error in render callback:', err);
+    }
     this.renderer.render(this.scene, this.camera);
   };
 

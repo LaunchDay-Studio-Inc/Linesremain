@@ -231,7 +231,7 @@ export const GameCanvas: React.FC = () => {
     const localX = ((spawnX % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
     const localZ = ((spawnZ % CHUNK_SIZE_Z) + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
 
-    let surfaceY = findSurfaceY(spawnChunkData, localX, localZ);
+    const surfaceY = findSurfaceY(spawnChunkData, localX, localZ);
     let spawnY = surfaceY + 1.5;
 
     // If surface is below sea level (underwater), search outward for dry land
@@ -342,6 +342,9 @@ export const GameCanvas: React.FC = () => {
         return;
       }
 
+      // Re-focus canvas so keyboard events (WASD) are received
+      canvas.focus();
+
       if (!input.isPointerLocked()) {
         input.requestPointerLock(canvas);
       } else if (buildingPreview.active && buildingPreview.isValid) {
@@ -378,6 +381,7 @@ export const GameCanvas: React.FC = () => {
       }
       // Only act if click didn't reach the canvas directly (canvas handler will cover that)
       if (!input.isPointerLocked() && target !== canvas) {
+        canvas.focus();
         input.requestPointerLock(canvas);
       }
       audio.init();
@@ -656,6 +660,9 @@ export const GameCanvas: React.FC = () => {
       // Render interpolation can be used for smooth visuals between fixed updates
     });
 
+    // ── Focus canvas for keyboard input ──
+    canvas.focus();
+
     // ── Start ──
     engine.start();
 
@@ -699,7 +706,11 @@ export const GameCanvas: React.FC = () => {
 
   return (
     <div style={{ position: 'fixed', inset: 0 }}>
-      <canvas ref={canvasRef} style={{ display: 'block', width: '100%', height: '100%' }} />
+      <canvas
+        ref={canvasRef}
+        tabIndex={0}
+        style={{ display: 'block', width: '100%', height: '100%', outline: 'none' }}
+      />
 
       {/* Debug overlay */}
       <FPSCounter getRenderer={getRenderer} />
