@@ -22,6 +22,8 @@ export interface ResourceMultipliers {
   hqm: number;
 }
 
+export type TreeStyle = 'oak' | 'pine' | 'acacia' | 'willow' | 'none';
+
 export interface BiomeDefinition {
   type: BiomeType;
   name: string;
@@ -30,4 +32,6 @@ export interface BiomeDefinition {
   resourceMultipliers: ResourceMultipliers;
   surfaceBlock: BlockType;
   subsurfaceBlock: BlockType;
+  heightModifier: number; // multiplier for elevation noise amplitude (1.0 = default)
+  treeStyle: TreeStyle;
 }

@@ -217,6 +217,22 @@ export class BiomeTracker {
     return this.currentBiome;
   }
 
+  getBiomeDisplayName(): string {
+    return BiomeTracker.BIOME_DISPLAY_NAMES[this.currentBiome];
+  }
+
+  private static readonly BIOME_DISPLAY_NAMES: Record<BiomeType, string> = {
+    [BiomeType.Scorchlands]: 'Scorchlands',
+    [BiomeType.AshwoodForest]: 'Ashwood Forest',
+    [BiomeType.MireHollows]: 'Mire Hollows',
+    [BiomeType.DrygrassPlains]: 'Drygrass Plains',
+    [BiomeType.Greenhollow]: 'Greenhollow',
+    [BiomeType.Mossreach]: 'Mossreach',
+    [BiomeType.FrostveilPeaks]: 'Frostveil Peaks',
+    [BiomeType.SnowmeltWoods]: 'Snowmelt Woods',
+    [BiomeType.GlacialExpanse]: 'Glacial Expanse',
+  };
+
   // ─── Helpers ───
 
   /** Smooth hermite interpolation for organic transitions */

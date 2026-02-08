@@ -213,6 +213,7 @@ export const GameCanvas: React.FC = () => {
     let lastFedTick = 0;
     let inputSeq = 0;
     let inputTimer = 0;
+    let lastBiomeName = '';
     const INPUT_SEND_INTERVAL = 1 / 20; // Send input 20 times per second
 
     // ── Player Sprite & Renderer ──
@@ -687,6 +688,21 @@ export const GameCanvas: React.FC = () => {
       // Biome atmosphere tracking
       biomeTracker.update(pos.x, pos.z, dt);
       const atmosphere = biomeTracker.getCurrentAtmosphere();
+
+      // Apply biome atmosphere to sky/fog/lighting
+      skyRenderer.applyBiomeAtmosphere(
+        atmosphere.fogColor,
+        atmosphere.fogNear,
+        atmosphere.fogFar,
+        atmosphere.ambientTint,
+      );
+
+      // Track biome changes for HUD display
+      const biomeName = biomeTracker.getBiomeDisplayName();
+      if (biomeName !== lastBiomeName) {
+        lastBiomeName = biomeName;
+        usePlayerStore.getState().setCurrentBiome(biomeName);
+      }
 
       // Biome-specific ambient particles
       biomeParticleSystem.update(

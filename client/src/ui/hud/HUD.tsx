@@ -7,7 +7,7 @@ import { CustomizationPanel } from '../panels/CustomizationPanel';
 import { JournalPanel } from '../panels/JournalPanel';
 import { LeaderboardPanel } from '../panels/LeaderboardPanel';
 import { AchievementToast } from './AchievementToast';
-import { NotificationToast } from './NotificationToast';
+import { BiomeIndicator } from './BiomeIndicator';
 import { ChatBox } from './ChatBox';
 import { Crosshair } from './Crosshair';
 import { DamageIndicator } from './DamageIndicator';
@@ -15,6 +15,7 @@ import { HealthBar } from './HealthBar';
 import { Hotbar } from './Hotbar';
 import { LevelUpNotification } from './LevelUpNotification';
 import { Minimap } from './Minimap';
+import { NotificationToast } from './NotificationToast';
 import { PickupNotifications } from './PickupNotifications';
 import { RaidAlertPanel } from './RaidAlertPanel';
 import { ReconnectOverlay } from './ReconnectOverlay';
@@ -31,6 +32,7 @@ export const HUD: React.FC = () => {
       <XPBar />
       <Minimap />
       <Crosshair />
+      <BiomeIndicator />
       <ChatBox />
       <StatusEffects />
       <DamageIndicator />

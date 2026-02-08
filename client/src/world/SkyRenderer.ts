@@ -329,6 +329,32 @@ export class SkyRenderer {
     return this.ambientLight;
   }
 
+  /** Blend biome atmosphere into the current time-of-day fog/lighting */
+  applyBiomeAtmosphere(
+    fogColor: string,
+    fogNear: number,
+    fogFar: number,
+    ambientTint: string,
+  ): void {
+    // Parse biome fog color
+    const biomeFog = new THREE.Color(fogColor);
+
+    // Blend fog color: 50% time-of-day + 50% biome
+    this.fog.color.lerp(biomeFog, 0.5);
+
+    // Use whichever fog distance is shorter (more atmospheric)
+    this.fog.near = Math.min(this.fog.near, fogNear);
+    this.fog.far = Math.min(this.fog.far, fogFar);
+
+    // Tint ambient light: blend 30% toward biome tint
+    const biomeTint = new THREE.Color(ambientTint);
+    this.ambientLight.color.lerp(biomeTint, 0.3);
+
+    // Also tint sky horizon slightly
+    const horizonUniform = this.skyMaterial.uniforms['uHorizonColor']!.value as THREE.Color;
+    horizonUniform.lerp(biomeFog, 0.2);
+  }
+
   dispose(): void {
     this.scene.remove(this.skyMesh);
     this.skyMesh.geometry.dispose();

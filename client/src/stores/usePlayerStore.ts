@@ -1,17 +1,9 @@
 // ─── Player Store ───
 
-import { create } from 'zustand';
+import { HOTBAR_SLOTS, PLAYER_INVENTORY_SLOTS } from '@shared/constants/game';
+import { MAX_HEALTH, MAX_HUNGER, MAX_THIRST, NORMAL_BODY_TEMP } from '@shared/constants/survival';
 import type { ItemStack } from '@shared/types/items';
-import {
-  MAX_HEALTH,
-  MAX_HUNGER,
-  MAX_THIRST,
-  NORMAL_BODY_TEMP,
-} from '@shared/constants/survival';
-import {
-  PLAYER_INVENTORY_SLOTS,
-  HOTBAR_SLOTS,
-} from '@shared/constants/game';
+import { create } from 'zustand';
 
 interface PlayerState {
   position: { x: number; y: number; z: number };
@@ -22,6 +14,7 @@ interface PlayerState {
   inventory: (ItemStack | null)[];
   equipment: Record<string, ItemStack | null>;
   hotbarIndex: number;
+  currentBiome: string;
 
   setPosition: (x: number, y: number, z: number) => void;
   setHealth: (health: number) => void;
@@ -31,6 +24,7 @@ interface PlayerState {
   setInventory: (inventory: (ItemStack | null)[]) => void;
   setEquipment: (equipment: Record<string, ItemStack | null>) => void;
   setHotbarIndex: (index: number) => void;
+  setCurrentBiome: (biome: string) => void;
 }
 
 export const usePlayerStore = create<PlayerState>((set) => ({
@@ -42,6 +36,7 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   inventory: Array(PLAYER_INVENTORY_SLOTS + HOTBAR_SLOTS).fill(null) as (ItemStack | null)[],
   equipment: {},
   hotbarIndex: 0,
+  currentBiome: 'Greenhollow',
 
   setPosition: (x, y, z) => set({ position: { x, y, z } }),
   setHealth: (health) => set({ health }),
@@ -51,4 +46,5 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   setInventory: (inventory) => set({ inventory }),
   setEquipment: (equipment) => set({ equipment }),
   setHotbarIndex: (index) => set({ hotbarIndex: index }),
+  setCurrentBiome: (biome) => set({ currentBiome: biome }),
 }));

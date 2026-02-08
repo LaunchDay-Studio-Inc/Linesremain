@@ -75,6 +75,9 @@ interface BiomeProps {
   surfaceBlock: BlockType;
   subsurfaceBlock: BlockType;
   treeFrequency: number;
+  heightModifier: number;
+  treeStyle: string;
+  resourceMultipliers: { wood: number; stone: number; metal: number; sulfur: number; hqm: number };
 }
 
 const BIOME_PROPS: Record<BiomeType, BiomeProps> = {
@@ -82,46 +85,73 @@ const BIOME_PROPS: Record<BiomeType, BiomeProps> = {
     surfaceBlock: BlockType.Sand,
     subsurfaceBlock: BlockType.Sand,
     treeFrequency: 0,
+    heightModifier: 0.5,
+    treeStyle: 'none',
+    resourceMultipliers: { wood: 0.2, stone: 1.0, metal: 1.0, sulfur: 2.0, hqm: 0.8 },
   },
   [BiomeType.AshwoodForest]: {
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Dirt,
     treeFrequency: 0.5,
+    heightModifier: 1.0,
+    treeStyle: 'oak',
+    resourceMultipliers: { wood: 1.5, stone: 1.0, metal: 0.8, sulfur: 1.0, hqm: 0.5 },
   },
   [BiomeType.MireHollows]: {
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Clay,
     treeFrequency: 0.3,
+    heightModifier: 0.6,
+    treeStyle: 'willow',
+    resourceMultipliers: { wood: 1.0, stone: 0.8, metal: 0.6, sulfur: 0.8, hqm: 0.3 },
   },
   [BiomeType.DrygrassPlains]: {
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Dirt,
     treeFrequency: 0.05,
+    heightModifier: 0.7,
+    treeStyle: 'acacia',
+    resourceMultipliers: { wood: 0.3, stone: 1.2, metal: 1.2, sulfur: 1.0, hqm: 0.6 },
   },
   [BiomeType.Greenhollow]: {
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Dirt,
     treeFrequency: 0.4,
+    heightModifier: 1.0,
+    treeStyle: 'oak',
+    resourceMultipliers: { wood: 1.2, stone: 1.0, metal: 1.0, sulfur: 0.8, hqm: 0.5 },
   },
   [BiomeType.Mossreach]: {
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Dirt,
     treeFrequency: 0.7,
+    heightModifier: 1.1,
+    treeStyle: 'oak',
+    resourceMultipliers: { wood: 2.0, stone: 0.8, metal: 0.6, sulfur: 0.5, hqm: 0.4 },
   },
   [BiomeType.FrostveilPeaks]: {
     surfaceBlock: BlockType.Snow,
     subsurfaceBlock: BlockType.Gravel,
     treeFrequency: 0.02,
+    heightModifier: 1.8,
+    treeStyle: 'pine',
+    resourceMultipliers: { wood: 0.1, stone: 1.5, metal: 1.5, sulfur: 0.5, hqm: 1.5 },
   },
   [BiomeType.SnowmeltWoods]: {
     surfaceBlock: BlockType.Snow,
     subsurfaceBlock: BlockType.Dirt,
     treeFrequency: 0.35,
+    heightModifier: 1.2,
+    treeStyle: 'pine',
+    resourceMultipliers: { wood: 1.3, stone: 1.0, metal: 1.0, sulfur: 0.6, hqm: 0.8 },
   },
   [BiomeType.GlacialExpanse]: {
     surfaceBlock: BlockType.Ice,
     subsurfaceBlock: BlockType.Gravel,
     treeFrequency: 0,
+    heightModifier: 1.5,
+    treeStyle: 'none',
+    resourceMultipliers: { wood: 0, stone: 1.0, metal: 1.2, sulfur: 0.3, hqm: 1.2 },
   },
 };
 
@@ -208,19 +238,29 @@ export class ClientTerrainGenerator {
   // ─── Ore placement ───
 
   private getOreOrStone(worldX: number, y: number, worldZ: number, biome: BiomeType): BlockType {
+    const multipliers = BIOME_PROPS[biome].resourceMultipliers;
+
+    // HQM ore: Y < 20, base ~1% of stone, scaled by biome multiplier
     if (y < 20) {
+      const threshold = 1 - (1 - 0.85) * multipliers.hqm;
       const hqmVal = this.oreNoise.noise3D(worldX, y, worldZ, 0.15, 1);
-      if (hqmVal > 0.85) return BlockType.HQMOre;
+      if (hqmVal > threshold) return BlockType.HQMOre;
     }
+
+    // Sulfur ore: Y < 30, base ~3% of stone, scaled by biome multiplier
     if (y < 30) {
-      const sulfurThreshold = biome === BiomeType.Scorchlands ? 0.72 : 0.8;
+      const threshold = 1 - (1 - 0.8) * multipliers.sulfur;
       const sulfurVal = this.oreNoise.noise3D(worldX + 1000, y, worldZ, 0.12, 1);
-      if (sulfurVal > sulfurThreshold) return BlockType.SulfurOre;
+      if (sulfurVal > threshold) return BlockType.SulfurOre;
     }
+
+    // Metal ore: Y < 40, base ~5% of stone, scaled by biome multiplier
     if (y < 40) {
+      const threshold = 1 - (1 - 0.75) * multipliers.metal;
       const metalVal = this.oreNoise.noise3D(worldX + 2000, y, worldZ, 0.1, 1);
-      if (metalVal > 0.75) return BlockType.MetalOre;
+      if (metalVal > threshold) return BlockType.MetalOre;
     }
+
     return BlockType.Stone;
   }
 
@@ -237,18 +277,21 @@ export class ClientTerrainGenerator {
         const worldX = chunkX * CHUNK_SIZE_X + lx;
         const worldZ = chunkZ * CHUNK_SIZE_Z + lz;
 
+        // Get biome for this column and cache it
+        const biome = this.getBiome(worldX, worldZ);
+        biomeMap[lx + lz * CHUNK_SIZE_X] = biome;
+        const props = BIOME_PROPS[biome];
+
+        // Height calculation with biome-specific scaling
         const continental = this.continentNoise.noise2D(worldX, worldZ, 0.0005, 1) * 15 + 35;
         const elevation = this.elevationNoise.octaveNoise2D(worldX, worldZ, 0.003, 15, 4);
         const detail = this.detailNoise.octaveNoise2D(worldX, worldZ, 0.02, 1.5, 2);
 
-        let finalHeight = Math.floor(continental + elevation + detail);
+        const scaledElevation = elevation * props.heightModifier;
+        let finalHeight = Math.floor(continental + scaledElevation + detail);
         finalHeight = Math.max(1, Math.min(finalHeight, CHUNK_SIZE_Y - 2));
 
         heightMap[lx + lz * CHUNK_SIZE_X] = finalHeight;
-
-        const biome = this.getBiome(worldX, worldZ);
-        biomeMap[lx + lz * CHUNK_SIZE_X] = biome;
-        const props = BIOME_PROPS[biome];
 
         for (let y = 0; y < CHUNK_SIZE_Y; y++) {
           const idx = getBlockIndex(lx, y, lz);
@@ -305,58 +348,204 @@ export class ClientTerrainGenerator {
         const worldZ = chunkZ * CHUNK_SIZE_Z + lz;
 
         const surfaceY = heightMap[lx + lz * CHUNK_SIZE_X]!;
+
+        // Skip underwater or too high
         if (surfaceY <= SEA_LEVEL - 1 || surfaceY >= CHUNK_SIZE_Y - 10) continue;
 
+        // Get biome tree density
         const biome = biomeMap[lx + lz * CHUNK_SIZE_X]!;
         const props = BIOME_PROPS[biome];
-        if (props.treeFrequency <= 0) continue;
 
+        if (props.treeFrequency <= 0 || props.treeStyle === 'none') continue;
+
+        // Check surface block — don't place trees on sand, ice, or water (allow snow for pines)
         const surfaceBlock = blocks[getBlockIndex(lx, surfaceY, lz)];
         if (
           surfaceBlock === BlockType.Sand ||
-          surfaceBlock === BlockType.Snow ||
           surfaceBlock === BlockType.Ice ||
           surfaceBlock === BlockType.Water
         )
           continue;
 
+        // Noise-based tree placement threshold
         const treeVal = (this.treeNoise.noise2D(worldX, worldZ, 0.4, 1) + 1) / 2;
         const threshold = 1 - props.treeFrequency * 0.15;
         if (treeVal < threshold) continue;
 
-        const trunkHeight =
-          5 + Math.floor(((this.treeNoise.noise2D(worldX, worldZ, 1.7, 1) + 1) / 2) * 3);
-        const leafRadius = 2;
+        // Dispatch to biome-specific tree shape
+        const treeVariation = (this.treeNoise.noise2D(worldX, worldZ, 1.7, 1) + 1) / 2;
+        this.buildTree(blocks, lx, surfaceY, lz, props.treeStyle, treeVariation);
+      }
+    }
+  }
 
-        // Build trunk
-        for (let ty = 1; ty <= trunkHeight; ty++) {
-          const y = surfaceY + ty;
-          if (y >= CHUNK_SIZE_Y) break;
-          blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+  private buildTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    style: string,
+    variation: number,
+  ): void {
+    switch (style) {
+      case 'pine':
+        this.buildPineTree(blocks, lx, surfaceY, lz, variation);
+        break;
+      case 'acacia':
+        this.buildAcaciaTree(blocks, lx, surfaceY, lz, variation);
+        break;
+      case 'willow':
+        this.buildWillowTree(blocks, lx, surfaceY, lz, variation);
+        break;
+      default:
+        this.buildOakTree(blocks, lx, surfaceY, lz, variation);
+        break;
+    }
+  }
+
+  private setLeaf(blocks: Uint8Array, x: number, y: number, z: number): void {
+    if (x < 0 || x >= CHUNK_SIZE_X || z < 0 || z >= CHUNK_SIZE_Z || y < 0 || y >= CHUNK_SIZE_Y)
+      return;
+    const idx = getBlockIndex(x, y, z);
+    if (blocks[idx] === BlockType.Air) {
+      blocks[idx] = BlockType.Leaves;
+    }
+  }
+
+  // Oak: sphere canopy, trunk 5-7
+  private buildOakTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    variation: number,
+  ): void {
+    const trunkHeight = 5 + Math.floor(variation * 3);
+    const leafRadius = 2;
+
+    for (let ty = 1; ty <= trunkHeight; ty++) {
+      const y = surfaceY + ty;
+      if (y >= CHUNK_SIZE_Y) break;
+      blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+    }
+
+    const leafCenterY = surfaceY + trunkHeight;
+    for (let dx = -leafRadius; dx <= leafRadius; dx++) {
+      for (let dy = -1; dy <= leafRadius; dy++) {
+        for (let dz = -leafRadius; dz <= leafRadius; dz++) {
+          const dist = dx * dx + dy * dy + dz * dz;
+          if (dist > leafRadius * leafRadius + 1) continue;
+          this.setLeaf(blocks, lx + dx, leafCenterY + dy, lz + dz);
         }
+      }
+    }
+  }
 
-        // Build leaf sphere
-        const leafCenterY = surfaceY + trunkHeight;
-        for (let dx = -leafRadius; dx <= leafRadius; dx++) {
-          for (let dy = -1; dy <= leafRadius; dy++) {
-            for (let dz = -leafRadius; dz <= leafRadius; dz++) {
-              const nx = lx + dx;
-              const ny = leafCenterY + dy;
-              const nz = lz + dz;
+  // Pine: conical canopy, trunk 7-9, tapering leaf layers
+  private buildPineTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    variation: number,
+  ): void {
+    const trunkHeight = 7 + Math.floor(variation * 3);
 
-              if (nx < 0 || nx >= CHUNK_SIZE_X) continue;
-              if (nz < 0 || nz >= CHUNK_SIZE_Z) continue;
-              if (ny < 0 || ny >= CHUNK_SIZE_Y) continue;
+    for (let ty = 1; ty <= trunkHeight; ty++) {
+      const y = surfaceY + ty;
+      if (y >= CHUNK_SIZE_Y) break;
+      blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+    }
 
-              const dist = dx * dx + dy * dy + dz * dz;
-              if (dist > leafRadius * leafRadius + 1) continue;
+    // Conical canopy: 4 layers of decreasing radius
+    const layers = [
+      { yOffset: -1, radius: 3 },
+      { yOffset: 0, radius: 2 },
+      { yOffset: 1, radius: 2 },
+      { yOffset: 2, radius: 1 },
+    ];
 
-              const existingIdx = getBlockIndex(nx, ny, nz);
-              if (blocks[existingIdx] === BlockType.Air) {
-                blocks[existingIdx] = BlockType.Leaves;
-              }
-            }
-          }
+    const canopyBase = surfaceY + trunkHeight;
+    for (const layer of layers) {
+      const ly = canopyBase + layer.yOffset;
+      for (let dx = -layer.radius; dx <= layer.radius; dx++) {
+        for (let dz = -layer.radius; dz <= layer.radius; dz++) {
+          if (Math.abs(dx) === layer.radius && Math.abs(dz) === layer.radius) continue; // skip corners
+          this.setLeaf(blocks, lx + dx, ly, lz + dz);
+        }
+      }
+    }
+    // Tip
+    this.setLeaf(blocks, lx, canopyBase + 3, lz);
+  }
+
+  // Acacia: flat-top canopy, tall thin trunk 7-9
+  private buildAcaciaTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    variation: number,
+  ): void {
+    const trunkHeight = 7 + Math.floor(variation * 3);
+
+    for (let ty = 1; ty <= trunkHeight; ty++) {
+      const y = surfaceY + ty;
+      if (y >= CHUNK_SIZE_Y) break;
+      blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+    }
+
+    // Flat disc canopy at top (radius 3, 2 blocks thick)
+    const canopyY = surfaceY + trunkHeight;
+    for (let dy = 0; dy <= 1; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        for (let dz = -3; dz <= 3; dz++) {
+          // Circular shape
+          if (dx * dx + dz * dz > 10) continue;
+          this.setLeaf(blocks, lx + dx, canopyY + dy, lz + dz);
+        }
+      }
+    }
+  }
+
+  // Willow: short wide canopy, trunk 3-5, hanging leaf columns
+  private buildWillowTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    variation: number,
+  ): void {
+    const trunkHeight = 3 + Math.floor(variation * 3);
+
+    for (let ty = 1; ty <= trunkHeight; ty++) {
+      const y = surfaceY + ty;
+      if (y >= CHUNK_SIZE_Y) break;
+      blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+    }
+
+    // Wide sphere canopy (radius 3)
+    const leafCenterY = surfaceY + trunkHeight;
+    const leafRadius = 3;
+    for (let dx = -leafRadius; dx <= leafRadius; dx++) {
+      for (let dy = -1; dy <= leafRadius; dy++) {
+        for (let dz = -leafRadius; dz <= leafRadius; dz++) {
+          const dist = dx * dx + dy * dy + dz * dz;
+          if (dist > leafRadius * leafRadius + 1) continue;
+          this.setLeaf(blocks, lx + dx, leafCenterY + dy, lz + dz);
+        }
+      }
+    }
+
+    // Hanging leaf columns from canopy edge (droop 2-3 blocks down)
+    for (let dx = -leafRadius; dx <= leafRadius; dx++) {
+      for (let dz = -leafRadius; dz <= leafRadius; dz++) {
+        const dist = dx * dx + dz * dz;
+        // Only at edges
+        if (dist < (leafRadius - 1) * (leafRadius - 1) || dist > leafRadius * leafRadius) continue;
+        const hangLength = 2 + Math.floor(variation * 2);
+        for (let hy = 1; hy <= hangLength; hy++) {
+          this.setLeaf(blocks, lx + dx, leafCenterY - 1 - hy, lz + dz);
         }
       }
     }

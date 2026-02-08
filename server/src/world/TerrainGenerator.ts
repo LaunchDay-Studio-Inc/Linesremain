@@ -1,14 +1,14 @@
 // ─── Terrain Generator ───
 
 import {
-  BlockType,
+  BLOCKS_PER_CHUNK,
   BiomeType,
+  BlockType,
   CHUNK_SIZE_X,
   CHUNK_SIZE_Y,
   CHUNK_SIZE_Z,
   SEA_LEVEL,
   getBlockIndex,
-  BLOCKS_PER_CHUNK,
 } from '@lineremain/shared';
 import { SeededNoise } from '../utils/noise.js';
 import { BiomeManager } from './BiomeManager.js';
@@ -54,23 +54,21 @@ export class TerrainGenerator {
         const worldX = chunkX * CHUNK_SIZE_X + lx;
         const worldZ = chunkZ * CHUNK_SIZE_Z + lz;
 
-        // Height calculation
-        const continental =
-          this.continentNoise.noise2D(worldX, worldZ, 0.0005, 1) * 15 + 35; // range ~20-50
-        const elevation =
-          this.elevationNoise.octaveNoise2D(worldX, worldZ, 0.003, 15, 4); // range ~-15 to +15
-        const detail =
-          this.detailNoise.octaveNoise2D(worldX, worldZ, 0.02, 1.5, 2); // range ~-1.5 to +1.5
-
-        let finalHeight = Math.floor(continental + elevation + detail);
-        finalHeight = Math.max(1, Math.min(finalHeight, CHUNK_SIZE_Y - 2));
-
-        heightMap[lx + lz * CHUNK_SIZE_X] = finalHeight;
-
         // Get biome for this column and cache it
         const biome = this.biomeManager.getBiome(worldX, worldZ);
         biomeMap[lx + lz * CHUNK_SIZE_X] = biome;
         const biomeProps = this.biomeManager.getBiomeProperties(biome);
+
+        // Height calculation with biome-specific scaling
+        const continental = this.continentNoise.noise2D(worldX, worldZ, 0.0005, 1) * 15 + 35; // range ~20-50
+        const elevation = this.elevationNoise.octaveNoise2D(worldX, worldZ, 0.003, 15, 4); // range ~-15 to +15
+        const detail = this.detailNoise.octaveNoise2D(worldX, worldZ, 0.02, 1.5, 2); // range ~-1.5 to +1.5
+
+        const scaledElevation = elevation * biomeProps.heightModifier;
+        let finalHeight = Math.floor(continental + scaledElevation + detail);
+        finalHeight = Math.max(1, Math.min(finalHeight, CHUNK_SIZE_Y - 2));
+
+        heightMap[lx + lz * CHUNK_SIZE_X] = finalHeight;
 
         // ── Fill column ──
         for (let y = 0; y < CHUNK_SIZE_Y; y++) {
@@ -125,23 +123,27 @@ export class TerrainGenerator {
   // ─── Ore Placement ───
 
   private getOreOrStone(worldX: number, y: number, worldZ: number, biome: BiomeType): BlockType {
-    // HQM ore: Y < 20, ~1% of stone
+    const multipliers = this.biomeManager.getBiomeProperties(biome).resourceMultipliers;
+
+    // HQM ore: Y < 20, base ~1% of stone, scaled by biome multiplier
     if (y < 20) {
+      const threshold = 1 - (1 - 0.85) * multipliers.hqm;
       const hqmVal = this.oreNoise.noise3D(worldX, y, worldZ, 0.15, 1);
-      if (hqmVal > 0.85) return BlockType.HQMOre;
+      if (hqmVal > threshold) return BlockType.HQMOre;
     }
 
-    // Sulfur ore: Y < 30, ~3% of stone (more common in Scorchlands)
+    // Sulfur ore: Y < 30, base ~3% of stone, scaled by biome multiplier
     if (y < 30) {
-      const sulfurThreshold = biome === BiomeType.Scorchlands ? 0.72 : 0.8;
+      const threshold = 1 - (1 - 0.80) * multipliers.sulfur;
       const sulfurVal = this.oreNoise.noise3D(worldX + 1000, y, worldZ, 0.12, 1);
-      if (sulfurVal > sulfurThreshold) return BlockType.SulfurOre;
+      if (sulfurVal > threshold) return BlockType.SulfurOre;
     }
 
-    // Metal ore: Y < 40, ~5% of stone
+    // Metal ore: Y < 40, base ~5% of stone, scaled by biome multiplier
     if (y < 40) {
+      const threshold = 1 - (1 - 0.75) * multipliers.metal;
       const metalVal = this.oreNoise.noise3D(worldX + 2000, y, worldZ, 0.1, 1);
-      if (metalVal > 0.75) return BlockType.MetalOre;
+      if (metalVal > threshold) return BlockType.MetalOre;
     }
 
     return BlockType.Stone;
@@ -170,16 +172,16 @@ export class TerrainGenerator {
         const biome = biomeMap[lx + lz * CHUNK_SIZE_X]!;
         const biomeProps = this.biomeManager.getBiomeProperties(biome);
 
-        if (biomeProps.treeFrequency <= 0) continue;
+        if (biomeProps.treeFrequency <= 0 || biomeProps.treeStyle === 'none') continue;
 
-        // Check surface block — don't place trees on sand, snow, or ice
+        // Check surface block — don't place trees on sand, ice, or water (allow snow for pines)
         const surfaceBlock = blocks[getBlockIndex(lx, surfaceY, lz)];
         if (
           surfaceBlock === BlockType.Sand ||
-          surfaceBlock === BlockType.Snow ||
           surfaceBlock === BlockType.Ice ||
           surfaceBlock === BlockType.Water
-        ) continue;
+        )
+          continue;
 
         // Noise-based tree placement threshold
         const treeVal = (this.treeNoise.noise2D(worldX, worldZ, 0.4, 1) + 1) / 2;
@@ -187,42 +189,180 @@ export class TerrainGenerator {
 
         if (treeVal < threshold) continue;
 
-        // Tree parameters
-        const trunkHeight = 5 + Math.floor(((this.treeNoise.noise2D(worldX, worldZ, 1.7, 1) + 1) / 2) * 3);
-        const leafRadius = 2;
+        // Dispatch to biome-specific tree shape
+        const treeVariation = (this.treeNoise.noise2D(worldX, worldZ, 1.7, 1) + 1) / 2;
+        this.buildTree(blocks, lx, surfaceY, lz, biomeProps.treeStyle, treeVariation);
+      }
+    }
+  }
 
-        // Build trunk
-        for (let ty = 1; ty <= trunkHeight; ty++) {
-          const y = surfaceY + ty;
-          if (y >= CHUNK_SIZE_Y) break;
-          blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+  private buildTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    style: string,
+    variation: number,
+  ): void {
+    switch (style) {
+      case 'pine':
+        this.buildPineTree(blocks, lx, surfaceY, lz, variation);
+        break;
+      case 'acacia':
+        this.buildAcaciaTree(blocks, lx, surfaceY, lz, variation);
+        break;
+      case 'willow':
+        this.buildWillowTree(blocks, lx, surfaceY, lz, variation);
+        break;
+      default:
+        this.buildOakTree(blocks, lx, surfaceY, lz, variation);
+        break;
+    }
+  }
+
+  private setLeaf(blocks: Uint8Array, x: number, y: number, z: number): void {
+    if (x < 0 || x >= CHUNK_SIZE_X || z < 0 || z >= CHUNK_SIZE_Z || y < 0 || y >= CHUNK_SIZE_Y)
+      return;
+    const idx = getBlockIndex(x, y, z);
+    if (blocks[idx] === BlockType.Air) {
+      blocks[idx] = BlockType.Leaves;
+    }
+  }
+
+  // Oak: sphere canopy, trunk 5-7
+  private buildOakTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    variation: number,
+  ): void {
+    const trunkHeight = 5 + Math.floor(variation * 3);
+    const leafRadius = 2;
+
+    for (let ty = 1; ty <= trunkHeight; ty++) {
+      const y = surfaceY + ty;
+      if (y >= CHUNK_SIZE_Y) break;
+      blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+    }
+
+    const leafCenterY = surfaceY + trunkHeight;
+    for (let dx = -leafRadius; dx <= leafRadius; dx++) {
+      for (let dy = -1; dy <= leafRadius; dy++) {
+        for (let dz = -leafRadius; dz <= leafRadius; dz++) {
+          const dist = dx * dx + dy * dy + dz * dz;
+          if (dist > leafRadius * leafRadius + 1) continue;
+          this.setLeaf(blocks, lx + dx, leafCenterY + dy, lz + dz);
         }
+      }
+    }
+  }
 
-        // Build leaf sphere at top of trunk
-        const leafCenterY = surfaceY + trunkHeight;
-        for (let dx = -leafRadius; dx <= leafRadius; dx++) {
-          for (let dy = -1; dy <= leafRadius; dy++) {
-            for (let dz = -leafRadius; dz <= leafRadius; dz++) {
-              const nx = lx + dx;
-              const ny = leafCenterY + dy;
-              const nz = lz + dz;
+  // Pine: conical canopy, trunk 7-9, tapering leaf layers
+  private buildPineTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    variation: number,
+  ): void {
+    const trunkHeight = 7 + Math.floor(variation * 3);
 
-              // Bounds check
-              if (nx < 0 || nx >= CHUNK_SIZE_X) continue;
-              if (nz < 0 || nz >= CHUNK_SIZE_Z) continue;
-              if (ny < 0 || ny >= CHUNK_SIZE_Y) continue;
+    for (let ty = 1; ty <= trunkHeight; ty++) {
+      const y = surfaceY + ty;
+      if (y >= CHUNK_SIZE_Y) break;
+      blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+    }
 
-              // Spherical shape — skip corners
-              const dist = dx * dx + dy * dy + dz * dz;
-              if (dist > leafRadius * leafRadius + 1) continue;
+    // Conical canopy: 4 layers of decreasing radius
+    const layers = [
+      { yOffset: -1, radius: 3 },
+      { yOffset: 0, radius: 2 },
+      { yOffset: 1, radius: 2 },
+      { yOffset: 2, radius: 1 },
+    ];
 
-              // Don't overwrite trunk
-              const existingIdx = getBlockIndex(nx, ny, nz);
-              if (blocks[existingIdx] === BlockType.Air) {
-                blocks[existingIdx] = BlockType.Leaves;
-              }
-            }
-          }
+    const canopyBase = surfaceY + trunkHeight;
+    for (const layer of layers) {
+      const ly = canopyBase + layer.yOffset;
+      for (let dx = -layer.radius; dx <= layer.radius; dx++) {
+        for (let dz = -layer.radius; dz <= layer.radius; dz++) {
+          if (Math.abs(dx) === layer.radius && Math.abs(dz) === layer.radius) continue; // skip corners
+          this.setLeaf(blocks, lx + dx, ly, lz + dz);
+        }
+      }
+    }
+    // Tip
+    this.setLeaf(blocks, lx, canopyBase + 3, lz);
+  }
+
+  // Acacia: flat-top canopy, tall thin trunk 7-9
+  private buildAcaciaTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    variation: number,
+  ): void {
+    const trunkHeight = 7 + Math.floor(variation * 3);
+
+    for (let ty = 1; ty <= trunkHeight; ty++) {
+      const y = surfaceY + ty;
+      if (y >= CHUNK_SIZE_Y) break;
+      blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+    }
+
+    // Flat disc canopy at top (radius 3, 2 blocks thick)
+    const canopyY = surfaceY + trunkHeight;
+    for (let dy = 0; dy <= 1; dy++) {
+      for (let dx = -3; dx <= 3; dx++) {
+        for (let dz = -3; dz <= 3; dz++) {
+          // Circular shape
+          if (dx * dx + dz * dz > 10) continue;
+          this.setLeaf(blocks, lx + dx, canopyY + dy, lz + dz);
+        }
+      }
+    }
+  }
+
+  // Willow: short wide canopy, trunk 3-5, hanging leaf columns
+  private buildWillowTree(
+    blocks: Uint8Array,
+    lx: number,
+    surfaceY: number,
+    lz: number,
+    variation: number,
+  ): void {
+    const trunkHeight = 3 + Math.floor(variation * 3);
+
+    for (let ty = 1; ty <= trunkHeight; ty++) {
+      const y = surfaceY + ty;
+      if (y >= CHUNK_SIZE_Y) break;
+      blocks[getBlockIndex(lx, y, lz)] = BlockType.Log;
+    }
+
+    // Wide sphere canopy (radius 3)
+    const leafCenterY = surfaceY + trunkHeight;
+    const leafRadius = 3;
+    for (let dx = -leafRadius; dx <= leafRadius; dx++) {
+      for (let dy = -1; dy <= leafRadius; dy++) {
+        for (let dz = -leafRadius; dz <= leafRadius; dz++) {
+          const dist = dx * dx + dy * dy + dz * dz;
+          if (dist > leafRadius * leafRadius + 1) continue;
+          this.setLeaf(blocks, lx + dx, leafCenterY + dy, lz + dz);
+        }
+      }
+    }
+
+    // Hanging leaf columns from canopy edge (droop 2-3 blocks down)
+    for (let dx = -leafRadius; dx <= leafRadius; dx++) {
+      for (let dz = -leafRadius; dz <= leafRadius; dz++) {
+        const dist = dx * dx + dz * dz;
+        // Only at edges
+        if (dist < (leafRadius - 1) * (leafRadius - 1) || dist > leafRadius * leafRadius) continue;
+        const hangLength = 2 + Math.floor(variation * 2);
+        for (let hy = 1; hy <= hangLength; hy++) {
+          this.setLeaf(blocks, lx + dx, leafCenterY - 1 - hy, lz + dz);
         }
       }
     }
@@ -261,7 +401,9 @@ export class TerrainGenerator {
           // Mushrooms in forested biomes (~2%)
           else if (
             decoVal < 0.02 &&
-            (biome === BiomeType.Mossreach || biome === BiomeType.AshwoodForest || biome === BiomeType.MireHollows)
+            (biome === BiomeType.Mossreach ||
+              biome === BiomeType.AshwoodForest ||
+              biome === BiomeType.MireHollows)
           ) {
             blocks[aboveIdx] = BlockType.Mushroom;
           }

@@ -1,9 +1,7 @@
 // ─── Biome Manager ───
 
-import { BiomeType } from '@lineremain/shared';
 import type { BiomeDefinition } from '@lineremain/shared';
-import { BlockType } from '@lineremain/shared';
-import { WORLD_SIZE } from '@lineremain/shared';
+import { BiomeType, BlockType, WORLD_SIZE } from '@lineremain/shared';
 import { SeededNoise } from '../utils/noise.js';
 
 // ─── Biome Definitions ───
@@ -17,6 +15,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 0.2, stone: 1.0, metal: 1.0, sulfur: 2.0, hqm: 0.8 },
     surfaceBlock: BlockType.Sand,
     subsurfaceBlock: BlockType.Sand,
+    heightModifier: 0.5,
+    treeStyle: 'none',
   },
   [BiomeType.AshwoodForest]: {
     type: BiomeType.AshwoodForest,
@@ -26,6 +26,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 1.5, stone: 1.0, metal: 0.8, sulfur: 1.0, hqm: 0.5 },
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Dirt,
+    heightModifier: 1.0,
+    treeStyle: 'oak',
   },
   [BiomeType.MireHollows]: {
     type: BiomeType.MireHollows,
@@ -35,6 +37,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 1.0, stone: 0.8, metal: 0.6, sulfur: 0.8, hqm: 0.3 },
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Clay,
+    heightModifier: 0.6,
+    treeStyle: 'willow',
   },
   [BiomeType.DrygrassPlains]: {
     type: BiomeType.DrygrassPlains,
@@ -44,6 +48,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 0.3, stone: 1.2, metal: 1.2, sulfur: 1.0, hqm: 0.6 },
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Dirt,
+    heightModifier: 0.7,
+    treeStyle: 'acacia',
   },
   [BiomeType.Greenhollow]: {
     type: BiomeType.Greenhollow,
@@ -53,6 +59,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 1.2, stone: 1.0, metal: 1.0, sulfur: 0.8, hqm: 0.5 },
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Dirt,
+    heightModifier: 1.0,
+    treeStyle: 'oak',
   },
   [BiomeType.Mossreach]: {
     type: BiomeType.Mossreach,
@@ -62,6 +70,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 2.0, stone: 0.8, metal: 0.6, sulfur: 0.5, hqm: 0.4 },
     surfaceBlock: BlockType.Grass,
     subsurfaceBlock: BlockType.Dirt,
+    heightModifier: 1.1,
+    treeStyle: 'oak',
   },
   [BiomeType.FrostveilPeaks]: {
     type: BiomeType.FrostveilPeaks,
@@ -71,6 +81,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 0.1, stone: 1.5, metal: 1.5, sulfur: 0.5, hqm: 1.5 },
     surfaceBlock: BlockType.Snow,
     subsurfaceBlock: BlockType.Gravel,
+    heightModifier: 1.8,
+    treeStyle: 'pine',
   },
   [BiomeType.SnowmeltWoods]: {
     type: BiomeType.SnowmeltWoods,
@@ -80,6 +92,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 1.3, stone: 1.0, metal: 1.0, sulfur: 0.6, hqm: 0.8 },
     surfaceBlock: BlockType.Snow,
     subsurfaceBlock: BlockType.Dirt,
+    heightModifier: 1.2,
+    treeStyle: 'pine',
   },
   [BiomeType.GlacialExpanse]: {
     type: BiomeType.GlacialExpanse,
@@ -89,6 +103,8 @@ const BIOME_DEFINITIONS: Record<BiomeType, BiomeDefinition> = {
     resourceMultipliers: { wood: 0, stone: 1.0, metal: 1.2, sulfur: 0.3, hqm: 1.2 },
     surfaceBlock: BlockType.Ice,
     subsurfaceBlock: BlockType.Gravel,
+    heightModifier: 1.5,
+    treeStyle: 'none',
   },
 };
 
