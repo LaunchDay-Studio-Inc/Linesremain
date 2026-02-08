@@ -39,6 +39,10 @@ import {
   handlePlayerDisconnect,
   registerTeamHandlers,
 } from './handlers/TeamHandler.js';
+import { registerEndgameHandlers } from './handlers/EndgameHandler.js';
+import { loadPlayerBlueprints, unloadPlayerBlueprints } from '../game/systems/BlueprintSystem.js';
+import { closePlayerContainer } from '../game/systems/ContainerSystem.js';
+import { getSeasonInfo } from '../game/systems/WipeSystem.js';
 
 // ─── Types ───
 
@@ -152,6 +156,17 @@ export class SocketServer {
       logger.error({ err, playerId }, 'Failed to load player stats');
     });
 
+    // Load blueprints into memory
+    loadPlayerBlueprints(playerId, []);
+
+    // Send season info
+    const seasonInfo = getSeasonInfo();
+    socket.emit(ServerMessage.SeasonInfo, {
+      seasonNumber: seasonInfo.seasonNumber,
+      wipeTimestamp: seasonInfo.wipeTimestamp,
+      seasonStartedAt: seasonInfo.seasonStartedAt,
+    });
+
     logger.info(
       {
         playerId,
@@ -254,6 +269,11 @@ export class SocketServer {
       ComponentType.NPCType,
       ComponentType.AI,
       ComponentType.Ownership,
+      ComponentType.DoorState,
+      ComponentType.Container,
+      ComponentType.Explosive,
+      ComponentType.Landmine,
+      ComponentType.Barricade,
     ];
 
     let hasAny = false;
@@ -296,6 +316,7 @@ export class SocketServer {
     registerTeamHandlers(this.io, socket, world, getPlayerId, getPlayerName);
     registerBlockHandlers(this.io, socket, world, getPlayerId);
     registerCustomizationHandlers(this.io, socket, world, getPlayerId);
+    registerEndgameHandlers(this.io, socket, world, getPlayerId);
 
     // Respawn handler — creates fresh entity via RespawnSystem
     socket.on(ClientMessage.Respawn, () => {
@@ -373,6 +394,12 @@ export class SocketServer {
     unloadPlayerStats(playerId).catch((err) => {
       logger.error({ err, playerId }, 'Failed to unload player stats');
     });
+
+    // Unload blueprints from memory
+    unloadPlayerBlueprints(playerId);
+
+    // Close any open containers
+    closePlayerContainer(playerId);
 
     logger.info({ playerId }, 'Player entity removed after grace period');
   }

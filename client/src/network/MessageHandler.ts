@@ -7,24 +7,35 @@ import type { ItemStack } from '@shared/types/items';
 import {
   ServerMessage,
   type AchievementPayload,
+  type BaseAttackPayload,
+  type BlueprintLearnedPayload,
   type ChunkUpdatePayload,
+  type CodeLockPromptPayload,
+  type ContainerContentsPayload,
   type CustomizationUpdatedPayload,
   type DeathPayload,
   type DeltaPayload,
+  type ExplosionPayload,
   type InventoryUpdatePayload,
   type LevelUpPayload,
   type NotificationPayload,
   type PlayerStatsPayload,
+  type ResearchProgressPayload,
+  type SeasonInfoPayload,
   type ServerChatPayload,
   type SnapshotPayload,
   type TutorialStepPayload,
+  type GameNotificationPayload,
+  type WipeWarningPayload,
   type WorldTimePayload,
   type XpGainPayload,
 } from '@shared/types/network';
 import { useAchievementStore } from '../stores/useAchievementStore';
 import { useChatStore } from '../stores/useChatStore';
+import { useEndgameStore } from '../stores/useEndgameStore';
 import { useGameStore } from '../stores/useGameStore';
 import { usePlayerStore } from '../stores/usePlayerStore';
+import { showNotification } from '../ui/hud/NotificationToast';
 import { socketClient } from './SocketClient';
 
 // ─── Entity Store (client-side entity cache) ───
@@ -145,6 +156,103 @@ export function initializeMessageHandlers(): void {
   socketClient.on(ServerMessage.TutorialStep, (data) => {
     const payload = data as TutorialStepPayload;
     useAchievementStore.getState().setTutorialStep(payload.step as TutorialStep | null);
+  });
+
+  // Base attack notification
+  socketClient.on(ServerMessage.BaseAttack, (data) => {
+    const payload = data as BaseAttackPayload;
+    useEndgameStore.getState().setRaidAlert({
+      position: payload.position,
+      attackerName: payload.attackerName,
+    });
+  });
+
+  // Code lock prompt
+  socketClient.on(ServerMessage.CodeLockPrompt, (data) => {
+    const payload = data as CodeLockPromptPayload;
+    useEndgameStore.getState().setCodeLockPrompt({
+      entityId: payload.entityId,
+      isOwner: payload.isOwner,
+    });
+  });
+
+  // Container contents
+  socketClient.on(ServerMessage.ContainerContents, (data) => {
+    const payload = data as ContainerContentsPayload;
+    useEndgameStore.getState().setContainerOpen({
+      entityId: payload.entityId,
+      containerType: payload.containerType,
+      slots: payload.slots,
+      maxSlots: payload.maxSlots,
+    });
+  });
+
+  // Container closed
+  socketClient.on(ServerMessage.ContainerClosed, () => {
+    useEndgameStore.getState().setContainerOpen(null);
+  });
+
+  // Research progress
+  socketClient.on(ServerMessage.ResearchProgress, (data) => {
+    const payload = data as ResearchProgressPayload;
+    useEndgameStore.getState().setResearchProgress({
+      entityId: payload.entityId,
+      progress: payload.progress,
+      isComplete: payload.isComplete,
+      itemName: payload.itemName,
+    });
+  });
+
+  // Blueprint learned
+  socketClient.on(ServerMessage.BlueprintLearned, (data) => {
+    const payload = data as BlueprintLearnedPayload;
+    useEndgameStore.getState().addBlueprint(payload.recipeId);
+  });
+
+  // Season info
+  socketClient.on(ServerMessage.SeasonInfo, (data) => {
+    const payload = data as SeasonInfoPayload;
+    useEndgameStore.getState().setSeasonInfo({
+      seasonNumber: payload.seasonNumber,
+      wipeTimestamp: payload.wipeTimestamp,
+      seasonStartedAt: payload.seasonStartedAt,
+    });
+  });
+
+  // Wipe warning
+  socketClient.on(ServerMessage.WipeWarning, (data) => {
+    const payload = data as WipeWarningPayload;
+    useEndgameStore.getState().setWipeWarning({
+      timeRemainingMs: payload.timeRemainingMs,
+      message: payload.message,
+    });
+  });
+
+  // Explosion effects (for rendering - store for particle system)
+  socketClient.on(ServerMessage.Explosion, (_data) => {
+    // Explosion visual effects are handled by the rendering layer
+    // Store can be extended later for particle effects
+  });
+
+  // C4 placed (for rendering)
+  socketClient.on(ServerMessage.C4Placed, (_data) => {
+    // C4 entity appears via delta updates
+  });
+
+  // C4 detonated (for rendering)
+  socketClient.on(ServerMessage.C4Detonated, (_data) => {
+    // Handled by Explosion message
+  });
+
+  // Door state (handled by delta updates to DoorState component)
+  socketClient.on(ServerMessage.DoorState, (_data) => {
+    // Door state changes come through delta updates
+  });
+
+  // Game notification (unified toast system)
+  socketClient.on(ServerMessage.GameNotification, (data) => {
+    const payload = data as GameNotificationPayload;
+    showNotification(payload.type, payload.title, payload.message);
   });
 }
 

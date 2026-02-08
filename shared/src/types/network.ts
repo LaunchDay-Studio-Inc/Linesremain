@@ -28,6 +28,21 @@ export enum ClientMessage {
   Customize = 'c:customize',
   TutorialAdvance = 'c:tutorial:advance',
   TutorialSkip = 'c:tutorial:skip',
+  PlaceC4 = 'c:place_c4',
+  DoorInteract = 'c:door_interact',
+  SetLockCode = 'c:set_lock_code',
+  EnterLockCode = 'c:enter_lock_code',
+  ContainerOpen = 'c:container_open',
+  ContainerClose = 'c:container_close',
+  ContainerMoveItem = 'c:container_move',
+  ResearchStart = 'c:research_start',
+  ResearchCancel = 'c:research_cancel',
+  PlaceDeployable = 'c:place_deployable',
+  StoreGetItems = 'store:getItems',
+  StorePurchase = 'store:purchase',
+  BattlePassGet = 'battlePass:get',
+  BattlePassPurchase = 'battlePass:purchase',
+  BattlePassClaimReward = 'battlePass:claimReward',
 }
 
 // ─── Server → Client Messages ───
@@ -55,6 +70,22 @@ export enum ServerMessage {
   CustomizationUpdated = 's:customization:updated',
   TutorialStep = 's:tutorial:step',
   PlayerProfile = 's:player:profile',
+  C4Placed = 's:c4_placed',
+  C4Detonated = 's:c4_detonated',
+  BaseAttack = 's:base_attack',
+  DoorState = 's:door_state',
+  CodeLockPrompt = 's:code_lock_prompt',
+  ContainerContents = 's:container_contents',
+  ContainerClosed = 's:container_closed',
+  ResearchProgress = 's:research_progress',
+  BlueprintLearned = 's:blueprint_learned',
+  SeasonInfo = 's:season_info',
+  WipeWarning = 's:wipe_warning',
+  Explosion = 's:explosion',
+  StoreItems = 'store:items',
+  StorePurchaseResult = 'store:purchaseResult',
+  BattlePassState = 'battlePass:state',
+  GameNotification = 'game:notification',
 }
 
 // ─── Client Payload Interfaces ───
@@ -343,3 +374,130 @@ export interface PlayerProfilePayload {
     journalsFound: number;
   };
 }
+
+// ─── Endgame Payload Interfaces ───
+
+// Client payloads
+export interface PlaceC4Payload {
+  targetEntityId: number; // building entity to attach C4 to
+}
+
+export interface DoorInteractPayload {
+  entityId: number; // door entity
+}
+
+export interface SetLockCodePayload {
+  entityId: number; // door entity
+  code: string; // 4-digit code
+}
+
+export interface EnterLockCodePayload {
+  entityId: number; // door entity
+  code: string;
+}
+
+export interface ContainerOpenPayload {
+  entityId: number; // container entity
+}
+
+// eslint-disable-next-line @typescript-eslint/no-empty-object-type
+export interface ContainerClosePayload {}
+
+export interface ContainerMoveItemPayload {
+  fromSlot: number;
+  toSlot: number;
+  fromContainer: boolean; // true = from container, false = from player inventory
+  toContainer: boolean;
+}
+
+export interface ResearchStartPayload {
+  entityId: number; // research table entity
+  itemSlot: number; // player inventory slot of item to research
+}
+
+export interface ResearchCancelPayload {
+  entityId: number; // research table entity
+}
+
+export interface PlaceDeployablePayload {
+  itemId: number; // item from inventory
+  position: { x: number; y: number; z: number };
+  rotation: number;
+}
+
+// Server payloads
+export interface C4PlacedPayload {
+  entityId: number;
+  position: { x: number; y: number; z: number };
+  fuseEndTime: number; // timestamp when it detonates
+}
+
+export interface C4DetonatedPayload {
+  position: { x: number; y: number; z: number };
+  destroyedEntityIds: number[];
+}
+
+export interface BaseAttackPayload {
+  position: { x: number; y: number; z: number };
+  attackerName: string;
+}
+
+export interface DoorStatePayload {
+  entityId: number;
+  isOpen: boolean;
+  isLocked: boolean;
+}
+
+export interface CodeLockPromptPayload {
+  entityId: number;
+  isOwner: boolean; // owner can set code, others can enter code
+}
+
+export interface ContainerContentsPayload {
+  entityId: number;
+  containerType: string;
+  slots: (ItemStack | null)[];
+  maxSlots: number;
+}
+
+export interface ContainerClosedPayload {
+  entityId: number;
+}
+
+export interface ResearchProgressPayload {
+  entityId: number;
+  progress: number; // 0-1
+  isComplete: boolean;
+  itemName?: string;
+}
+
+export interface BlueprintLearnedPayload {
+  recipeId: number;
+  recipeName: string;
+}
+
+export interface SeasonInfoPayload {
+  seasonNumber: number;
+  wipeTimestamp: number; // when the next wipe happens (ms epoch)
+  seasonStartedAt: number;
+}
+
+export interface WipeWarningPayload {
+  timeRemainingMs: number; // ms until wipe
+  message: string;
+}
+
+export interface ExplosionPayload {
+  position: { x: number; y: number; z: number };
+  radius: number;
+  type: 'c4' | 'landmine';
+}
+
+// ─── Monetization Payload Interfaces ───
+
+export interface StoreItemsPayload { items: import('../types/monetization.js').StoreItem[] }
+export interface StorePurchasePayload { itemId: string }
+export interface StorePurchaseResultPayload { success: boolean; message: string; itemId: string }
+export interface BattlePassStatePayload { state: import('../types/monetization.js').BattlePassState }
+export interface BattlePassClaimPayload { tier: number; track: 'free' | 'premium' }
+export interface GameNotificationPayload { type: import('../types/monetization.js').NotificationType; title: string; message?: string; duration?: number }

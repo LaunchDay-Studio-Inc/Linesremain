@@ -655,4 +655,57 @@ export const ITEM_REGISTRY: Record<number, ItemDefinition> = {
   // ═══════════════════════════════════════
   88: { id: 88, name: 'Frost Fang', category: ItemCategory.Resource, maxStack: 10, description: 'A razor-sharp tooth from a Frost Stalker. Cold to the touch.' },
   89: { id: 89, name: 'Crimson Core', category: ItemCategory.Resource, maxStack: 5, description: 'A pulsing organ from a Crimson Husk. Radiates faint heat.' },
+
+  // ═══════════════════════════════════════
+  // ENDGAME ITEMS (90-96)
+  // ═══════════════════════════════════════
+  90: {
+    id: 90,
+    name: 'C4 Explosive',
+    category: ItemCategory.Deployable,
+    maxStack: 5,
+    description: 'Timed explosive. Place on enemy buildings to breach walls.',
+  },
+  91: {
+    id: 91,
+    name: 'Storage Box',
+    category: ItemCategory.Deployable,
+    maxStack: 5,
+    description: 'A wooden container with 12 storage slots.',
+  },
+  92: {
+    id: 92,
+    name: 'Large Storage Box',
+    category: ItemCategory.Deployable,
+    maxStack: 3,
+    description: 'A large wooden container with 24 storage slots.',
+  },
+  93: {
+    id: 93,
+    name: 'Landmine',
+    category: ItemCategory.Deployable,
+    maxStack: 10,
+    description: 'Proximity-triggered explosive. Arms after 5 seconds.',
+  },
+  94: {
+    id: 94,
+    name: 'Wooden Barricade',
+    category: ItemCategory.Building,
+    maxStack: 10,
+    description: 'A defensive barrier. Blocks movement.',
+  },
+  95: {
+    id: 95,
+    name: 'Research Table',
+    category: ItemCategory.Deployable,
+    maxStack: 1,
+    description: 'Use scrap to research items and learn their blueprints.',
+  },
+  96: {
+    id: 96,
+    name: 'Scrap',
+    category: ItemCategory.Resource,
+    maxStack: 1000,
+    description: 'Salvaged material used for research.',
+  },
 };

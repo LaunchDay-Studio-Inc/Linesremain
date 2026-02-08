@@ -2,45 +2,51 @@
 // Central game world container that owns the ECS, chunk storage, terrain generation,
 // and orchestrates system execution each tick.
 
-import { ECSWorld } from './ECS.js';
-import { ChunkStore } from '../world/ChunkStore.js';
-import { TerrainGenerator } from '../world/TerrainGenerator.js';
 import {
-  ComponentType,
-  PLAYER_INVENTORY_SLOTS,
-  PLAYER_HEIGHT,
-  PLAYER_WIDTH,
-  type EntityId,
-  type PositionComponent,
-  type VelocityComponent,
-  type HealthComponent,
-  type HungerComponent,
-  type ThirstComponent,
-  type TemperatureComponent,
-  type InventoryComponent,
-  type EquipmentComponent,
-  type BuildingComponent,
-  type ColliderComponent,
-  type DecayComponent,
-  type OwnershipComponent,
-  type ResourceNodeComponent,
-  type ProjectileComponent,
-  type NPCTypeComponent,
-  type CraftQueueComponent,
-  type AIComponent,
-  type LootableComponent,
-  type LootTableEntry,
-  AIState,
-  NPCCreatureType,
   AIBehavior,
-  type BuildingPieceType,
-  type BuildingTier,
-  type ItemStack,
+  AIState,
   BUILDING_REGISTRY,
+  ComponentType,
   DECAY_NO_TC_DELAY_SECONDS,
   DECAY_TIME_PER_TIER,
+  NPCCreatureType,
+  PLAYER_HEIGHT,
+  PLAYER_INVENTORY_SLOTS,
+  PLAYER_WIDTH,
+  type AIComponent,
+  type BarricadeComponent,
+  type BuildingComponent,
+  type BuildingPieceType,
+  type BuildingTier,
+  type ColliderComponent,
+  type ContainerComponent,
+  type CraftQueueComponent,
+  type DecayComponent,
+  type DoorStateComponent,
+  type EntityId,
+  type EquipmentComponent,
+  type ExplosiveComponent,
+  type HealthComponent,
+  type HungerComponent,
+  type InventoryComponent,
+  type ItemStack,
+  type LandmineComponent,
+  type LootableComponent,
+  type LootTableEntry,
+  type NPCTypeComponent,
+  type OwnershipComponent,
+  type PositionComponent,
+  type ProjectileComponent,
+  type ResearchComponent,
+  type ResourceNodeComponent,
+  type TemperatureComponent,
+  type ThirstComponent,
+  type VelocityComponent,
 } from '@lineremain/shared';
 import { logger } from '../utils/logger.js';
+import { ChunkStore } from '../world/ChunkStore.js';
+import { TerrainGenerator } from '../world/TerrainGenerator.js';
+import { ECSWorld } from './ECS.js';
 
 // ─── System Function Type ───
 export type SystemFn = (world: GameWorld, dt: number) => void;
@@ -90,6 +96,12 @@ export class GameWorld {
     this.ecs.registerComponent<CraftQueueComponent>(ComponentType.CraftQueue);
     this.ecs.registerComponent<AIComponent>(ComponentType.AI);
     this.ecs.registerComponent<LootableComponent>(ComponentType.Lootable);
+    this.ecs.registerComponent<ExplosiveComponent>(ComponentType.Explosive);
+    this.ecs.registerComponent<DoorStateComponent>(ComponentType.DoorState);
+    this.ecs.registerComponent<ContainerComponent>(ComponentType.Container);
+    this.ecs.registerComponent<LandmineComponent>(ComponentType.Landmine);
+    this.ecs.registerComponent<ResearchComponent>(ComponentType.Research);
+    this.ecs.registerComponent<BarricadeComponent>(ComponentType.Barricade);
 
     logger.info({ seed }, 'GameWorld initialized');
   }
@@ -134,7 +146,9 @@ export class GameWorld {
     });
 
     this.ecs.addComponent<VelocityComponent>(entityId, ComponentType.Velocity, {
-      vx: 0, vy: 0, vz: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
     });
 
     this.ecs.addComponent<HealthComponent>(entityId, ComponentType.Health, {
@@ -265,7 +279,10 @@ export class GameWorld {
     const entityId = this.ecs.createEntity();
 
     this.ecs.addComponent<PositionComponent>(entityId, ComponentType.Position, {
-      x: position.x, y: position.y, z: position.z, rotation: 0,
+      x: position.x,
+      y: position.y,
+      z: position.z,
+      rotation: 0,
     });
 
     this.ecs.addComponent<HealthComponent>(entityId, ComponentType.Health, {
@@ -282,7 +299,10 @@ export class GameWorld {
     });
 
     this.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
-      width: 1.5, height: 1.5, depth: 1.5, isStatic: true,
+      width: 1.5,
+      height: 1.5,
+      depth: 1.5,
+      isStatic: true,
     });
 
     return entityId;
@@ -297,7 +317,10 @@ export class GameWorld {
     const entityId = this.ecs.createEntity();
 
     this.ecs.addComponent<PositionComponent>(entityId, ComponentType.Position, {
-      x: position.x, y: position.y, z: position.z, rotation: 0,
+      x: position.x,
+      y: position.y,
+      z: position.z,
+      rotation: 0,
     });
 
     this.ecs.addComponent<InventoryComponent>(entityId, ComponentType.Inventory, {
@@ -306,7 +329,10 @@ export class GameWorld {
     });
 
     this.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
-      width: 0.4, height: 0.4, depth: 0.4, isStatic: false,
+      width: 0.4,
+      height: 0.4,
+      depth: 0.4,
+      isStatic: false,
     });
 
     return entityId;
@@ -336,16 +362,22 @@ export class GameWorld {
     const entityId = this.ecs.createEntity();
 
     this.ecs.addComponent<PositionComponent>(entityId, ComponentType.Position, {
-      x: position.x, y: position.y, z: position.z, rotation: 0,
+      x: position.x,
+      y: position.y,
+      z: position.z,
+      rotation: 0,
     });
 
     this.ecs.addComponent<VelocityComponent>(entityId, ComponentType.Velocity, {
-      vx: 0, vy: 0, vz: 0,
+      vx: 0,
+      vy: 0,
+      vz: 0,
     });
 
     const hp = config?.health ?? 150;
     this.ecs.addComponent<HealthComponent>(entityId, ComponentType.Health, {
-      current: hp, max: hp,
+      current: hp,
+      max: hp,
     });
 
     this.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
@@ -404,11 +436,16 @@ export class GameWorld {
     const entityId = this.ecs.createEntity();
 
     this.ecs.addComponent<PositionComponent>(entityId, ComponentType.Position, {
-      x: position.x, y: position.y, z: position.z, rotation: 0,
+      x: position.x,
+      y: position.y,
+      z: position.z,
+      rotation: 0,
     });
 
     this.ecs.addComponent<VelocityComponent>(entityId, ComponentType.Velocity, {
-      vx: velocity.vx, vy: velocity.vy, vz: velocity.vz,
+      vx: velocity.vx,
+      vy: velocity.vy,
+      vz: velocity.vz,
     });
 
     this.ecs.addComponent<ProjectileComponent>(entityId, ComponentType.Projectile, {
@@ -423,7 +460,10 @@ export class GameWorld {
     });
 
     this.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
-      width: 0.1, height: 0.1, depth: 0.1, isStatic: false,
+      width: 0.1,
+      height: 0.1,
+      depth: 0.1,
+      isStatic: false,
     });
 
     return entityId;
@@ -439,7 +479,10 @@ export class GameWorld {
     const entityId = this.ecs.createEntity();
 
     this.ecs.addComponent<PositionComponent>(entityId, ComponentType.Position, {
-      x: position.x, y: position.y, z: position.z, rotation: 0,
+      x: position.x,
+      y: position.y,
+      z: position.z,
+      rotation: 0,
     });
 
     this.ecs.addComponent<InventoryComponent>(entityId, ComponentType.Inventory, {
@@ -453,7 +496,10 @@ export class GameWorld {
     });
 
     this.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
-      width: 0.6, height: 0.6, depth: 0.6, isStatic: true,
+      width: 0.6,
+      height: 0.6,
+      depth: 0.6,
+      isStatic: true,
     });
 
     this.ecs.addComponent<DecayComponent>(entityId, ComponentType.Decay, {

@@ -7,6 +7,7 @@ import { CustomizationPanel } from '../panels/CustomizationPanel';
 import { JournalPanel } from '../panels/JournalPanel';
 import { LeaderboardPanel } from '../panels/LeaderboardPanel';
 import { AchievementToast } from './AchievementToast';
+import { NotificationToast } from './NotificationToast';
 import { ChatBox } from './ChatBox';
 import { Crosshair } from './Crosshair';
 import { DamageIndicator } from './DamageIndicator';
@@ -15,9 +16,11 @@ import { Hotbar } from './Hotbar';
 import { LevelUpNotification } from './LevelUpNotification';
 import { Minimap } from './Minimap';
 import { PickupNotifications } from './PickupNotifications';
+import { RaidAlertPanel } from './RaidAlertPanel';
 import { ReconnectOverlay } from './ReconnectOverlay';
 import { StatusEffects } from './StatusEffects';
 import { TutorialOverlay } from './TutorialOverlay';
+import { WipeWarningHUD } from './WipeWarningHUD';
 import { XPBar } from './XPBar';
 
 export const HUD: React.FC = () => {
@@ -36,10 +39,13 @@ export const HUD: React.FC = () => {
       <AchievementToast />
       <LevelUpNotification />
       <TutorialOverlay />
+      <RaidAlertPanel />
+      <WipeWarningHUD />
       <JournalPanel />
       <AchievementPanel />
       <CustomizationPanel />
       <LeaderboardPanel />
+      <NotificationToast />
     </div>
   );
 };

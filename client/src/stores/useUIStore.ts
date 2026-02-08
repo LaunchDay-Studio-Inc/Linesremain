@@ -13,6 +13,7 @@ interface UIState {
   customizationOpen: boolean;
   leaderboardOpen: boolean;
   cursorLocked: boolean;
+  menuPanel: string | null;
 
   toggleInventory: () => void;
   toggleCrafting: () => void;
@@ -24,6 +25,8 @@ interface UIState {
   toggleCustomization: () => void;
   toggleLeaderboard: () => void;
   setCursorLocked: (locked: boolean) => void;
+  openPanel: (name: string) => void;
+  closePanel: () => void;
   closeAll: () => void;
 }
 
@@ -36,6 +39,7 @@ const CLOSE_PANELS = {
   achievementsOpen: false,
   customizationOpen: false,
   leaderboardOpen: false,
+  menuPanel: null,
 };
 
 export const useUIStore = create<UIState>((set) => ({
@@ -49,6 +53,7 @@ export const useUIStore = create<UIState>((set) => ({
   customizationOpen: false,
   leaderboardOpen: false,
   cursorLocked: false,
+  menuPanel: null,
 
   toggleInventory: () =>
     set((s) => ({
@@ -101,6 +106,10 @@ export const useUIStore = create<UIState>((set) => ({
     })),
 
   setCursorLocked: (locked) => set({ cursorLocked: locked }),
+
+  openPanel: (name) => set({ menuPanel: name }),
+
+  closePanel: () => set({ menuPanel: null }),
 
   closeAll: () => set(CLOSE_PANELS),
 }));

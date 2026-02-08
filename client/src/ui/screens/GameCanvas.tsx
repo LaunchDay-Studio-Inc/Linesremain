@@ -42,6 +42,10 @@ import { AmbientSynthesizer } from '../../engine/AmbientSynthesizer';
 import { SupplyDropRenderer } from '../../entities/SupplyDropRenderer';
 import { CinematicText } from '../hud/CinematicText';
 import { triggerJournalPopup } from '../panels/JournalPanel';
+import { ContainerPanel } from '../panels/ContainerPanel';
+import { CodeLockPanel } from '../panels/CodeLockPanel';
+import { ResearchPanel } from '../panels/ResearchPanel';
+import { useEndgameStore } from '../../stores/useEndgameStore';
 
 // ─── Component ───
 
@@ -58,6 +62,13 @@ export const GameCanvas: React.FC = () => {
   const toggleBuildingMode = useUIStore((s) => s.toggleBuildingMode);
   const toggleSettings = useUIStore((s) => s.toggleSettings);
   const closeAll = useUIStore((s) => s.closeAll);
+
+  // Endgame panel state
+  const codeLockPrompt = useEndgameStore((s) => s.codeLockPrompt);
+  const setCodeLockPrompt = useEndgameStore((s) => s.setCodeLockPrompt);
+  const containerOpen = useEndgameStore((s) => s.containerOpen);
+  const setContainerOpen = useEndgameStore((s) => s.setContainerOpen);
+  const researchProgress = useEndgameStore((s) => s.researchProgress);
 
   // Cinematic text overlay state
   const [cinematicData, setCinematicData] = useState<{ text: string; subtitle?: string; duration: number; key: number }>({ text: '', subtitle: undefined, duration: 5000, key: 0 });
@@ -561,6 +572,35 @@ export const GameCanvas: React.FC = () => {
       <BuildingPanel onSelectPiece={handleSelectPiece} onCancelPreview={handleCancelPreview} />
       <MapPanel />
       <SettingsPanel />
+
+      {codeLockPrompt && (
+        <CodeLockPanel
+          isOpen={true}
+          onClose={() => setCodeLockPrompt(null)}
+          entityId={codeLockPrompt.entityId}
+          isOwner={codeLockPrompt.isOwner}
+        />
+      )}
+
+      {containerOpen && (
+        <ContainerPanel
+          isOpen={true}
+          onClose={() => {
+            setContainerOpen(null);
+            socketClient.emit(ClientMessage.ContainerClose);
+          }}
+          containerName={containerOpen.containerType === 'large_storage_box' ? 'Large Storage Box' : containerOpen.containerType === 'research_table' ? 'Research Table' : 'Storage Box'}
+          containerSlots={containerOpen.slots}
+        />
+      )}
+
+      {researchProgress && (
+        <ResearchPanel
+          isOpen={true}
+          onClose={() => useEndgameStore.getState().setResearchProgress(null)}
+          entityId={researchProgress.entityId}
+        />
+      )}
 
     </div>
   );

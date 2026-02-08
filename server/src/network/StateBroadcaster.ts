@@ -10,17 +10,25 @@ import {
   TICK_RATE,
   VIEW_DISTANCE_CHUNKS,
   type AchievementPayload,
+  type BaseAttackPayload,
+  type BlueprintLearnedPayload,
+  type CodeLockPromptPayload,
+  type ContainerContentsPayload,
   type DeathPayload,
   type DeltaPayload,
+  type DoorStatePayload,
   type EntitySnapshot,
+  type ExplosionPayload,
   type JournalFoundPayload,
   type HealthComponent,
   type HungerComponent,
   type LevelUpPayload,
   type PlayerStatsPayload,
   type PositionComponent,
+  type ResearchProgressPayload,
   type TemperatureComponent,
   type ThirstComponent,
+  type WipeWarningPayload,
   type WorldEventPayload,
   type WorldTimePayload,
   type XpGainPayload,
@@ -34,6 +42,12 @@ import {
   drainLevelUpNotifications,
   drainXpGainNotifications,
 } from '../game/systems/AchievementSystem.js';
+import { drainExplosionNotifications, drainBaseAttackNotifications } from '../game/systems/RaidingSystem.js';
+import { drainDoorStateNotifications, drainCodeLockPrompts } from '../game/systems/DoorSystem.js';
+import { drainContainerContentUpdates } from '../game/systems/ContainerSystem.js';
+import { drainDefenseExplosionNotifications } from '../game/systems/DefenseSystem.js';
+import { drainWipeWarnings } from '../game/systems/WipeSystem.js';
+import { drainBlueprintLearnedNotifications, drainResearchProgressUpdates } from '../game/systems/BlueprintSystem.js';
 import type { GameWorld } from '../game/World.js';
 import type { SocketServer } from './SocketServer.js';
 
@@ -65,6 +79,10 @@ const TRACKED_COMPONENTS = [
   ComponentType.Building,
   ComponentType.NPCType,
   ComponentType.AI,
+  ComponentType.DoorState,
+  ComponentType.Explosive,
+  ComponentType.Landmine,
+  ComponentType.Barricade,
 ];
 
 // ─── State Broadcaster ───
@@ -107,6 +125,9 @@ export class StateBroadcaster {
 
     // Broadcast progression notifications (every tick — immediate feedback)
     this.broadcastProgressionNotifications();
+
+    // Broadcast endgame notifications (every tick — immediate feedback)
+    this.broadcastEndgameNotifications();
 
     // Delta broadcast at configured interval
     if (tick % DELTA_INTERVAL === 0) {
@@ -414,6 +435,107 @@ export class StateBroadcaster {
         source: notif.source,
       };
       this.socketServer.emitToPlayer(notif.playerId, ServerMessage.XpGain, payload);
+    }
+  }
+
+  // ─── Endgame Notification Broadcast ───
+
+  private broadcastEndgameNotifications(): void {
+    // Explosion effects (C4 detonations)
+    const explosions = drainExplosionNotifications();
+    for (const exp of explosions) {
+      const payload: ExplosionPayload = {
+        position: exp.position,
+        radius: 5,
+        type: 'c4',
+      };
+      this.socketServer.broadcast(ServerMessage.Explosion, payload);
+    }
+
+    // Base attack alerts (notify building owners)
+    const attacks = drainBaseAttackNotifications();
+    for (const attack of attacks) {
+      const payload: BaseAttackPayload = {
+        position: attack.position,
+        attackerName: attack.attackerPlayerId,
+      };
+      this.socketServer.emitToPlayer(attack.ownerId, ServerMessage.BaseAttack, payload);
+    }
+
+    // Door state changes
+    const doorStates = drainDoorStateNotifications();
+    for (const ds of doorStates) {
+      const payload: DoorStatePayload = {
+        entityId: ds.entityId,
+        isOpen: ds.isOpen,
+        isLocked: ds.isLocked,
+      };
+      this.socketServer.broadcast(ServerMessage.DoorState, payload);
+    }
+
+    // Code lock prompts (per-player)
+    const lockPrompts = drainCodeLockPrompts();
+    for (const prompt of lockPrompts) {
+      const payload: CodeLockPromptPayload = {
+        entityId: prompt.entityId,
+        isOwner: prompt.isOwner,
+      };
+      this.socketServer.emitToPlayer(prompt.playerId, ServerMessage.CodeLockPrompt, payload);
+    }
+
+    // Container content updates (per-player)
+    const containerUpdates = drainContainerContentUpdates();
+    for (const update of containerUpdates) {
+      const payload: ContainerContentsPayload = {
+        entityId: update.entityId,
+        containerType: update.containerType,
+        slots: update.slots,
+        maxSlots: update.maxSlots,
+      };
+      this.socketServer.emitToPlayer(update.playerId, ServerMessage.ContainerContents, payload);
+    }
+
+    // Defense explosions (landmines)
+    const defenseExplosions = drainDefenseExplosionNotifications();
+    for (const exp of defenseExplosions) {
+      const payload: ExplosionPayload = {
+        position: exp.position,
+        radius: 3,
+        type: 'landmine',
+      };
+      this.socketServer.broadcast(ServerMessage.Explosion, payload);
+    }
+
+    // Wipe warnings
+    const wipeWarnings = drainWipeWarnings();
+    for (const warning of wipeWarnings) {
+      const payload: WipeWarningPayload = {
+        timeRemainingMs: warning.timeRemainingMs,
+        message: warning.message,
+      };
+      this.socketServer.broadcast(ServerMessage.WipeWarning, payload);
+    }
+
+    // Blueprint learned
+    const blueprints = drainBlueprintLearnedNotifications();
+    for (const bp of blueprints) {
+      const payload: BlueprintLearnedPayload = {
+        recipeId: bp.recipeId,
+        recipeName: bp.recipeName,
+      };
+      this.socketServer.emitToPlayer(bp.playerId, ServerMessage.BlueprintLearned, payload);
+    }
+
+    // Research progress
+    const researchUpdates = drainResearchProgressUpdates();
+    for (const update of researchUpdates) {
+      const payload: ResearchProgressPayload = {
+        entityId: update.entityId,
+        progress: update.progress,
+        isComplete: update.isComplete,
+        itemName: update.itemName,
+      };
+      this.socketServer.emitToPlayer(update.playerId, ServerMessage.ResearchProgress, payload);
     }
   }
 }

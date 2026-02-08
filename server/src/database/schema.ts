@@ -3,6 +3,7 @@
 import type { InferInsertModel, InferSelectModel } from 'drizzle-orm';
 import { relations } from 'drizzle-orm';
 import {
+  boolean,
   customType,
   index,
   integer,
@@ -10,6 +11,7 @@ import {
   pgTable,
   primaryKey,
   real,
+  text,
   timestamp,
   uuid,
   varchar,
@@ -330,3 +332,93 @@ export const refreshTokensRelations = relations(refreshTokens, ({ one }) => ({
 
 export type RefreshToken = InferSelectModel<typeof refreshTokens>;
 export type NewRefreshToken = InferInsertModel<typeof refreshTokens>;
+
+// ═══════════════════════════════════════
+// SEASONS
+// ═══════════════════════════════════════
+
+export const seasons = pgTable('seasons', {
+  id: uuid('id').defaultRandom().primaryKey(),
+  seasonNumber: integer('season_number').notNull().unique(),
+  worldSeed: integer('world_seed').notNull(),
+  startedAt: timestamp('started_at', { withTimezone: true }).defaultNow().notNull(),
+  endedAt: timestamp('ended_at', { withTimezone: true }),
+  leaderboardSnapshot: jsonb('leaderboard_snapshot').default({}).notNull(),
+});
+
+export type Season = InferSelectModel<typeof seasons>;
+export type NewSeason = InferInsertModel<typeof seasons>;
+
+// ═══════════════════════════════════════
+// CONTAINER ITEMS
+// ═══════════════════════════════════════
+
+export const containerItems = pgTable(
+  'container_items',
+  {
+    id: uuid('id').defaultRandom().primaryKey(),
+    buildingId: uuid('building_id')
+      .notNull()
+      .references(() => buildings.id, { onDelete: 'cascade' }),
+    slotIndex: integer('slot_index').notNull(),
+    itemId: integer('item_id').notNull(),
+    quantity: integer('quantity').notNull(),
+  },
+  (table) => ({
+    buildingIdx: index('container_items_building_idx').on(table.buildingId),
+    uniqueSlot: index('container_items_unique_slot_idx').on(table.buildingId, table.slotIndex),
+  }),
+);
+
+export type ContainerItem = InferSelectModel<typeof containerItems>;
+export type NewContainerItem = InferInsertModel<typeof containerItems>;
+
+// ═══════════════════════════════════════
+// STORE ITEMS
+// ═══════════════════════════════════════
+
+export const storeItems = pgTable('store_items', {
+  id: varchar('id', { length: 64 }).primaryKey(),
+  name: varchar('name', { length: 128 }).notNull(),
+  description: text('description'),
+  category: varchar('category', { length: 32 }).notNull(),
+  priceCents: integer('price_cents').notNull(),
+  previewData: jsonb('preview_data'),
+  releasedAt: timestamp('released_at', { withTimezone: true }).defaultNow(),
+  isActive: boolean('is_active').default(true),
+});
+
+export type StoreItem = InferSelectModel<typeof storeItems>;
+export type NewStoreItem = InferInsertModel<typeof storeItems>;
+
+// ═══════════════════════════════════════
+// PLAYER PURCHASES
+// ═══════════════════════════════════════
+
+export const playerPurchases = pgTable('player_purchases', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  playerId: uuid('player_id').references(() => players.id, { onDelete: 'cascade' }),
+  storeItemId: varchar('store_item_id', { length: 64 }).references(() => storeItems.id),
+  purchasedAt: timestamp('purchased_at', { withTimezone: true }).defaultNow(),
+  pricePaidCents: integer('price_paid_cents').notNull(),
+  transactionId: varchar('transaction_id', { length: 255 }),
+});
+
+export type PlayerPurchase = InferSelectModel<typeof playerPurchases>;
+export type NewPlayerPurchase = InferInsertModel<typeof playerPurchases>;
+
+// ═══════════════════════════════════════
+// BATTLE PASSES
+// ═══════════════════════════════════════
+
+export const battlePasses = pgTable('battle_passes', {
+  id: uuid('id').primaryKey().defaultRandom(),
+  playerId: uuid('player_id').references(() => players.id, { onDelete: 'cascade' }),
+  season: integer('season').notNull(),
+  tier: integer('tier').default(0),
+  xpInTier: integer('xp_in_tier').default(0),
+  purchasedAt: timestamp('purchased_at', { withTimezone: true }).defaultNow(),
+});
+
+export type BattlePass = InferSelectModel<typeof battlePasses>;
+export type NewBattlePass = InferInsertModel<typeof battlePasses>;

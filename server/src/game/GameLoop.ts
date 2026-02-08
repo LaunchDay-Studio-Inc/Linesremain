@@ -40,6 +40,12 @@ import { toolCupboardSystem } from './systems/ToolCupboardSystem.js';
 import { worldEventSystem } from './systems/WorldEventSystem.js';
 import { journalSystem } from './systems/JournalSystem.js';
 import { achievementSystem } from './systems/AchievementSystem.js';
+import { blueprintSystem } from './systems/BlueprintSystem.js';
+import { containerSystem } from './systems/ContainerSystem.js';
+import { defenseSystem } from './systems/DefenseSystem.js';
+import { doorSystem } from './systems/DoorSystem.js';
+import { raidingSystem } from './systems/RaidingSystem.js';
+import { wipeSystem } from './systems/WipeSystem.js';
 
 // ─── Input Queue ───
 
@@ -138,7 +144,15 @@ export class GameLoop {
     // 14. Achievement system (periodic stats flush)
     this.world.addSystem(achievementSystem);
 
-    logger.info({ systemCount: 21 }, 'GameLoop initialized with all systems');
+    // 15. Endgame systems
+    this.world.addSystem(raidingSystem);
+    this.world.addSystem(doorSystem);
+    this.world.addSystem(containerSystem);
+    this.world.addSystem(defenseSystem);
+    this.world.addSystem(blueprintSystem);
+    this.world.addSystem(wipeSystem);
+
+    logger.info({ systemCount: 27 }, 'GameLoop initialized with all systems');
   }
 
   // ─── Input Queue ───

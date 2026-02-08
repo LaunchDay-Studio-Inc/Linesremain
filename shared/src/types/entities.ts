@@ -23,6 +23,12 @@ export enum ComponentType {
   Projectile = 'Projectile',
   NPCType = 'NPCType',
   CraftQueue = 'CraftQueue',
+  Explosive = 'Explosive',
+  DoorState = 'DoorState',
+  Container = 'Container',
+  Landmine = 'Landmine',
+  Research = 'Research',
+  Barricade = 'Barricade',
 }
 
 // ─── Component Interfaces ───
@@ -191,3 +197,49 @@ export interface CraftQueueComponent {
   queue: CraftQueueItem[];
   maxQueue: number;
 }
+
+// ─── Endgame Component Interfaces ───
+
+export interface ExplosiveComponent {
+  placerId: string; // player who placed it
+  targetEntityId: EntityId; // building entity it's attached to
+  fuseStartTime: number; // timestamp when placed
+  fuseDuration: number; // seconds (default 10)
+  damage: number; // direct damage
+  splashDamage: number; // damage to adjacent pieces
+  splashRadius: number; // blocks
+}
+
+export interface DoorStateComponent {
+  isOpen: boolean;
+  lockCode: string | null; // null = unlocked
+  authorizedPlayerIds: string[];
+  ownerId: string;
+  doorItemId: number; // 61 = wooden, 62 = metal
+}
+
+export interface ContainerComponent {
+  containerType: 'storage_box' | 'large_storage_box' | 'research_table';
+  slots: (import('./items.js').ItemStack | null)[];
+  maxSlots: number;
+}
+
+export interface LandmineComponent {
+  placerId: string;
+  armedAt: number; // timestamp when it becomes active (5s after place)
+  isArmed: boolean;
+  damage: number;
+  triggerRadius: number; // blocks
+}
+
+export interface ResearchComponent {
+  researchingItemId: number | null;
+  researchStartTime: number | null;
+  researchDuration: number; // seconds (default 10)
+  researcherId: string | null; // player doing research
+}
+
+export interface BarricadeComponent {
+  placerId: string;
+}
+

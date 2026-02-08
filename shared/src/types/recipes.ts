@@ -21,4 +21,5 @@ export interface RecipeDefinition {
   outputQuantity: number;
   craftTimeSeconds: number;
   requiredStation?: string; // e.g. 'workbench', 'furnace', 'mixing_table'
+  requiredBlueprint?: boolean; // true = player must learn blueprint before crafting
 }
