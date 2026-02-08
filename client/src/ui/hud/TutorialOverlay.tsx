@@ -7,6 +7,7 @@ import { ClientMessage } from '@shared/types/network';
 import React, { useCallback } from 'react';
 import { socketClient } from '../../network/SocketClient';
 import { useAchievementStore } from '../../stores/useAchievementStore';
+import { useGameStore } from '../../stores/useGameStore';
 import '../../styles/progression.css';
 
 export const TutorialOverlay: React.FC = () => {
@@ -14,7 +15,12 @@ export const TutorialOverlay: React.FC = () => {
   const tutorialComplete = useAchievementStore((s) => s.tutorialComplete);
 
   const handleSkip = useCallback(() => {
-    socketClient.emit(ClientMessage.TutorialSkip, {});
+    const isOffline = useGameStore.getState().isOffline;
+    if (isOffline) {
+      useAchievementStore.getState().completeTutorial();
+    } else {
+      socketClient.emit(ClientMessage.TutorialSkip, {});
+    }
   }, []);
 
   if (tutorialComplete || !tutorialStep || tutorialStep === 'complete') return null;

@@ -132,6 +132,10 @@ export class InputManager {
   // ── Event Handlers ──
 
   private onKeyDown = (e: KeyboardEvent): void => {
+    // Don't capture game input when typing in form fields
+    const tag = (e.target as HTMLElement)?.tagName;
+    if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
     // Prevent default for game & navigation keys (not all keys, allow browser shortcuts)
     if (PREVENT_DEFAULT_KEYS.has(e.code)) {
       e.preventDefault();

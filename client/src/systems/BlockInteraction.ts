@@ -3,23 +3,19 @@
 // DDA voxel raycasting. Renders a wireframe highlight on the targeted block
 // and tracks break progress with per-block hardness timing.
 
-import * as THREE from 'three';
-import {
-  CHUNK_SIZE_X,
-  CHUNK_SIZE_Y,
-  CHUNK_SIZE_Z,
-} from '@shared/constants/game';
-import { BlockType } from '@shared/types/blocks';
 import { BLOCK_REGISTRY } from '@shared/constants/blocks';
+import { CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z } from '@shared/constants/game';
 import { ITEM_REGISTRY } from '@shared/constants/items';
+import { BlockType } from '@shared/types/blocks';
 import { ClientMessage } from '@shared/types/network';
-import type { ChunkManager } from '../world/ChunkManager';
-import type { ParticleSystem } from '../engine/ParticleSystem';
-import { InputManager } from '../engine/InputManager';
+import * as THREE from 'three';
 import { AudioManager } from '../engine/AudioManager';
+import { InputManager } from '../engine/InputManager';
+import type { ParticleSystem } from '../engine/ParticleSystem';
 import { socketClient } from '../network/SocketClient';
-import { usePlayerStore } from '../stores/usePlayerStore';
 import { useGameStore } from '../stores/useGameStore';
+import { usePlayerStore } from '../stores/usePlayerStore';
+import type { ChunkManager } from '../world/ChunkManager';
 
 // ─── Types ───
 
@@ -33,9 +29,9 @@ interface RaycastHit {
 // ─── Item-to-Block Mapping ───
 // Maps item IDs to the block type they place when right-clicking
 const ITEM_TO_BLOCK: Partial<Record<number, BlockType>> = {
-  1: BlockType.Planks,        // Wood → Planks
-  2: BlockType.Cobblestone,   // Stone → Cobblestone
-  4: BlockType.Sand,          // Sand resource (Sulfur Ore) → Sand block
+  1: BlockType.Planks, // Wood → Planks
+  2: BlockType.Cobblestone, // Stone → Cobblestone
+  4: BlockType.Sand, // Sand resource (Sulfur Ore) → Sand block
 };
 
 // ─── Constants ───
@@ -288,6 +284,35 @@ export class BlockInteraction {
     const isOffline = useGameStore.getState().isOffline;
     if (!isOffline) {
       socketClient.emit(ClientMessage.BlockBreak, { x, y, z });
+    } else {
+      // In offline mode, add block drops directly to player inventory
+      const def = BLOCK_REGISTRY[blockType];
+      if (def?.dropItemId != null) {
+        const dropId = def.dropItemId;
+        const dropQty = def.dropQuantity ?? 1;
+        const store = usePlayerStore.getState();
+        const inv = [...store.inventory];
+        let added = false;
+        // Try to stack with existing matching slot
+        for (let i = 0; i < inv.length; i++) {
+          if (inv[i]?.itemId === dropId && inv[i]!.quantity < 99) {
+            inv[i] = { ...inv[i]!, quantity: inv[i]!.quantity + dropQty };
+            added = true;
+            break;
+          }
+        }
+        // Otherwise find first empty slot
+        if (!added) {
+          for (let i = 0; i < inv.length; i++) {
+            if (!inv[i]) {
+              inv[i] = { itemId: dropId, quantity: dropQty };
+              added = true;
+              break;
+            }
+          }
+        }
+        if (added) store.setInventory(inv);
+      }
     }
 
     // Spawn break particles

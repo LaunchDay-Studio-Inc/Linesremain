@@ -42,10 +42,16 @@ export class AudioManager {
   /** Must be called after a user gesture (click/keydown) to unlock AudioContext */
   init(): void {
     if (this.ctx) return;
-    this.ctx = new AudioContext();
-    this.masterGain = this.ctx.createGain();
-    this.masterGain.gain.value = this.volume;
-    this.masterGain.connect(this.ctx.destination);
+    try {
+      this.ctx = new AudioContext();
+      this.masterGain = this.ctx.createGain();
+      this.masterGain.gain.value = this.volume;
+      this.masterGain.connect(this.ctx.destination);
+    } catch {
+      // Audio not available — game continues silently
+      this.ctx = null;
+      this.masterGain = null;
+    }
   }
 
   private ensureContext(): AudioContext {
@@ -73,9 +79,10 @@ export class AudioManager {
 
   play(sound: SoundName): void {
     if (this.muted) return;
-    const ctx = this.ensureContext();
-    if (ctx.state === 'suspended') {
-      ctx.resume();
+    if (!this.ctx) this.init();
+    if (!this.ctx) return; // init failed — audio unavailable
+    if (this.ctx.state === 'suspended') {
+      this.ctx.resume();
     }
 
     switch (sound) {

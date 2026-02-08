@@ -12,7 +12,7 @@ export class CameraController {
 
   // Orbit parameters
   private azimuth = 0; // degrees
-  private elevation = 35; // degrees
+  private elevation = 20; // degrees
   private distance = 20;
 
   // Limits

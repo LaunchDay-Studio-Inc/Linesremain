@@ -2,29 +2,29 @@
 // WASD+mouse first-person controller with collision detection against voxel terrain.
 // Uses pointer lock for mouse look and reads input from InputManager singleton.
 
-import * as THREE from 'three';
-import { InputManager } from '../engine/InputManager';
-import { CameraController } from '../engine/Camera';
-import { PlayerRenderer } from './PlayerRenderer';
-import { ChunkManager } from '../world/ChunkManager';
-import { usePlayerStore } from '../stores/usePlayerStore';
-import type { AnimationName } from '../assets/SpriteGenerator';
 import {
-  PLAYER_WALK_SPEED,
-  PLAYER_SPRINT_SPEED,
-  PLAYER_CROUCH_SPEED,
-  PLAYER_JUMP_VELOCITY,
-  PLAYER_HEIGHT,
-  PLAYER_WIDTH,
-  PLAYER_EYE_HEIGHT,
-  GRAVITY,
-  TERMINAL_VELOCITY,
   CHUNK_SIZE_X,
   CHUNK_SIZE_Y,
   CHUNK_SIZE_Z,
+  GRAVITY,
+  PLAYER_CROUCH_SPEED,
+  PLAYER_EYE_HEIGHT,
+  PLAYER_HEIGHT,
+  PLAYER_JUMP_VELOCITY,
+  PLAYER_SPRINT_SPEED,
+  PLAYER_WALK_SPEED,
+  PLAYER_WIDTH,
   SEA_LEVEL,
+  TERMINAL_VELOCITY,
 } from '@shared/constants/game';
 import { BlockType } from '@shared/types/blocks';
+import * as THREE from 'three';
+import type { AnimationName } from '../assets/SpriteGenerator';
+import { CameraController } from '../engine/Camera';
+import { InputManager } from '../engine/InputManager';
+import { usePlayerStore } from '../stores/usePlayerStore';
+import { ChunkManager } from '../world/ChunkManager';
+import { PlayerRenderer } from './PlayerRenderer';
 
 // ─── Constants ───
 
@@ -47,7 +47,14 @@ function getBlock(chunkManager: ChunkManager, wx: number, wy: number, wz: number
   const lz = ((Math.floor(wz) % CHUNK_SIZE_Z) + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
   const ly = Math.floor(wy);
 
-  if (lx < 0 || lx >= CHUNK_SIZE_X || ly < 0 || ly >= CHUNK_SIZE_Y || lz < 0 || lz >= CHUNK_SIZE_Z) {
+  if (
+    lx < 0 ||
+    lx >= CHUNK_SIZE_X ||
+    ly < 0 ||
+    ly >= CHUNK_SIZE_Y ||
+    lz < 0 ||
+    lz >= CHUNK_SIZE_Z
+  ) {
     return BlockType.Air;
   }
 
@@ -169,7 +176,12 @@ export class LocalPlayerController {
     this.isCrouching = this.input.isKeyDown(keybinds.crouch);
 
     // Check water
-    const feetBlock = getBlock(this.chunkManager, this.position.x, this.position.y, this.position.z);
+    const feetBlock = getBlock(
+      this.chunkManager,
+      this.position.x,
+      this.position.y,
+      this.position.z,
+    );
     this.isInWater = feetBlock === BlockType.Water;
 
     // Determine move speed
@@ -246,15 +258,28 @@ export class LocalPlayerController {
       this.velocity.z = 0;
     }
 
-    // Y axis
-    this.position.y += dy;
-    if (this.checkCollision()) {
-      this.position.y -= dy;
-      if (this.velocity.y < 0) {
-        this.isGrounded = true;
+    // Y axis — substep to prevent tunneling through thin floors at high speed
+    const MAX_STEP = 0.5;
+    let yRemaining = dy;
+    let yCollided = false;
+
+    while (Math.abs(yRemaining) > COLLISION_EPSILON) {
+      const stepY = Math.abs(yRemaining) > MAX_STEP ? Math.sign(yRemaining) * MAX_STEP : yRemaining;
+
+      this.position.y += stepY;
+      if (this.checkCollision()) {
+        this.position.y -= stepY;
+        if (this.velocity.y < 0) {
+          this.isGrounded = true;
+        }
+        this.velocity.y = 0;
+        yCollided = true;
+        break;
       }
-      this.velocity.y = 0;
-    } else {
+      yRemaining -= stepY;
+    }
+
+    if (!yCollided) {
       // Check if still grounded (one block below feet)
       const belowBlock = getBlock(
         this.chunkManager,
@@ -357,10 +382,6 @@ export class LocalPlayerController {
     this.lastSyncY = this.position.y;
     this.lastSyncZ = this.position.z;
 
-    usePlayerStore.getState().setPosition(
-      this.position.x,
-      this.position.y,
-      this.position.z,
-    );
+    usePlayerStore.getState().setPosition(this.position.x, this.position.y, this.position.z);
   }
 }

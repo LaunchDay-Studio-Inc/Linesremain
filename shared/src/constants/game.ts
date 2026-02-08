@@ -3,7 +3,7 @@
 // ─── Tick & Timing ───
 export const TICK_RATE = 20; // server ticks per second
 export const TICK_INTERVAL_MS = 1000 / TICK_RATE; // 50ms per tick
-export const DAY_LENGTH_SECONDS = 3600; // 1 real hour = 1 game day
+export const DAY_LENGTH_SECONDS = 600; // 10 real minutes = 1 game day
 export const NIGHT_START = 0.75; // timeOfDay when night begins
 export const NIGHT_END = 0.25; // timeOfDay when night ends
 

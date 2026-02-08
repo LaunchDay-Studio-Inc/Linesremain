@@ -2,51 +2,71 @@
 // Wires up the full game session: Engine, ChunkManager, Player Controller,
 // Particle System, Animation System, Camera, Sky, Water, and FPS Counter.
 
-import React, { useEffect, useRef, useCallback, useState } from 'react';
+import {
+  CHUNK_SIZE_X,
+  CHUNK_SIZE_Y,
+  CHUNK_SIZE_Z,
+  DAY_LENGTH_SECONDS,
+  SEA_LEVEL,
+} from '@shared/constants/game';
+import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
+import {
+  ClientMessage,
+  ServerMessage,
+  type CinematicTextPayload,
+  type InputPayload,
+  type JournalFoundPayload,
+  type WorldEventPayload,
+} from '@shared/types/network';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
-import { Engine } from '../../engine/Engine';
+import { generateSpriteSheet } from '../../assets/SpriteGenerator';
+import { AmbientSynthesizer } from '../../engine/AmbientSynthesizer';
+import { AudioManager } from '../../engine/AudioManager';
 import { CameraController } from '../../engine/Camera';
+import { Engine } from '../../engine/Engine';
 import { InputManager } from '../../engine/InputManager';
 import { ParticleSystem } from '../../engine/ParticleSystem';
-import { AudioManager } from '../../engine/AudioManager';
-import { ChunkManager } from '../../world/ChunkManager';
-import { SkyRenderer } from '../../world/SkyRenderer';
-import { WaterRenderer } from '../../world/WaterRenderer';
-import { ClientTerrainGenerator } from '../../world/ClientTerrainGenerator';
-import { PlayerRenderer } from '../../entities/PlayerRenderer';
+import { BuildingPreview } from '../../entities/BuildingPreview';
 import { LocalPlayerController } from '../../entities/LocalPlayerController';
+import { NPCRenderer } from '../../entities/NPCRenderer';
+import { PlayerRenderer } from '../../entities/PlayerRenderer';
+import { SupplyDropRenderer } from '../../entities/SupplyDropRenderer';
+import {
+  getEntities,
+  getLastServerTick,
+  getLocalPlayerEntityId,
+  setOnBlockChanged,
+} from '../../network/MessageHandler';
+import { socketClient } from '../../network/SocketClient';
+import { useAchievementStore } from '../../stores/useAchievementStore';
+import { useChatStore } from '../../stores/useChatStore';
+import { useEndgameStore } from '../../stores/useEndgameStore';
+import { useGameStore } from '../../stores/useGameStore';
+import { usePlayerStore } from '../../stores/usePlayerStore';
+import { useUIStore } from '../../stores/useUIStore';
 import { AnimationSystem } from '../../systems/AnimationSystem';
 import { BlockInteraction } from '../../systems/BlockInteraction';
-import { BuildingPreview } from '../../entities/BuildingPreview';
-import { NPCRenderer } from '../../entities/NPCRenderer';
 import { CombatEffects, type EntityHealthState } from '../../systems/CombatEffects';
 import { EntityInterpolation } from '../../systems/EntityInterpolation';
-import { generateSpriteSheet } from '../../assets/SpriteGenerator';
-import { useUIStore } from '../../stores/useUIStore';
-import { useChatStore } from '../../stores/useChatStore';
-import { useGameStore } from '../../stores/useGameStore';
-import { socketClient } from '../../network/SocketClient';
-import { SEA_LEVEL, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z, DAY_LENGTH_SECONDS } from '@shared/constants/game';
-import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
-import { ClientMessage, ServerMessage, type InputPayload, type WorldEventPayload, type JournalFoundPayload, type CinematicTextPayload } from '@shared/types/network';
-import { setOnBlockChanged, getEntities, getLocalPlayerEntityId, getLastServerTick } from '../../network/MessageHandler';
-import { HUD } from '../hud/HUD';
-import { FPSCounter } from '../hud/FPSCounter';
-import { InventoryPanel } from '../panels/InventoryPanel';
-import { CraftingPanel } from '../panels/CraftingPanel';
-import { BuildingPanel } from '../panels/BuildingPanel';
-import { MapPanel } from '../panels/MapPanel';
-import { SettingsPanel } from '../panels/SettingsPanel';
-import { BiomeTracker } from '../../world/BiomeTracker';
 import { BiomeParticleSystem } from '../../world/BiomeParticleSystem';
-import { AmbientSynthesizer } from '../../engine/AmbientSynthesizer';
-import { SupplyDropRenderer } from '../../entities/SupplyDropRenderer';
+import { BiomeTracker } from '../../world/BiomeTracker';
+import { ChunkManager } from '../../world/ChunkManager';
+import { ClientTerrainGenerator } from '../../world/ClientTerrainGenerator';
+import { SkyRenderer } from '../../world/SkyRenderer';
+import { WaterRenderer } from '../../world/WaterRenderer';
 import { CinematicText } from '../hud/CinematicText';
-import { triggerJournalPopup } from '../panels/JournalPanel';
-import { ContainerPanel } from '../panels/ContainerPanel';
+import { FPSCounter } from '../hud/FPSCounter';
+import { HUD } from '../hud/HUD';
+import { BuildingPanel } from '../panels/BuildingPanel';
 import { CodeLockPanel } from '../panels/CodeLockPanel';
+import { ContainerPanel } from '../panels/ContainerPanel';
+import { CraftingPanel } from '../panels/CraftingPanel';
+import { InventoryPanel } from '../panels/InventoryPanel';
+import { triggerJournalPopup } from '../panels/JournalPanel';
+import { MapPanel } from '../panels/MapPanel';
 import { ResearchPanel } from '../panels/ResearchPanel';
-import { useEndgameStore } from '../../stores/useEndgameStore';
+import { SettingsPanel } from '../panels/SettingsPanel';
 
 // ─── Component ───
 
@@ -72,7 +92,12 @@ export const GameCanvas: React.FC = () => {
   const researchProgress = useEndgameStore((s) => s.researchProgress);
 
   // Cinematic text overlay state
-  const [cinematicData, setCinematicData] = useState<{ text: string; subtitle?: string; duration: number; key: number }>({ text: '', subtitle: undefined, duration: 5000, key: 0 });
+  const [cinematicData, setCinematicData] = useState<{
+    text: string;
+    subtitle?: string;
+    duration: number;
+    key: number;
+  }>({ text: '', subtitle: undefined, duration: 5000, key: 0 });
 
   // Building panel callbacks
   const handleSelectPiece = useCallback((pieceType: BuildingPieceType, tier: BuildingTier) => {
@@ -184,9 +209,21 @@ export const GameCanvas: React.FC = () => {
     );
     playerControllerRef.current = playerController;
 
-    // ── Generate spawn chunk so we can find surface height ──
-    const spawnX = 16;
-    const spawnZ = 16;
+    // ── Generate spawn chunk and find a dry-land spawn position ──
+    const findSurfaceY = (chunkData: Uint8Array, lx: number, lz: number): number => {
+      for (let y = CHUNK_SIZE_Y - 1; y >= 0; y--) {
+        const idx = lx + lz * CHUNK_SIZE_X + y * CHUNK_SIZE_X * CHUNK_SIZE_Z;
+        const block = chunkData[idx]!;
+        if (block !== 0 && block !== 14) {
+          // not air, not water
+          return y;
+        }
+      }
+      return 0;
+    };
+
+    let spawnX = 16;
+    let spawnZ = 16;
     const spawnCX = Math.floor(spawnX / CHUNK_SIZE_X);
     const spawnCZ = Math.floor(spawnZ / CHUNK_SIZE_Z);
     const spawnChunkData = terrainGenerator.generateChunk(spawnCX, spawnCZ);
@@ -194,19 +231,53 @@ export const GameCanvas: React.FC = () => {
     const localX = ((spawnX % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
     const localZ = ((spawnZ % CHUNK_SIZE_Z) + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
 
-    let spawnY = SEA_LEVEL + 10; // fallback
-    if (spawnChunkData) {
-      for (let y = CHUNK_SIZE_Y - 1; y >= 0; y--) {
-        const idx = localX + localZ * CHUNK_SIZE_X + y * CHUNK_SIZE_X * CHUNK_SIZE_Z;
-        const block = spawnChunkData[idx]!;
-        // Skip air and water — find actual solid ground
-        if (block !== 0 && block !== 14) {
-          spawnY = y + 1;
-          break;
+    let surfaceY = findSurfaceY(spawnChunkData, localX, localZ);
+    let spawnY = surfaceY + 1.5;
+
+    // If surface is below sea level (underwater), search outward for dry land
+    if (surfaceY < SEA_LEVEL) {
+      let found = false;
+      searchLoop: for (let radius = 1; radius <= 6; radius++) {
+        for (let dx = -radius; dx <= radius; dx++) {
+          for (let dz = -radius; dz <= radius; dz++) {
+            // Only check the ring perimeter, not the interior
+            if (Math.abs(dx) !== radius && Math.abs(dz) !== radius) continue;
+            const cx = spawnCX + dx;
+            const cz = spawnCZ + dz;
+            const chunkData = terrainGenerator.generateChunk(cx, cz);
+            chunkManager.onChunkDataReceived(cx, cz, chunkData);
+            // Check center of this chunk
+            const checkX = Math.floor(CHUNK_SIZE_X / 2);
+            const checkZ = Math.floor(CHUNK_SIZE_Z / 2);
+            const sy = findSurfaceY(chunkData, checkX, checkZ);
+            if (sy >= SEA_LEVEL) {
+              spawnX = cx * CHUNK_SIZE_X + checkX;
+              spawnZ = cz * CHUNK_SIZE_Z + checkZ;
+              spawnY = sy + 1.5;
+              found = true;
+              break searchLoop;
+            }
+          }
         }
       }
+      if (!found) {
+        spawnY = SEA_LEVEL + 5;
+      }
     }
-    playerController.setPosition(spawnX, spawnY + 0.1, spawnZ);
+
+    playerController.setPosition(spawnX, spawnY, spawnZ);
+
+    // ── Give starter items in offline mode ──
+    if (useGameStore.getState().isOffline) {
+      const playerStore = usePlayerStore.getState();
+      const starterInv: (import('@shared/types/items').ItemStack | null)[] = Array(
+        playerStore.inventory.length,
+      ).fill(null);
+      starterInv[0] = { itemId: 1, quantity: 50 }; // Wood
+      starterInv[1] = { itemId: 2, quantity: 30 }; // Stone
+      starterInv[2] = { itemId: 22, quantity: 1 }; // Stone Hatchet
+      playerStore.setInventory(starterInv);
+    }
 
     // Sync water planes with initially loaded chunks
     waterRenderer.syncWithChunks(chunkManager.getLoadedChunkKeys());
@@ -250,6 +321,8 @@ export const GameCanvas: React.FC = () => {
           toggleBuildingMode();
         } else if ((e.key === 'r' || e.key === 'R') && !e.ctrlKey && !e.metaKey) {
           buildingPreview.rotate();
+        } else if (e.key >= '1' && e.key <= '6') {
+          usePlayerStore.getState().setHotbarIndex(parseInt(e.key) - 1);
         }
       }
     };
@@ -303,7 +376,7 @@ export const GameCanvas: React.FC = () => {
 
     const handleCinematicText = (data: unknown) => {
       const payload = data as CinematicTextPayload;
-      setCinematicData(prev => ({
+      setCinematicData((prev) => ({
         text: payload.text,
         subtitle: payload.subtitle,
         duration: payload.duration,
@@ -326,6 +399,19 @@ export const GameCanvas: React.FC = () => {
       // Update chunks around player
       const pos = playerController.getPosition();
       chunkManager.update(pos.x, pos.z);
+
+      // Offline tutorial step detection
+      const isOffline = useGameStore.getState().isOffline;
+      if (isOffline) {
+        const achStore = useAchievementStore.getState();
+        if (!achStore.tutorialComplete) {
+          const step = achStore.tutorialStep;
+          if (step === 'move') {
+            const dist = Math.sqrt((pos.x - spawnX) ** 2 + (pos.z - spawnZ) ** 2);
+            if (dist > 5) achStore.setTutorialStep('gather');
+          }
+        }
+      }
 
       // Sync water planes with loaded chunks
       waterRenderer.syncWithChunks(chunkManager.getLoadedChunkKeys());
@@ -350,7 +436,9 @@ export const GameCanvas: React.FC = () => {
         const now = Date.now();
         for (const [entityId, entity] of entities) {
           if (entityId === localPlayerId) continue;
-          const entPos = entity.components['Position'] as { x: number; y: number; z: number } | undefined;
+          const entPos = entity.components['Position'] as
+            | { x: number; y: number; z: number }
+            | undefined;
           if (entPos) {
             const rot = entity.components['Rotation'] as { yaw?: number } | undefined;
             entityInterpolation.addSnapshot(
@@ -364,10 +452,13 @@ export const GameCanvas: React.FC = () => {
       }
       entityInterpolation.update(Date.now());
 
-      const npcEntityData = new Map<number, {
-        position: { x: number; y: number; z: number };
-        health?: { current: number; max: number };
-      }>();
+      const npcEntityData = new Map<
+        number,
+        {
+          position: { x: number; y: number; z: number };
+          health?: { current: number; max: number };
+        }
+      >();
       const activeNpcIds = new Set<number>();
 
       for (const [entityId, entity] of entities) {
@@ -376,12 +467,20 @@ export const GameCanvas: React.FC = () => {
         if (!npcType?.creatureType) continue;
 
         activeNpcIds.add(entityId);
-        const entPos = entity.components['Position'] as { x: number; y: number; z: number } | undefined;
-        const entHealth = entity.components['Health'] as { current: number; max: number } | undefined;
+        const entPos = entity.components['Position'] as
+          | { x: number; y: number; z: number }
+          | undefined;
+        const entHealth = entity.components['Health'] as
+          | { current: number; max: number }
+          | undefined;
 
         if (entPos) {
           if (!npcRenderer.hasNPC(entityId)) {
-            npcRenderer.addNPC(entityId, npcType.creatureType, new THREE.Vector3(entPos.x, entPos.y, entPos.z));
+            npcRenderer.addNPC(
+              entityId,
+              npcType.creatureType,
+              new THREE.Vector3(entPos.x, entPos.y, entPos.z),
+            );
           }
           npcEntityData.set(entityId, { position: entPos, health: entHealth });
         }
@@ -397,7 +496,9 @@ export const GameCanvas: React.FC = () => {
       for (const [entityId, entity] of entities) {
         if (entityId === localPlayerId) continue;
         if (entity.components['NPCType']) continue;
-        const entPos = entity.components['Position'] as { x: number; y: number; z: number } | undefined;
+        const entPos = entity.components['Position'] as
+          | { x: number; y: number; z: number }
+          | undefined;
         if (!entPos) continue;
 
         activeRemotePlayerIds.add(entityId);
@@ -437,8 +538,12 @@ export const GameCanvas: React.FC = () => {
       // Combat effects — detect health changes and spawn damage numbers / blood
       const healthStates: EntityHealthState[] = [];
       for (const [entityId, entity] of entities) {
-        const entPos = entity.components['Position'] as { x: number; y: number; z: number } | undefined;
-        const entHealth = entity.components['Health'] as { current: number; max: number } | undefined;
+        const entPos = entity.components['Position'] as
+          | { x: number; y: number; z: number }
+          | undefined;
+        const entHealth = entity.components['Health'] as
+          | { current: number; max: number }
+          | undefined;
         if (entPos && entHealth) {
           healthStates.push({
             entityId,
@@ -493,8 +598,12 @@ export const GameCanvas: React.FC = () => {
         const keybinds = input.keybinds;
         const inputPayload: InputPayload = {
           seq: inputSeq,
-          forward: (input.isKeyDown(keybinds.moveForward) ? 1 : 0) - (input.isKeyDown(keybinds.moveBackward) ? 1 : 0),
-          right: (input.isKeyDown(keybinds.moveRight) ? 1 : 0) - (input.isKeyDown(keybinds.moveLeft) ? 1 : 0),
+          forward:
+            (input.isKeyDown(keybinds.moveForward) ? 1 : 0) -
+            (input.isKeyDown(keybinds.moveBackward) ? 1 : 0),
+          right:
+            (input.isKeyDown(keybinds.moveRight) ? 1 : 0) -
+            (input.isKeyDown(keybinds.moveLeft) ? 1 : 0),
           jump: input.isKeyDown(keybinds.jump),
           crouch: input.isKeyDown(keybinds.crouch),
           sprint: input.isKeyDown(keybinds.sprint),
@@ -599,7 +708,13 @@ export const GameCanvas: React.FC = () => {
               socketClient.emit(ClientMessage.ContainerClose);
             }
           }}
-          containerName={containerOpen.containerType === 'large_storage_box' ? 'Large Storage Box' : containerOpen.containerType === 'research_table' ? 'Research Table' : 'Storage Box'}
+          containerName={
+            containerOpen.containerType === 'large_storage_box'
+              ? 'Large Storage Box'
+              : containerOpen.containerType === 'research_table'
+                ? 'Research Table'
+                : 'Storage Box'
+          }
           containerSlots={containerOpen.slots}
         />
       )}
@@ -611,7 +726,6 @@ export const GameCanvas: React.FC = () => {
           entityId={researchProgress.entityId}
         />
       )}
-
     </div>
   );
 };
