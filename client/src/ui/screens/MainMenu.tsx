@@ -501,7 +501,12 @@ export const MainMenu: React.FC = () => {
               onMouseLeave={() => setHoveredBtn(null)}
               onClick={() => {
                 useGameStore.getState().setOffline(true);
-                setScreen('playing');
+                const customization = useAchievementStore.getState().customization;
+                if (customization.bodyType) {
+                  setScreen('playing');
+                } else {
+                  setScreen('character-select');
+                }
               }}
             >
               Play Offline

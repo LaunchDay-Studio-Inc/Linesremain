@@ -404,6 +404,7 @@ export class NPCRenderer {
     const sprite = new THREE.Sprite(material);
     sprite.scale.set(spriteScale * 1.5, spriteScale * 1.5, 1);
     sprite.position.y = spriteScale * 0.75;
+    sprite.renderOrder = 10; // Render above water (renderOrder 1) and terrain
     group.add(sprite);
 
     // Health bar (hidden by default)

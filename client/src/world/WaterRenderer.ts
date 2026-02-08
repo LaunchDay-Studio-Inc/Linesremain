@@ -75,7 +75,8 @@ export class WaterRenderer {
       },
       transparent: true,
       side: THREE.DoubleSide,
-      depthWrite: false,
+      depthWrite: true,
+      depthTest: true,
     });
 
     // One plane per chunk, sized to chunk dimensions
@@ -95,7 +96,7 @@ export class WaterRenderer {
       SEA_LEVEL - 0.1, // Slightly below to avoid z-fighting with terrain water blocks
       chunkZ * CHUNK_SIZE_Z + CHUNK_SIZE_Z / 2,
     );
-    mesh.renderOrder = 2;
+    mesh.renderOrder = 1;
     mesh.frustumCulled = true;
 
     this.scene.add(mesh);

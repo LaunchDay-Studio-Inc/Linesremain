@@ -50,17 +50,24 @@ export const CharacterSelect: React.FC = () => {
       bodyColor: selectedColor,
     });
 
-    socketClient.emit(ClientMessage.Customize, {
-      bodyType: selectedType,
-      bodyColor: selectedColor,
-      accessory: customization.accessory,
-      trail: customization.trail,
-      deathEffect: customization.deathEffect,
-      title: customization.title,
-    });
+    if (!useGameStore.getState().isOffline) {
+      socketClient.emit(ClientMessage.Customize, {
+        bodyType: selectedType,
+        bodyColor: selectedColor,
+        accessory: customization.accessory,
+        trail: customization.trail,
+        deathEffect: customization.deathEffect,
+        title: customization.title,
+      });
+    }
 
     setTimeout(() => {
-      setScreen('loading');
+      const isOffline = useGameStore.getState().isOffline;
+      if (isOffline) {
+        setScreen('playing');
+      } else {
+        setScreen('loading');
+      }
     }, 800);
   }, [selectedType, selectedColor, setScreen, setCustomization]);
 

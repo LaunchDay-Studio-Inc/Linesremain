@@ -2,9 +2,9 @@
 // Billboard sprite renderer for stickman characters.
 // Uses Three.js SpriteMaterial with sprite sheet UV offsets for animation.
 
+import { PLAYER_HEIGHT } from '@shared/constants/game';
 import * as THREE from 'three';
 import type { AnimationName, SpriteSheetConfig } from '../assets/SpriteGenerator';
-import { PLAYER_HEIGHT } from '@shared/constants/game';
 
 // ─── Types ───
 
@@ -80,6 +80,7 @@ export class PlayerRenderer {
     // Create sprite
     this.sprite = new THREE.Sprite(this.material);
     this.sprite.scale.set(PLAYER_HEIGHT * 0.8, PLAYER_HEIGHT, 1);
+    this.sprite.renderOrder = 10; // Render above water (renderOrder 1) and terrain
 
     // Set initial UV
     this.updateUV();
