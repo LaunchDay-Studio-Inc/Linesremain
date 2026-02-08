@@ -462,7 +462,10 @@ export const MainMenu: React.FC = () => {
               }}
               onMouseEnter={() => setHoveredBtn('offline')}
               onMouseLeave={() => setHoveredBtn(null)}
-              onClick={() => setScreen('playing')}
+              onClick={() => {
+                useGameStore.getState().setOffline(true);
+                setScreen('playing');
+              }}
             >
               Play Offline
             </button>
