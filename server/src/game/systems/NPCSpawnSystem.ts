@@ -269,6 +269,11 @@ const HOSTILE_TEMPLATES: CreatureTemplate[] = [
     ],
     weight: 8,
     groupSize: { min: 2, max: 3 },
+    spawnBiomes: [
+      BiomeType.FrostveilPeaks,
+      BiomeType.SnowmeltWoods,
+      BiomeType.GlacialExpanse,
+    ],
   },
   {
     creatureType: NPCCreatureType.Wolf,
@@ -413,9 +418,13 @@ const DAYTIME_TOTAL_WEIGHT = DAYTIME_TEMPLATES.reduce((sum, t) => sum + t.weight
 const NIGHTTIME_TEMPLATES = [...PASSIVE_TEMPLATES, ...NEUTRAL_TEMPLATES, ...HOSTILE_TEMPLATES];
 const NIGHTTIME_TOTAL_WEIGHT = NIGHTTIME_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
 
-// Nighttime-only hostile templates filtered out for non-night hostile spawns
+// Pre-allocated blood moon spawn pool (avoid per-tick array concatenation)
 const NON_NIGHT_HOSTILE_TEMPLATES = HOSTILE_TEMPLATES.filter((t) => !t.nightOnly);
 const NON_NIGHT_HOSTILE_WEIGHT = NON_NIGHT_HOSTILE_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
+
+// Pre-allocated blood moon spawn pool (avoid per-tick array concatenation)
+const BLOOD_MOON_POOL = [...HOSTILE_TEMPLATES, ...BLOOD_MOON_TEMPLATES];
+const BLOOD_MOON_TOTAL_WEIGHT = BLOOD_MOON_POOL.reduce((sum, t) => sum + t.weight, 0);
 
 // ─── Tick Counter ───
 
@@ -557,9 +566,7 @@ function pickTemplate(
   // During Blood Moon: heavily favor hostile and blood moon creatures
   if (isBloodMoon()) {
     if (hostileCount >= MAX_HOSTILE_NPCS * 3) return null; // 3x cap during blood moon
-    const bloodPool = [...HOSTILE_TEMPLATES, ...BLOOD_MOON_TEMPLATES];
-    const bloodWeight = bloodPool.reduce((sum, t) => sum + t.weight, 0);
-    return pickWeightedTemplate(bloodPool, bloodWeight);
+    return pickWeightedTemplate(BLOOD_MOON_POOL, BLOOD_MOON_TOTAL_WEIGHT);
   }
 
   // During day: only spawn passive/neutral

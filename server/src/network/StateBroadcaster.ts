@@ -90,6 +90,8 @@ const TRACKED_COMPONENTS = [
   ComponentType.Explosive,
   ComponentType.Landmine,
   ComponentType.Barricade,
+  ComponentType.ResourceNode,
+  ComponentType.Lootable,
 ];
 
 // ─── State Broadcaster ───

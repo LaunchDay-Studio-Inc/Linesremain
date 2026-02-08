@@ -21,7 +21,7 @@ interface InterpolatedEntity {
 // ─── Constants ───
 
 const INTERPOLATION_DELAY_MS = 100; // 100ms interpolation delay
-const MAX_SNAPSHOTS = 20;
+const MAX_SNAPSHOTS = 6;
 const MAX_EXTRAPOLATION_MS = 200; // max time to extrapolate beyond last snapshot
 
 // Reusable vector to avoid per-frame allocations during extrapolation

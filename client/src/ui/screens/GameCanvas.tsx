@@ -21,7 +21,6 @@ import {
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { generateSpriteSheet } from '../../assets/SpriteGenerator';
-import { AmbientSynthesizer } from '../../engine/AmbientSynthesizer';
 import { AudioManager } from '../../engine/AudioManager';
 import { CameraController } from '../../engine/Camera';
 import { Engine } from '../../engine/Engine';
@@ -30,9 +29,12 @@ import { musicSystem } from '../../engine/MusicSystem';
 import { ParticleSystem } from '../../engine/ParticleSystem';
 import { BuildingPreview } from '../../entities/BuildingPreview';
 import { BuildingRenderer } from '../../entities/BuildingRenderer';
+import { ItemDropRenderer } from '../../entities/ItemDropRenderer';
 import { LocalPlayerController } from '../../entities/LocalPlayerController';
+import { LootBagRenderer } from '../../entities/LootBagRenderer';
 import { NPCRenderer } from '../../entities/NPCRenderer';
 import { PlayerRenderer } from '../../entities/PlayerRenderer';
+import { ResourceNodeRenderer } from '../../entities/ResourceNodeRenderer';
 import { SupplyDropRenderer } from '../../entities/SupplyDropRenderer';
 import {
   getEntities,
@@ -201,17 +203,23 @@ export const GameCanvas: React.FC = () => {
     // ── Biome Particle System (biome-specific ambient particles) ──
     const biomeParticleSystem = new BiomeParticleSystem(scene);
 
-    // ── Ambient Synthesizer (procedural audio drones) ──
-    const ambientSynth = new AmbientSynthesizer();
-
     // ── Dynamic Lighting System (flickering campfire/torch point lights) ──
     const lightingSystem = new LightingSystem(scene);
 
     // Wire lighting system to building renderer for campfire point lights
     buildingRenderer.setLightingSystem(lightingSystem);
 
+    // ── Resource Node Renderer (stone, metal ore, sulfur ore clusters) ──
+    const resourceNodeRenderer = new ResourceNodeRenderer(scene);
+
     // ── Supply Drop Renderer (falling crates with smoke trails) ──
     const supplyDropRenderer = new SupplyDropRenderer(scene);
+
+    // ── Item Drop Renderer (loot bags, dropped items from NPC kills) ──
+    const itemDropRenderer = new ItemDropRenderer(scene);
+
+    // ── Loot Bag Renderer (player death bags, lootable containers) ──
+    const lootBagRenderer = new LootBagRenderer(scene);
 
     // ── Remote Player Tracking ──
     const remotePlayerRenderers = new Map<number, PlayerRenderer>();
@@ -236,7 +244,11 @@ export const GameCanvas: React.FC = () => {
     // ── Reusable collections (avoid per-frame allocation) ──
     const _activeNpcIds = new Set<number>();
     const _activeBuildingIds = new Set<number>();
+    const _activeResourceNodeIds = new Set<number>();
     const _activeRemotePlayerIds = new Set<number>();
+    const _activeHealthIds = new Set<number>();
+    const _activeItemDropIds = new Set<number>();
+    const _activeLootBagIds = new Set<number>();
     const _healthStates: EntityHealthState[] = [];
     const _npcEntityData = new Map<
       number,
@@ -248,13 +260,14 @@ export const GameCanvas: React.FC = () => {
 
     // ── Throttle counters ──
     let debugThrottleCounter = 0;
+    let healthPruneCounter = 0;
     let _lastSentYaw = 0;
     let _settingsCacheCounter = 0;
     let _cachedSettings = useSettingsStore.getState();
     const isOffline = useGameStore.getState().isOffline;
 
     // ── View distance squared for entity culling ──
-    const VIEW_DIST_SQ = (4 * CHUNK_SIZE_X) * (4 * CHUNK_SIZE_X);
+    const VIEW_DIST_SQ = 4 * CHUNK_SIZE_X * (4 * CHUNK_SIZE_X);
 
     // ── Player Sprite & Renderer ──
     const customization = useAchievementStore.getState().customization;
@@ -435,7 +448,6 @@ export const GameCanvas: React.FC = () => {
       }
       // Initialize audio on first user gesture
       audio.init();
-      ambientSynth.init();
       musicSystem.init();
     };
     // Primary: canvas click — most reliable for requestPointerLock (event target matches lock target)
@@ -457,7 +469,6 @@ export const GameCanvas: React.FC = () => {
         input.requestPointerLock(canvas);
       }
       audio.init();
-      ambientSynth.init();
       musicSystem.init();
     };
     window.addEventListener('mousedown', handleWindowMouseDown);
@@ -559,7 +570,11 @@ export const GameCanvas: React.FC = () => {
       // Clear reusable collections
       _activeNpcIds.clear();
       _activeBuildingIds.clear();
+      _activeResourceNodeIds.clear();
       _activeRemotePlayerIds.clear();
+      _activeHealthIds.clear();
+      _activeItemDropIds.clear();
+      _activeLootBagIds.clear();
       _healthStates.length = 0;
       _npcEntityData.clear();
 
@@ -589,6 +604,7 @@ export const GameCanvas: React.FC = () => {
 
         // Health tracking (for combat effects)
         if (entHealth) {
+          _activeHealthIds.add(entityId);
           _healthStates.push({
             entityId,
             position: entPos,
@@ -643,6 +659,66 @@ export const GameCanvas: React.FC = () => {
           continue;
         }
 
+        // Resource node processing (stone, metal ore, sulfur ore)
+        const resourceNode = entity.components['ResourceNode'] as
+          | { resourceItemId: number; amountRemaining: number; maxAmount: number }
+          | undefined;
+        if (resourceNode) {
+          _activeResourceNodeIds.add(entityId);
+          const existingData = resourceNodeRenderer.getNodeData(entityId);
+          if (!existingData) {
+            resourceNodeRenderer.addNode(
+              entityId,
+              resourceNode.resourceItemId,
+              resourceNode.amountRemaining,
+              resourceNode.maxAmount,
+              entPos,
+            );
+          } else {
+            // Update depletion if amount changed
+            if (existingData.amountRemaining !== resourceNode.amountRemaining) {
+              resourceNodeRenderer.updateDepletion(
+                entityId,
+                resourceNode.amountRemaining,
+                resourceNode.maxAmount,
+              );
+            }
+          }
+          continue;
+        }
+
+        // Loot bag processing (player death bags, lootable containers)
+        const lootable = entity.components['Lootable'] as { isLooted: boolean } | undefined;
+        if (lootable) {
+          _activeLootBagIds.add(entityId);
+          const isPlayerBag = !entHealth; // Player bags have no Health; loot containers do
+          if (!lootBagRenderer.hasBag(entityId)) {
+            _npcVec.set(entPos.x, entPos.y, entPos.z);
+            lootBagRenderer.addBag(entityId, _npcVec, isPlayerBag);
+          }
+          continue;
+        }
+
+        // Item drop processing (individual items from NPC kills)
+        const inventory = entity.components['Inventory'] as
+          | { slots: ({ itemId: number; quantity: number } | null)[] }
+          | undefined;
+        if (inventory && !entHealth) {
+          _activeItemDropIds.add(entityId);
+          if (!itemDropRenderer.getDropData(entityId)) {
+            // Find the first non-null item slot
+            const firstItem = inventory.slots?.find((s) => s !== null);
+            if (firstItem) {
+              itemDropRenderer.addDrop(entityId, firstItem.itemId, firstItem.quantity, entPos);
+            }
+          }
+          continue;
+        }
+
+        // Only treat entities with Velocity as remote players (skip sleeping bags, etc.)
+        const velocity = entity.components['Velocity'];
+        if (!velocity) continue;
+
         // Remote player processing
         _activeRemotePlayerIds.add(entityId);
         if (!remotePlayerRenderers.has(entityId)) {
@@ -676,6 +752,27 @@ export const GameCanvas: React.FC = () => {
         }
       }
 
+      // Remove stale resource nodes
+      for (const eid of resourceNodeRenderer.getAllNodeIds()) {
+        if (!_activeResourceNodeIds.has(eid)) {
+          resourceNodeRenderer.removeNode(eid);
+        }
+      }
+
+      // Remove stale item drops
+      for (const dropId of itemDropRenderer.getAllDropIds()) {
+        if (!_activeItemDropIds.has(dropId)) {
+          itemDropRenderer.removeDrop(dropId);
+        }
+      }
+
+      // Remove stale loot bags
+      for (const bagId of lootBagRenderer.getAllBagIds()) {
+        if (!_activeLootBagIds.has(bagId)) {
+          lootBagRenderer.removeBag(bagId);
+        }
+      }
+
       // Remove departed remote players
       for (const [eid, rRenderer] of remotePlayerRenderers) {
         if (!_activeRemotePlayerIds.has(eid)) {
@@ -690,6 +787,25 @@ export const GameCanvas: React.FC = () => {
       // Combat effects
       combatEffects.processEntityStates(_healthStates);
       combatEffects.update(dt);
+
+      // Prune stale health tracking entries periodically (~every 5 seconds at 60fps)
+      healthPruneCounter++;
+      if (healthPruneCounter >= 300) {
+        healthPruneCounter = 0;
+        combatEffects.pruneHealthTracking(_activeHealthIds);
+      }
+
+      // Resource node rendering (billboard health bars, proximity checks)
+      _playerVec.set(pos.x, pos.y, pos.z);
+      resourceNodeRenderer.update(camera, _playerVec);
+
+      // Item drop animations (bob, spin, glow)
+      _playerVec.set(pos.x, pos.y, pos.z);
+      itemDropRenderer.update(performance.now() / 1000, _playerVec);
+
+      // Loot bag animations (bob, glow, proximity prompt)
+      _playerVec.set(pos.x, pos.y, pos.z);
+      lootBagRenderer.update(dt, camera, _playerVec);
 
       // Block interaction (raycast, breaking, placing)
       blockInteraction.update(dt);
@@ -729,10 +845,6 @@ export const GameCanvas: React.FC = () => {
         atmosphere.particleDensity,
         worldTime,
       );
-
-      // Ambient synthesizer mood
-      ambientSynth.update(dt);
-      ambientSynth.setMood(atmosphere.mood);
 
       // Procedural music system — use cached settings (re-read once per second)
       _settingsCacheCounter++;
@@ -855,11 +967,14 @@ export const GameCanvas: React.FC = () => {
       blockInteraction.dispose();
       animationSystem.dispose();
       npcRenderer.dispose();
+      resourceNodeRenderer.dispose();
+      ResourceNodeRenderer.disposeSharedGeometries();
       combatEffects.dispose();
       particleSystem.dispose();
       biomeParticleSystem.dispose();
       biomeTracker.dispose();
-      ambientSynth.dispose();
+      itemDropRenderer.dispose();
+      lootBagRenderer.dispose();
       lightingSystem.dispose();
       supplyDropRenderer.dispose();
       socketClient.off(ServerMessage.WorldEvent, handleWorldEvent);

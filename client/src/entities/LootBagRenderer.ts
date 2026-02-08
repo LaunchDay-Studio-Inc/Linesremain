@@ -358,6 +358,10 @@ export class LootBagRenderer {
     return this.bags.has(entityId);
   }
 
+  getAllBagIds(): number[] {
+    return Array.from(this.bags.keys());
+  }
+
   getBagPosition(entityId: number): THREE.Vector3 | null {
     const bag = this.bags.get(entityId);
     return bag ? bag.group.position.clone() : null;

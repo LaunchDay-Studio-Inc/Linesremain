@@ -28,6 +28,10 @@ export class AudioManager {
   private isWalking = false;
   private isSprinting = false;
 
+  // Pre-cached noise buffers for footsteps (avoid per-call AudioBuffer creation)
+  private grassNoiseBuffer: AudioBuffer | null = null;
+  private stoneNoiseBuffer: AudioBuffer | null = null;
+
   static getInstance(): AudioManager {
     if (!instance) {
       instance = new AudioManager();
@@ -132,19 +136,42 @@ export class AudioManager {
 
   // ─── Sound Generators ───
 
+  /** Ensure the grass noise buffer is pre-cached (reused across all grass footstep calls) */
+  private getGrassNoiseBuffer(ctx: AudioContext): AudioBuffer {
+    if (!this.grassNoiseBuffer || this.grassNoiseBuffer.sampleRate !== ctx.sampleRate) {
+      const duration = 0.08;
+      const bufferSize = Math.ceil(ctx.sampleRate * duration);
+      this.grassNoiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = this.grassNoiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.5;
+      }
+    }
+    return this.grassNoiseBuffer;
+  }
+
+  /** Ensure the stone noise buffer is pre-cached (reused across all stone footstep calls) */
+  private getStoneNoiseBuffer(ctx: AudioContext): AudioBuffer {
+    if (!this.stoneNoiseBuffer || this.stoneNoiseBuffer.sampleRate !== ctx.sampleRate) {
+      const duration = 0.06;
+      const bufferSize = Math.ceil(ctx.sampleRate * duration);
+      this.stoneNoiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = this.stoneNoiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.4;
+      }
+    }
+    return this.stoneNoiseBuffer;
+  }
+
   /** Grass footstep: short burst of filtered white noise (earthy thud) */
   private playFootstepGrass(): void {
     const ctx = this.ensureContext();
     const duration = 0.08;
     const now = ctx.currentTime;
 
-    // White noise buffer
-    const bufferSize = Math.ceil(ctx.sampleRate * duration);
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.5;
-    }
+    // Reuse pre-cached noise buffer
+    const buffer = this.getGrassNoiseBuffer(ctx);
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -166,6 +193,13 @@ export class AudioManager {
 
     source.start(now);
     source.stop(now + duration);
+
+    // Disconnect audio nodes after playback to prevent memory leaks
+    source.onended = () => {
+      source.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
   }
 
   /** Stone footstep: short click with high-pass filter (sharp tap) */
@@ -174,13 +208,8 @@ export class AudioManager {
     const duration = 0.06;
     const now = ctx.currentTime;
 
-    // Short noise burst
-    const bufferSize = Math.ceil(ctx.sampleRate * duration);
-    const buffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
-    const data = buffer.getChannelData(0);
-    for (let i = 0; i < bufferSize; i++) {
-      data[i] = (Math.random() * 2 - 1) * 0.4;
-    }
+    // Reuse pre-cached noise buffer
+    const buffer = this.getStoneNoiseBuffer(ctx);
 
     const source = ctx.createBufferSource();
     source.buffer = buffer;
@@ -202,6 +231,13 @@ export class AudioManager {
 
     source.start(now);
     source.stop(now + duration);
+
+    // Disconnect audio nodes after playback to prevent memory leaks
+    source.onended = () => {
+      source.disconnect();
+      filter.disconnect();
+      gain.disconnect();
+    };
   }
 
   /** Block break: descending tone with noise (crumble) */
@@ -250,6 +286,15 @@ export class AudioManager {
     osc.stop(now + duration);
     noiseSource.start(now);
     noiseSource.stop(now + duration);
+
+    // Disconnect audio nodes after playback to prevent memory leaks
+    noiseSource.onended = () => {
+      osc.disconnect();
+      oscGain.disconnect();
+      noiseSource.disconnect();
+      noiseFilter.disconnect();
+      noiseGain.disconnect();
+    };
   }
 
   /** Block place: ascending tone (thunk) */
@@ -273,6 +318,12 @@ export class AudioManager {
 
     osc.start(now);
     osc.stop(now + duration);
+
+    // Disconnect audio nodes after playback to prevent memory leaks
+    osc.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+    };
   }
 
   /** Hit: short sharp noise burst (impact) */
@@ -321,6 +372,15 @@ export class AudioManager {
     osc.stop(now + duration);
     noiseSource.start(now);
     noiseSource.stop(now + duration);
+
+    // Disconnect audio nodes after playback to prevent memory leaks
+    noiseSource.onended = () => {
+      osc.disconnect();
+      oscGain.disconnect();
+      noiseSource.disconnect();
+      noiseFilter.disconnect();
+      noiseGain.disconnect();
+    };
   }
 
   /** Pickup: short ascending chime (happy boop) */
@@ -359,6 +419,14 @@ export class AudioManager {
     osc.stop(now + duration);
     osc2.start(now);
     osc2.stop(now + duration);
+
+    // Disconnect audio nodes after playback to prevent memory leaks
+    osc2.onended = () => {
+      osc.disconnect();
+      gain.disconnect();
+      osc2.disconnect();
+      gain2.disconnect();
+    };
   }
 
   /** Craft complete: two-tone ascending ding */
@@ -396,6 +464,14 @@ export class AudioManager {
 
     osc2.start(now + 0.12);
     osc2.stop(now + 0.35);
+
+    // Disconnect audio nodes after playback to prevent memory leaks
+    osc2.onended = () => {
+      osc1.disconnect();
+      gain1.disconnect();
+      osc2.disconnect();
+      gain2.disconnect();
+    };
   }
 
   // ─── Cleanup ───
@@ -406,6 +482,8 @@ export class AudioManager {
       this.ctx = null;
       this.masterGain = null;
     }
+    this.grassNoiseBuffer = null;
+    this.stoneNoiseBuffer = null;
     instance = null;
   }
 }

@@ -303,6 +303,8 @@ export class SocketServer {
       ComponentType.Landmine,
       ComponentType.Barricade,
       ComponentType.SleepingBag,
+      ComponentType.ResourceNode,
+      ComponentType.Lootable,
     ];
 
     let hasAny = false;
@@ -395,7 +397,10 @@ export class SocketServer {
       // Send fresh snapshot to the respawned player
       this.sendInitialSnapshot(player);
 
-      logger.info({ playerId: player.playerId, entityId: newEntityId, isLineDeath }, 'Player respawned');
+      logger.info(
+        { playerId: player.playerId, entityId: newEntityId, isLineDeath },
+        'Player respawned',
+      );
     });
   }
 

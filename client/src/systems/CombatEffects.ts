@@ -174,6 +174,19 @@ export class CombatEffects {
     this.prevHealth.delete(entityId);
   }
 
+  /**
+   * Prune stale entries from the prevHealth map.
+   * Call periodically with the set of entity IDs that are still active
+   * to prevent unbounded growth over long sessions.
+   */
+  pruneHealthTracking(activeEntityIds: Set<number>): void {
+    for (const entityId of this.prevHealth.keys()) {
+      if (!activeEntityIds.has(entityId)) {
+        this.prevHealth.delete(entityId);
+      }
+    }
+  }
+
   // ─── Damage Events ───
 
   private onEntityDamaged(entity: EntityHealthState, damage: number): void {
