@@ -73,6 +73,7 @@ export class InputManager {
     window.addEventListener('mouseup', this.onMouseUp);
     window.addEventListener('mousemove', this.onMouseMove);
     window.addEventListener('wheel', this.onWheel, { passive: false });
+    window.addEventListener('blur', this.onBlur);
     document.addEventListener('pointerlockchange', this.onPointerLockChange);
   }
 
@@ -163,12 +164,15 @@ export class InputManager {
   // ── Event Handlers ──
 
   private onKeyDown = (e: KeyboardEvent): void => {
+    // Clear stuck Meta keys — macOS doesn't reliably fire keyup for Meta
+    if (e.code !== 'MetaLeft' && e.code !== 'MetaRight') {
+      this.keysDown.delete('MetaLeft');
+      this.keysDown.delete('MetaRight');
+    }
+
     // Don't capture game input when typing in form fields
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
-
-    // Debug: Log keyboard events to help diagnose focus issues
-    console.log('InputManager keydown:', e.code);
 
     // Prevent default for game & navigation keys (not all keys, allow browser shortcuts)
     if (PREVENT_DEFAULT_KEYS.has(e.code)) {
@@ -208,6 +212,12 @@ export class InputManager {
     this.pointerLocked = document.pointerLockElement !== null;
   };
 
+  private onBlur = (): void => {
+    this.keysDown.clear();
+    this.keysPressed.clear();
+    this.mouseButtons.clear();
+  };
+
   // ── Cleanup ──
 
   /**
@@ -224,6 +234,7 @@ export class InputManager {
     window.removeEventListener('mouseup', this.onMouseUp);
     window.removeEventListener('mousemove', this.onMouseMove);
     window.removeEventListener('wheel', this.onWheel);
+    window.removeEventListener('blur', this.onBlur);
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
     this.detachFromElement();
     InputManager.instance = null;

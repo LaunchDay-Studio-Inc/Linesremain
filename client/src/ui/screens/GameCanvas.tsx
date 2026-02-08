@@ -241,7 +241,7 @@ export const GameCanvas: React.FC = () => {
     const localZ = ((spawnZ % CHUNK_SIZE_Z) + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
 
     const surfaceY = findSurfaceY(spawnChunkData, localX, localZ);
-    let spawnY = surfaceY + 1.5;
+    let spawnY = surfaceY + 2.5;
 
     // If surface is below sea level (underwater), search outward for dry land
     if (surfaceY < SEA_LEVEL) {
@@ -262,7 +262,7 @@ export const GameCanvas: React.FC = () => {
             if (sy >= SEA_LEVEL) {
               spawnX = cx * CHUNK_SIZE_X + checkX;
               spawnZ = cz * CHUNK_SIZE_Z + checkZ;
-              spawnY = sy + 1.5;
+              spawnY = sy + 2.5;
               found = true;
               break searchLoop;
             }

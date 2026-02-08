@@ -249,6 +249,18 @@ export class LocalPlayerController {
   // ─── Collision Detection & Response ───
 
   private handleCollision(dt: number): void {
+    // ── Escape hatch: if player starts the frame stuck inside geometry, push up ──
+    if (this.checkCollision()) {
+      for (let i = 0; i < 10; i++) {
+        this.position.y += 1;
+        if (!this.checkCollision()) {
+          this.velocity.y = 0;
+          this.isGrounded = true;
+          break;
+        }
+      }
+    }
+
     // Move and collide each axis independently
     const dx = this.velocity.x * dt;
     const dy = this.velocity.y * dt;
