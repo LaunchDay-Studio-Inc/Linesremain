@@ -24,6 +24,7 @@ import { EntityInterpolation } from '../../systems/EntityInterpolation';
 import { generateSpriteSheet } from '../../assets/SpriteGenerator';
 import { useUIStore } from '../../stores/useUIStore';
 import { useChatStore } from '../../stores/useChatStore';
+import { useGameStore } from '../../stores/useGameStore';
 import { socketClient } from '../../network/SocketClient';
 import { SEA_LEVEL, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z, DAY_LENGTH_SECONDS } from '@shared/constants/game';
 import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
@@ -263,12 +264,14 @@ export const GameCanvas: React.FC = () => {
         // Place building piece
         const data = buildingPreview.getPlacementData();
         if (data) {
-          socketClient.emit(ClientMessage.BuildPlace, {
-            pieceType: data.pieceType,
-            tier: data.tier,
-            position: data.position,
-            rotation: data.rotation,
-          });
+          if (!useGameStore.getState().isOffline) {
+            socketClient.emit(ClientMessage.BuildPlace, {
+              pieceType: data.pieceType,
+              tier: data.tier,
+              position: data.position,
+              rotation: data.rotation,
+            });
+          }
           AudioManager.getInstance().play('blockPlace');
         }
       }
@@ -308,9 +311,12 @@ export const GameCanvas: React.FC = () => {
       }));
     };
 
-    socketClient.on(ServerMessage.WorldEvent, handleWorldEvent);
-    socketClient.on(ServerMessage.JournalFound, handleJournalFound);
-    socketClient.on(ServerMessage.CinematicText, handleCinematicText);
+    // Only register socket event listeners when not in offline mode
+    if (!useGameStore.getState().isOffline) {
+      socketClient.on(ServerMessage.WorldEvent, handleWorldEvent);
+      socketClient.on(ServerMessage.JournalFound, handleJournalFound);
+      socketClient.on(ServerMessage.CinematicText, handleCinematicText);
+    }
 
     // ── Game Loop ──
     engine.onUpdate((dt) => {
@@ -497,7 +503,9 @@ export const GameCanvas: React.FC = () => {
           secondaryAction: false,
           selectedSlot: 0,
         };
-        socketClient.emit(ClientMessage.Input, inputPayload);
+        if (!useGameStore.getState().isOffline) {
+          socketClient.emit(ClientMessage.Input, inputPayload);
+        }
       }
 
       // Reset input frame state
@@ -587,7 +595,9 @@ export const GameCanvas: React.FC = () => {
           isOpen={true}
           onClose={() => {
             setContainerOpen(null);
-            socketClient.emit(ClientMessage.ContainerClose);
+            if (!useGameStore.getState().isOffline) {
+              socketClient.emit(ClientMessage.ContainerClose);
+            }
           }}
           containerName={containerOpen.containerType === 'large_storage_box' ? 'Large Storage Box' : containerOpen.containerType === 'research_table' ? 'Research Table' : 'Storage Box'}
           containerSlots={containerOpen.slots}

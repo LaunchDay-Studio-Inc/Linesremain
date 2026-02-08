@@ -6,10 +6,11 @@ import { useGameStore } from '../../stores/useGameStore';
 
 export const ReconnectOverlay: React.FC = () => {
   const isConnected = useGameStore((s) => s.isConnected);
+  const isOffline = useGameStore((s) => s.isOffline);
   const screen = useGameStore((s) => s.screen);
 
-  // Only show when disconnected while actively playing
-  if (isConnected || screen !== 'playing') return null;
+  // Only show when disconnected while actively playing (and not in offline mode)
+  if (isConnected || isOffline || screen !== 'playing') return null;
 
   return (
     <div

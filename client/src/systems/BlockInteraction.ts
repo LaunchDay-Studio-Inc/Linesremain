@@ -19,6 +19,7 @@ import { InputManager } from '../engine/InputManager';
 import { AudioManager } from '../engine/AudioManager';
 import { socketClient } from '../network/SocketClient';
 import { usePlayerStore } from '../stores/usePlayerStore';
+import { useGameStore } from '../stores/useGameStore';
 
 // ─── Types ───
 
@@ -283,8 +284,11 @@ export class BlockInteraction {
     // Remove locally
     this.chunkManager.onBlockChanged(x, y, z, BlockType.Air);
 
-    // Notify server
-    socketClient.emit(ClientMessage.BlockBreak, { x, y, z });
+    // Notify server (only if not in offline mode)
+    const isOffline = useGameStore.getState().isOffline;
+    if (!isOffline) {
+      socketClient.emit(ClientMessage.BlockBreak, { x, y, z });
+    }
 
     // Spawn break particles
     const color = BLOCK_COLORS[blockType as BlockType] ?? 0x888888;
@@ -334,8 +338,11 @@ export class BlockInteraction {
     // Place locally
     this.chunkManager.onBlockChanged(x, y, z, placeType);
 
-    // Notify server
-    socketClient.emit(ClientMessage.BlockPlace, { x, y, z, blockType: placeType });
+    // Notify server (only if not in offline mode)
+    const isOffline = useGameStore.getState().isOffline;
+    if (!isOffline) {
+      socketClient.emit(ClientMessage.BlockPlace, { x, y, z, blockType: placeType });
+    }
 
     // Consume one item from hotbar slot
     const updatedInventory = [...store.inventory];
