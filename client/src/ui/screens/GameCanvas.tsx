@@ -363,8 +363,27 @@ export const GameCanvas: React.FC = () => {
       audio.init();
       ambientSynth.init();
     };
-    // Listen on window so clicks that pass through HUD overlays still trigger pointer lock
-    window.addEventListener('mousedown', handleClick);
+    // Primary: canvas click — most reliable for requestPointerLock (event target matches lock target)
+    canvas.addEventListener('click', handleClick);
+    // Fallback: window mousedown catches clicks that land on HUD overlay divs
+    const handleWindowMouseDown = (e: MouseEvent) => {
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      ) {
+        return;
+      }
+      // Only act if click didn't reach the canvas directly (canvas handler will cover that)
+      if (!input.isPointerLocked() && target !== canvas) {
+        input.requestPointerLock(canvas);
+      }
+      audio.init();
+      ambientSynth.init();
+    };
+    window.addEventListener('mousedown', handleWindowMouseDown);
 
     // Prevent context menu so right-click can place blocks
     const handleContextMenu = (e: Event) => e.preventDefault();
@@ -644,7 +663,8 @@ export const GameCanvas: React.FC = () => {
     return () => {
       document.removeEventListener('pointerlockchange', handleLockChange);
       window.removeEventListener('keydown', handleUIKeys);
-      window.removeEventListener('mousedown', handleClick);
+      window.removeEventListener('mousedown', handleWindowMouseDown);
+      canvas.removeEventListener('click', handleClick);
       canvas.removeEventListener('contextmenu', handleContextMenu);
       cameraController.detach();
       playerRenderer.removeFromScene(scene);
