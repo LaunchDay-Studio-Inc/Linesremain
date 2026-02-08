@@ -85,3 +85,11 @@ export function hungerSystem(world: GameWorld, _dt: number): void {
     }
   }
 }
+
+// TODO: Implement food consumption handler
+// Items with hungerRestore/thirstRestore/healAmount fields exist in shared/constants/items.ts
+// (e.g., Cooked Meat id=53, Grilled Fish id=54, Berry Mix id=55, etc.)
+// but no server-side handler processes eating/drinking actions.
+// Needs: a UseItem message handler that checks ITEM_REGISTRY for consumable
+// properties, applies hungerRestore/thirstRestore/healAmount to player stats,
+// and removes the consumed item from inventory.

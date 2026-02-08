@@ -51,8 +51,9 @@ export class EntityInterpolation {
     // Reuse oldest snapshot's Vector3 to avoid allocation when buffer is full
     let snapshotPos: THREE.Vector3;
     if (entity.snapshots.length >= MAX_SNAPSHOTS) {
-      // Reclaim the Vector3 from the snapshot about to be evicted
-      snapshotPos = entity.snapshots[0]!.position;
+      // Shift first to evict the oldest, then reuse its Vector3
+      const evicted = entity.snapshots.shift()!;
+      snapshotPos = evicted.position;
       snapshotPos.copy(position);
     } else {
       snapshotPos = position.clone();
@@ -64,10 +65,7 @@ export class EntityInterpolation {
       yaw,
     });
 
-    // Keep buffer bounded (shift is acceptable here — array capped at 6 elements)
-    if (entity.snapshots.length > MAX_SNAPSHOTS) {
-      entity.snapshots.shift();
-    }
+    // No need to shift again — already handled above for the full-buffer case
   }
 
   /**

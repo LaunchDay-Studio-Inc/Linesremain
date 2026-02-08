@@ -71,7 +71,19 @@ export function temperatureSystem(world: GameWorld, _dt: number): void {
 
   const entities = world.ecs.query(ComponentType.Temperature, ComponentType.Position);
 
+  // Only process player entities — NPCs should not have temperature effects
+  const playerMap = world.getPlayerEntityMap();
+
   for (const entityId of entities) {
+    // Skip non-player entities
+    let isPlayer = false;
+    for (const [, eid] of playerMap) {
+      if (eid === entityId) {
+        isPlayer = true;
+        break;
+      }
+    }
+    if (!isPlayer) continue;
     const temp = world.ecs.getComponent<TemperatureComponent>(entityId, ComponentType.Temperature)!;
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position)!;
     const health = world.ecs.getComponent<HealthComponent>(entityId, ComponentType.Health);
@@ -82,9 +94,9 @@ export function temperatureSystem(world: GameWorld, _dt: number): void {
     let envTemp = biomeProps.baseTemperature;
 
     // ── 2. Time-of-day modifier (sinusoidal) ──
-    // worldTime: 0 = dawn, 0.25 = noon, 0.5 = dusk, 0.75 = midnight
+    // worldTime: 0 = midnight, 0.5 = noon, 1.0 = next midnight
     // Sin curve: peak at noon (+5°C), trough at midnight (-NIGHT_TEMPERATURE_DROP)
-    const timeAngle = (world.worldTime - 0.25) * Math.PI * 2; // offset so 0.25 (noon) = sin peak
+    const timeAngle = (world.worldTime - 0.5) * Math.PI * 2; // offset so 0.5 (noon) = sin peak
     const timeMod = -Math.sin(timeAngle); // +1 at noon, -1 at midnight
     // Map: +1 → +5°C, -1 → -NIGHT_TEMPERATURE_DROP
     const timeTemp = timeMod > 0 ? timeMod * 5 : timeMod * NIGHT_TEMPERATURE_DROP;
@@ -149,7 +161,9 @@ export function temperatureSystem(world: GameWorld, _dt: number): void {
         : envTemp > HEAT_THRESHOLD
           ? Math.min(envTemp, envTemp - (envTemp - 37) * 0.3)
           : 37;
-    temp.current += (bodyTarget - temp.current) * 0.1;
+    // Time-scaled lerp factor: accounts for variable check interval
+    const lerpFactor = 1 - Math.pow(0.9, CHECK_INTERVAL_SECONDS);
+    temp.current += (bodyTarget - temp.current) * lerpFactor;
 
     // ── 7. Temperature damage effects ──
     if (!health) continue;

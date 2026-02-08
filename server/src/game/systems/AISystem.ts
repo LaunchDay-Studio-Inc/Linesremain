@@ -25,6 +25,7 @@ const WANDER_PAUSE_MAX_S = 8;
 const FLEE_DURATION_S = 5;
 const NEUTRAL_AGGRO_DURATION_S = 30;
 const MAX_CHASE_DISTANCE = 60; // give up chasing if too far from home
+const AI_LOD_DISTANCE = 80; // skip AI tick for NPCs farther than this from all players
 
 // ─── Helpers ───
 
@@ -61,7 +62,8 @@ function pickRandomWanderTarget(
   radius: number,
 ): { x: number; z: number } {
   const angle = Math.random() * Math.PI * 2;
-  const dist = Math.random() * radius;
+  // sqrt for uniform distribution within a disk (avoids center bias)
+  const dist = Math.sqrt(Math.random()) * radius;
   return {
     x: homeX + Math.cos(angle) * dist,
     z: homeZ + Math.sin(angle) * dist,
@@ -73,20 +75,18 @@ function findNearestPlayer(
   pos: PositionComponent,
   maxRange: number,
 ): EntityId | null {
-  const players = world.ecs.query(
-    ComponentType.Position,
-    ComponentType.Health,
-    ComponentType.Inventory,
-  );
+  const playerMap = world.getPlayerEntityMap();
   let nearest: EntityId | null = null;
   let nearestDist = maxRange;
 
-  for (const playerId of players) {
+  for (const [, playerId] of playerMap) {
     // Skip dead players
-    const health = world.ecs.getComponent<HealthComponent>(playerId, ComponentType.Health)!;
-    if (health.current <= 0) continue;
+    const health = world.ecs.getComponent<HealthComponent>(playerId, ComponentType.Health);
+    if (!health || health.current <= 0) continue;
 
-    const playerPos = world.ecs.getComponent<PositionComponent>(playerId, ComponentType.Position)!;
+    const playerPos = world.ecs.getComponent<PositionComponent>(playerId, ComponentType.Position);
+    if (!playerPos) continue;
+
     const dist = distanceXZ(pos.x, pos.z, playerPos.x, playerPos.z);
     if (dist < nearestDist) {
       nearestDist = dist;
@@ -264,6 +264,9 @@ function handleAttacking(
   const finalDamage = Math.max(1, Math.round(ai.attackDamage * (1 - armorPercent)));
   targetHealth.current = Math.max(0, targetHealth.current - finalDamage);
 
+  // TODO: emit NPC damage event to client so the player sees a hit indicator
+  // and floating damage number (needs ServerMessage.DamageEvent or similar)
+
   logger.debug(
     {
       npc: entityId,
@@ -341,6 +344,14 @@ export const aiSystem: SystemFn = (world: GameWorld, _dt: number): void => {
   );
   const now = Date.now();
 
+  // Pre-collect player positions for LOD distance check
+  const playerMap = world.getPlayerEntityMap();
+  const playerPositions: PositionComponent[] = [];
+  for (const [, playerEntityId] of playerMap) {
+    const pPos = world.ecs.getComponent<PositionComponent>(playerEntityId, ComponentType.Position);
+    if (pPos) playerPositions.push(pPos);
+  }
+
   for (const entityId of npcs) {
     const ai = world.ecs.getComponent<AIComponent>(entityId, ComponentType.AI)!;
     const npcType = world.ecs.getComponent<NPCTypeComponent>(entityId, ComponentType.NPCType)!;
@@ -355,10 +366,47 @@ export const aiSystem: SystemFn = (world: GameWorld, _dt: number): void => {
       continue;
     }
 
+    // Distance-based LOD: skip AI for NPCs far from all players (Issue 87)
+    let nearAnyPlayer = false;
+    for (const pPos of playerPositions) {
+      if (distanceXZ(pos.x, pos.z, pPos.x, pPos.z) <= AI_LOD_DISTANCE) {
+        nearAnyPlayer = true;
+        break;
+      }
+    }
+    if (!nearAnyPlayer) {
+      vel.vx = 0;
+      vel.vz = 0;
+      continue;
+    }
+
     // Determine effective behavior
     let effectiveBehavior = npcType.behavior;
     if (npcType.behavior === AIBehavior.Neutral && now < npcType.neutralAggroUntil) {
       effectiveBehavior = AIBehavior.Hostile;
+    }
+
+    // Aggro leash: give up chase if target is > 2× aggroRange away (Issue 88)
+    if (
+      (ai.state === AIState.Chasing || ai.state === AIState.Attacking) &&
+      ai.targetEntityId !== null
+    ) {
+      const targetPos = world.ecs.getComponent<PositionComponent>(
+        ai.targetEntityId,
+        ComponentType.Position,
+      );
+      if (targetPos) {
+        const targetDist = distanceXZ(pos.x, pos.z, targetPos.x, targetPos.z);
+        if (targetDist > ai.aggroRange * 2) {
+          ai.targetEntityId = null;
+          ai.state = AIState.Roaming;
+          npcType.wanderTarget = {
+            x: ai.homePosition.x,
+            y: ai.homePosition.y,
+            z: ai.homePosition.z,
+          };
+        }
+      }
     }
 
     // Behavior-specific aggro detection (when idle or roaming)

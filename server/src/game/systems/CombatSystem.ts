@@ -3,7 +3,6 @@
 // damage calculation with armor reduction, and ranged projectile creation.
 
 import {
-  ARM_MULT,
   ARMOR_STATS,
   ComponentType,
   HEADSHOT_MULT,
@@ -47,14 +46,27 @@ export interface AttackRequest {
 
 const pendingAttacks: AttackRequest[] = [];
 
+// Per-player attack cooldown tracking (playerId → last attack timestamp in ms)
+const lastAttackTime = new Map<string, number>();
+
 /** Queue an attack to be processed next tick */
 export function queueAttack(request: AttackRequest): void {
+  // Validate direction — reject garbage input
+  const { x, y, z } = request.direction;
+  const mag = Math.sqrt(x * x + y * y + z * z);
+  if (mag < 0.1 || !isFinite(mag)) return;
+
+  // Re-normalize (don't trust client normalization)
+  request.direction.x = x / mag;
+  request.direction.y = y / mag;
+  request.direction.z = z / mag;
+
   pendingAttacks.push(request);
 }
 
 // ─── Hit Zone Determination ───
 
-export type HitZone = 'head' | 'torso' | 'legs' | 'arm';
+export type HitZone = 'head' | 'torso' | 'legs';
 
 function determineHitZone(
   attackerPos: PositionComponent,
@@ -93,8 +105,6 @@ function getHitZoneMultiplier(zone: HitZone): number {
       return TORSO_MULT;
     case 'legs':
       return LEG_MULT;
-    case 'arm':
-      return ARM_MULT;
   }
 }
 
@@ -131,8 +141,11 @@ function reduceWeaponDurability(world: GameWorld, entityId: EntityId): void {
   if (equipment.held.durability !== undefined) {
     equipment.held.durability -= 1;
     if (equipment.held.durability <= 0) {
+      const brokeItemId = equipment.held.itemId;
       equipment.held = null; // weapon broke
-      // TODO: emit weapon-broke event to client (needs emitToPlayer on GameWorld)
+      logger.info({ entityId, itemId: brokeItemId }, 'Weapon broke from durability loss');
+      // TODO: emit weapon-broke event to client via world.emitToPlayer()
+      // so the player sees a notification that their weapon broke
     }
   }
 }
@@ -267,7 +280,7 @@ function processMeleeAttack(
     }
   }
 
-  // Knockback
+  // Knockback (scaled by target mass approximation from collider volume)
   const targetVel = world.ecs.getComponent<VelocityComponent>(
     closestTarget,
     ComponentType.Velocity,
@@ -279,8 +292,12 @@ function processMeleeAttack(
     };
     const knockMag = Math.sqrt(knockDir.x * knockDir.x + knockDir.z * knockDir.z);
     if (knockMag > 0.01) {
-      targetVel.vx += (knockDir.x / knockMag) * MELEE_KNOCKBACK_FORCE;
-      targetVel.vz += (knockDir.z / knockMag) * MELEE_KNOCKBACK_FORCE;
+      // Approximate mass from collider volume (larger entities resist knockback more)
+      const volume = targetCollider.width * targetCollider.height * targetCollider.depth;
+      const massScale = 1 / Math.max(0.5, volume);
+      const force = MELEE_KNOCKBACK_FORCE * massScale;
+      targetVel.vx += (knockDir.x / knockMag) * force;
+      targetVel.vz += (knockDir.z / knockMag) * force;
     }
   }
 
@@ -341,18 +358,47 @@ function processRangedAttack(
     z: attackerPos.z + request.direction.z * 0.5,
   };
 
-  // Apply spread
+  // Apply spread using proper spherical perturbation
   let dirX = request.direction.x;
   let dirY = request.direction.y;
   let dirZ = request.direction.z;
 
   if (weaponStats.spreadDegrees) {
     const spreadRad = (weaponStats.spreadDegrees * Math.PI) / 180;
-    dirX += (Math.random() - 0.5) * spreadRad;
-    dirY += (Math.random() - 0.5) * spreadRad;
-    dirZ += (Math.random() - 0.5) * spreadRad;
+    // Random rotation angle around the direction vector
+    const phi = Math.random() * Math.PI * 2;
+    // Random deflection angle, uniform within cone
+    const theta = Math.random() * spreadRad;
+    const sinTheta = Math.sin(theta);
+    const cosTheta = Math.cos(theta);
 
-    // Re-normalize
+    // Build an orthonormal basis around the direction
+    // Pick an arbitrary vector not parallel to dir to cross with
+    const ax = Math.abs(dirX) < 0.9 ? 1 : 0;
+    const ay = Math.abs(dirX) < 0.9 ? 0 : 1;
+    // right = dir × arbitrary
+    let rx = dirY * 0 - dirZ * ay;
+    let ry = dirZ * ax - dirX * 0;
+    let rz = dirX * ay - dirY * ax;
+    const rMag = Math.sqrt(rx * rx + ry * ry + rz * rz);
+    if (rMag > 0.001) {
+      rx /= rMag;
+      ry /= rMag;
+      rz /= rMag;
+    }
+    // up = dir × right
+    const ux = dirY * rz - dirZ * ry;
+    const uy = dirZ * rx - dirX * rz;
+    const uz = dirX * ry - dirY * rx;
+
+    // Perturbed direction = dir * cosTheta + (right * cos(phi) + up * sin(phi)) * sinTheta
+    const cosPhi = Math.cos(phi);
+    const sinPhi = Math.sin(phi);
+    dirX = dirX * cosTheta + (rx * cosPhi + ux * sinPhi) * sinTheta;
+    dirY = dirY * cosTheta + (ry * cosPhi + uy * sinPhi) * sinTheta;
+    dirZ = dirZ * cosTheta + (rz * cosPhi + uz * sinPhi) * sinTheta;
+
+    // Normalize (should already be ~1 but ensure)
     const mag = Math.sqrt(dirX * dirX + dirY * dirY + dirZ * dirZ);
     if (mag > 0.001) {
       dirX /= mag;
@@ -411,6 +457,14 @@ export const combatSystem: SystemFn = (world: GameWorld, _dt: number): void => {
       logger.warn({ weaponId }, 'Unknown weapon ID in combat');
       continue;
     }
+
+    // Per-player attack cooldown: enforce weapon attack rate
+    const cooldownMs = (1 / weaponStats.attackRate) * 1000;
+    const lastTime = lastAttackTime.get(request.attackerPlayerId) ?? 0;
+    if (request.timestamp - lastTime < cooldownMs) {
+      continue; // attack too fast — skip
+    }
+    lastAttackTime.set(request.attackerPlayerId, request.timestamp);
 
     // Determine melee vs ranged
     if (weaponStats.projectileSpeed !== undefined || weaponStats.ammoItemId !== undefined) {

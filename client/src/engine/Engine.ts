@@ -21,6 +21,11 @@ export class Engine {
   private onUpdateCb: UpdateCallback | null = null;
   private onRenderCb: RenderCallback | null = null;
 
+  // FPS counter
+  private frameCount = 0;
+  private fpsAccumulator = 0;
+  private currentFPS = 0;
+
   constructor(canvas: HTMLCanvasElement) {
     // ── Renderer ──
     this.renderer = new THREE.WebGLRenderer({
@@ -82,6 +87,15 @@ export class Engine {
     const frameDelta = (now - this.lastTime) / 1000;
     this.lastTime = now;
 
+    // Track FPS
+    this.frameCount++;
+    this.fpsAccumulator += frameDelta;
+    if (this.fpsAccumulator >= 1) {
+      this.currentFPS = this.frameCount;
+      this.frameCount = 0;
+      this.fpsAccumulator -= 1;
+    }
+
     // Clamp to avoid spiral of death
     this.accumulator += Math.min(frameDelta, MAX_FRAME_SKIP * FIXED_DT);
 
@@ -127,6 +141,10 @@ export class Engine {
 
   getRenderer(): THREE.WebGLRenderer {
     return this.renderer;
+  }
+
+  getFPS(): number {
+    return this.currentFPS;
   }
 
   // ── Cleanup ──
