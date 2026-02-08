@@ -2,7 +2,7 @@
 
 import { create } from 'zustand';
 
-export type Screen = 'menu' | 'loading' | 'playing' | 'dead';
+export type Screen = 'menu' | 'character-select' | 'loading' | 'playing' | 'dead';
 
 interface GameState {
   screen: Screen;

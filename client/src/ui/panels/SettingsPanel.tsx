@@ -1,8 +1,9 @@
 // ─── Settings Panel ───
 
 import React, { useCallback } from 'react';
-import { useUIStore } from '../../stores/useUIStore';
+import { musicSystem } from '../../engine/MusicSystem';
 import { useSettingsStore } from '../../stores/useSettingsStore';
+import { useUIStore } from '../../stores/useUIStore';
 import '../../styles/panels.css';
 
 // ─── Shadow Quality Options ───
@@ -69,6 +70,7 @@ export const SettingsPanel: React.FC = () => {
   const masterVolume = useSettingsStore((s) => s.masterVolume);
   const sfxVolume = useSettingsStore((s) => s.sfxVolume);
   const musicVolume = useSettingsStore((s) => s.musicVolume);
+  const musicEnabled = useSettingsStore((s) => s.musicEnabled);
   const mouseSensitivity = useSettingsStore((s) => s.mouseSensitivity);
   const showFps = useSettingsStore((s) => s.showFps);
   const showPing = useSettingsStore((s) => s.showPing);
@@ -79,6 +81,7 @@ export const SettingsPanel: React.FC = () => {
   const setMasterVolume = useSettingsStore((s) => s.setMasterVolume);
   const setSfxVolume = useSettingsStore((s) => s.setSfxVolume);
   const setMusicVolume = useSettingsStore((s) => s.setMusicVolume);
+  const setMusicEnabled = useSettingsStore((s) => s.setMusicEnabled);
   const setMouseSensitivity = useSettingsStore((s) => s.setMouseSensitivity);
   const setShowFps = useSettingsStore((s) => s.setShowFps);
   const setShowPing = useSettingsStore((s) => s.setShowPing);
@@ -90,14 +93,27 @@ export const SettingsPanel: React.FC = () => {
     [setShadowQuality],
   );
 
+  const handleMusicVolumeChange = useCallback(
+    (v: number) => {
+      setMusicVolume(v);
+      musicSystem.setVolume(v / 100);
+    },
+    [setMusicVolume],
+  );
+
+  const handleMusicEnabledChange = useCallback(
+    (v: boolean) => {
+      setMusicEnabled(v);
+      musicSystem.setEnabled(v);
+    },
+    [setMusicEnabled],
+  );
+
   if (!settingsOpen) return null;
 
   return (
     <div className="panel-backdrop" onClick={toggleSettings}>
-      <div
-        className="panel settings-panel"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <div className="panel settings-panel" onClick={(e) => e.stopPropagation()}>
         <div className="panel__header">
           <span className="panel__title">Settings</span>
           <button className="panel__close" onClick={toggleSettings}>
@@ -172,6 +188,12 @@ export const SettingsPanel: React.FC = () => {
               onChange={setSfxVolume}
             />
 
+            <ToggleRow
+              label="Music"
+              checked={musicEnabled}
+              onChange={handleMusicEnabledChange}
+            />
+
             <SliderRow
               label="Music Volume"
               value={musicVolume}
@@ -179,7 +201,7 @@ export const SettingsPanel: React.FC = () => {
               max={100}
               step={1}
               displayValue={`${musicVolume}%`}
-              onChange={setMusicVolume}
+              onChange={handleMusicVolumeChange}
             />
           </div>
 

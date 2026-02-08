@@ -2,6 +2,7 @@
 // Handles player customization changes and tutorial progression.
 
 import {
+  BODY_TYPES,
   ClientMessage,
   FREE_COLORS,
   LEVEL_REWARDS,
@@ -24,6 +25,7 @@ function isValidCustomizePayload(payload: unknown): payload is CustomizePayload 
   // At least one field must be present
   return (
     p.bodyColor !== undefined ||
+    p.bodyType !== undefined ||
     p.accessory !== undefined ||
     p.trail !== undefined ||
     p.deathEffect !== undefined ||
@@ -125,9 +127,22 @@ export function registerCustomizationHandlers(
       }
     }
 
+    // Validate bodyType against allowed types
+    if (payload.bodyType !== undefined) {
+      if (!BODY_TYPES.includes(payload.bodyType as import('@lineremain/shared').BodyType)) {
+        socket.emit(ServerMessage.Notification, {
+          type: 'error',
+          message: 'Invalid body type.',
+          duration: 3000,
+        });
+        return;
+      }
+    }
+
     // Build customization update
     const customization = {
       bodyColor: payload.bodyColor ?? '#ffffff',
+      bodyType: payload.bodyType ?? 'striker',
       accessory: payload.accessory ?? null,
       trail: payload.trail ?? null,
       deathEffect: payload.deathEffect ?? null,

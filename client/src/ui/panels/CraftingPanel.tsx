@@ -1,17 +1,18 @@
 // ─── Crafting Panel ───
 
-import React, { useState, useMemo, useCallback, useEffect } from 'react';
-import { useUIStore } from '../../stores/useUIStore';
-import { usePlayerStore } from '../../stores/usePlayerStore';
 import { ITEM_REGISTRY } from '@shared/constants/items';
 import { RECIPE_REGISTRY } from '@shared/constants/recipes';
-import { CraftingTier } from '@shared/types/recipes';
-import type { RecipeDefinition } from '@shared/types/recipes';
-import { ServerMessage } from '@shared/types/network';
 import type { CraftProgressPayload } from '@shared/types/network';
-import { getItemIcon } from '../../utils/itemIcons';
+import { ServerMessage } from '@shared/types/network';
+import type { RecipeDefinition } from '@shared/types/recipes';
+import { CraftingTier } from '@shared/types/recipes';
+import React, { useCallback, useEffect, useMemo, useState } from 'react';
 import { socketClient } from '../../network/SocketClient';
+import { usePlayerStore } from '../../stores/usePlayerStore';
+import { useUIStore } from '../../stores/useUIStore';
 import '../../styles/panels.css';
+import { getItemIconName } from '../../utils/itemIcons';
+import { GameIcon } from '../common/GameIcon';
 
 const TIER_LABELS: Record<number, string> = {
   [CraftingTier.Primitive]: 'Primitive',
@@ -31,7 +32,9 @@ export const CraftingPanel: React.FC = () => {
       <div className="panel" onClick={(e) => e.stopPropagation()}>
         <div className="panel__header">
           <span className="panel__title">Crafting</span>
-          <button className="panel__close" onClick={toggleCrafting}>✕</button>
+          <button className="panel__close" onClick={toggleCrafting}>
+            ✕
+          </button>
         </div>
         <CraftingContent />
       </div>
@@ -45,7 +48,9 @@ const CraftingContent: React.FC = () => {
   const inventory = usePlayerStore((s) => s.inventory);
   const [search, setSearch] = useState('');
   const [selectedId, setSelectedId] = useState<number | null>(null);
-  const [craftProgress, setCraftProgress] = useState<{ recipeId: number; progress: number } | null>(null);
+  const [craftProgress, setCraftProgress] = useState<{ recipeId: number; progress: number } | null>(
+    null,
+  );
 
   // Listen for craft progress updates from server
   useEffect(() => {
@@ -95,14 +100,11 @@ const CraftingContent: React.FC = () => {
     return counts;
   }, [inventory]);
 
-  const selectedRecipe = selectedId != null
-    ? allRecipes.find((r) => r.id === selectedId) ?? null
-    : null;
+  const selectedRecipe =
+    selectedId != null ? (allRecipes.find((r) => r.id === selectedId) ?? null) : null;
 
   const canCraft = selectedRecipe
-    ? selectedRecipe.ingredients.every(
-        (ing) => (itemCounts.get(ing.itemId) ?? 0) >= ing.quantity,
-      )
+    ? selectedRecipe.ingredients.every((ing) => (itemCounts.get(ing.itemId) ?? 0) >= ing.quantity)
     : false;
 
   const handleCraft = useCallback(() => {
@@ -122,47 +124,69 @@ const CraftingContent: React.FC = () => {
           onChange={(e) => setSearch(e.target.value)}
         />
 
-        {[CraftingTier.Primitive, CraftingTier.Intermediate, CraftingTier.Advanced, CraftingTier.Military].map(
-          (tier) => {
-            const recipes = grouped.get(tier);
-            if (!recipes || recipes.length === 0) return null;
+        {[
+          CraftingTier.Primitive,
+          CraftingTier.Intermediate,
+          CraftingTier.Advanced,
+          CraftingTier.Military,
+        ].map((tier) => {
+          const recipes = grouped.get(tier);
+          if (!recipes || recipes.length === 0) return null;
 
-            return (
-              <div key={tier}>
-                <div className="crafting-tier-header">{TIER_LABELS[tier]}</div>
-                {recipes.map((recipe) => {
-                  const outputDef = ITEM_REGISTRY[recipe.outputItemId];
-                  const icon = outputDef ? getItemIcon(outputDef.category) : '❓';
-                  const hasAll = recipe.ingredients.every(
-                    (ing) => (itemCounts.get(ing.itemId) ?? 0) >= ing.quantity,
-                  );
+          return (
+            <div key={tier}>
+              <div className="crafting-tier-header">{TIER_LABELS[tier]}</div>
+              {recipes.map((recipe) => {
+                const outputDef = ITEM_REGISTRY[recipe.outputItemId];
+                const hasAll = recipe.ingredients.every(
+                  (ing) => (itemCounts.get(ing.itemId) ?? 0) >= ing.quantity,
+                );
 
-                  return (
-                    <div
-                      key={recipe.id}
-                      className={`crafting-recipe${selectedId === recipe.id ? ' crafting-recipe--selected' : ''}${!hasAll ? ' crafting-recipe--unavailable' : ''}`}
-                      onClick={() => setSelectedId(recipe.id)}
-                    >
-                      <span className="crafting-recipe__icon">{icon}</span>
-                      <span className="crafting-recipe__name">{recipe.name}</span>
-                    </div>
-                  );
-                })}
-              </div>
-            );
-          },
-        )}
+                return (
+                  <div
+                    key={recipe.id}
+                    className={`crafting-recipe${selectedId === recipe.id ? ' crafting-recipe--selected' : ''}${!hasAll ? ' crafting-recipe--unavailable' : ''}`}
+                    onClick={() => setSelectedId(recipe.id)}
+                  >
+                    <span className="crafting-recipe__icon">
+                      <GameIcon
+                        name={getItemIconName(recipe.outputItemId, outputDef?.category)}
+                        size={18}
+                      />
+                    </span>
+                    <span className="crafting-recipe__name">{recipe.name}</span>
+                  </div>
+                );
+              })}
+            </div>
+          );
+        })}
 
         {/* Active craft queue indicator */}
         {craftProgress && (
           <div className="craft-queue" style={{ marginTop: 8 }}>
-            <div className="craft-queue__item" onClick={() => setSelectedId(craftProgress.recipeId)}>
+            <div
+              className="craft-queue__item"
+              onClick={() => setSelectedId(craftProgress.recipeId)}
+            >
               {(() => {
-                const recipe = RECIPE_REGISTRY[craftProgress.recipeId] as RecipeDefinition | undefined;
+                const recipe = RECIPE_REGISTRY[craftProgress.recipeId] as
+                  | RecipeDefinition
+                  | undefined;
                 const outputDef = recipe ? ITEM_REGISTRY[recipe.outputItemId] : undefined;
-                return outputDef ? getItemIcon(outputDef.category) : '?';
+                return outputDef && recipe ? (
+                  <GameIcon
+                    name={getItemIconName(recipe.outputItemId, outputDef.category)}
+                    size={18}
+                  />
+                ) : (
+                  '?'
+                );
               })()}
-              <div className="craft-queue__progress" style={{ width: `${craftProgress.progress * 100}%` }} />
+              <div
+                className="craft-queue__progress"
+                style={{ width: `${craftProgress.progress * 100}%` }}
+              />
             </div>
           </div>
         )}
@@ -222,11 +246,16 @@ const CraftingContent: React.FC = () => {
                 Output
               </div>
               <div style={{ fontSize: 13, color: 'var(--text-primary)' }}>
-                {ITEM_REGISTRY[selectedRecipe.outputItemId]?.name ?? 'Unknown'} ×{selectedRecipe.outputQuantity}
+                {ITEM_REGISTRY[selectedRecipe.outputItemId]?.name ?? 'Unknown'} ×
+                {selectedRecipe.outputQuantity}
               </div>
             </div>
 
-            <button className="craft-btn" disabled={!canCraft || craftProgress !== null} onClick={handleCraft}>
+            <button
+              className="craft-btn"
+              disabled={!canCraft || craftProgress !== null}
+              onClick={handleCraft}
+            >
               {craftProgress && craftProgress.recipeId === selectedRecipe.id
                 ? `Crafting... ${Math.round(craftProgress.progress * 100)}%`
                 : 'Craft'}

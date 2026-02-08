@@ -12,6 +12,7 @@ interface SettingsState {
   masterVolume: number;
   sfxVolume: number;
   musicVolume: number;
+  musicEnabled: boolean;
   mouseSensitivity: number;
   showFps: boolean;
   showPing: boolean;
@@ -22,6 +23,7 @@ interface SettingsState {
   setMasterVolume: (v: number) => void;
   setSfxVolume: (v: number) => void;
   setMusicVolume: (v: number) => void;
+  setMusicEnabled: (v: boolean) => void;
   setMouseSensitivity: (v: number) => void;
   setShowFps: (v: boolean) => void;
   setShowPing: (v: boolean) => void;
@@ -36,6 +38,7 @@ export const useSettingsStore = create<SettingsState>()(
       masterVolume: 80,
       sfxVolume: 80,
       musicVolume: 50,
+      musicEnabled: true,
       mouseSensitivity: 1.0,
       showFps: false,
       showPing: false,
@@ -46,6 +49,7 @@ export const useSettingsStore = create<SettingsState>()(
       setMasterVolume: (v) => set({ masterVolume: Math.max(0, Math.min(100, v)) }),
       setSfxVolume: (v) => set({ sfxVolume: Math.max(0, Math.min(100, v)) }),
       setMusicVolume: (v) => set({ musicVolume: Math.max(0, Math.min(100, v)) }),
+      setMusicEnabled: (v) => set({ musicEnabled: v }),
       setMouseSensitivity: (v) => set({ mouseSensitivity: Math.max(0.1, Math.min(3.0, v)) }),
       setShowFps: (v) => set({ showFps: v }),
       setShowPing: (v) => set({ showPing: v }),

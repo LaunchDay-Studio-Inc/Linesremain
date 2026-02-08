@@ -26,6 +26,7 @@ import { AudioManager } from '../../engine/AudioManager';
 import { CameraController } from '../../engine/Camera';
 import { Engine } from '../../engine/Engine';
 import { InputManager } from '../../engine/InputManager';
+import { musicSystem } from '../../engine/MusicSystem';
 import { ParticleSystem } from '../../engine/ParticleSystem';
 import { BuildingPreview } from '../../entities/BuildingPreview';
 import { LocalPlayerController } from '../../entities/LocalPlayerController';
@@ -44,6 +45,7 @@ import { useChatStore } from '../../stores/useChatStore';
 import { useEndgameStore } from '../../stores/useEndgameStore';
 import { useGameStore } from '../../stores/useGameStore';
 import { usePlayerStore } from '../../stores/usePlayerStore';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useUIStore } from '../../stores/useUIStore';
 import { AnimationSystem } from '../../systems/AnimationSystem';
 import { BlockInteraction } from '../../systems/BlockInteraction';
@@ -203,7 +205,12 @@ export const GameCanvas: React.FC = () => {
     const INPUT_SEND_INTERVAL = 1 / 20; // Send input 20 times per second
 
     // ── Player Sprite & Renderer ──
-    const { canvas: spriteCanvas, config: spriteConfig } = generateSpriteSheet('#ffffff');
+    const customization = useAchievementStore.getState().customization;
+    const { canvas: spriteCanvas, config: spriteConfig } = generateSpriteSheet(
+      customization.bodyColor || '#ffffff',
+      customization.accessory || 'none',
+      customization.bodyType || 'striker',
+    );
     const playerRenderer = new PlayerRenderer(spriteCanvas, spriteConfig);
     playerRenderer.addToScene(scene);
     animationSystem.register('local', playerRenderer);
@@ -374,6 +381,7 @@ export const GameCanvas: React.FC = () => {
       // Initialize audio on first user gesture
       audio.init();
       ambientSynth.init();
+      musicSystem.init();
     };
     // Primary: canvas click — most reliable for requestPointerLock (event target matches lock target)
     canvas.addEventListener('click', handleClick);
@@ -395,6 +403,7 @@ export const GameCanvas: React.FC = () => {
       }
       audio.init();
       ambientSynth.init();
+      musicSystem.init();
     };
     window.addEventListener('mousedown', handleWindowMouseDown);
 
@@ -642,6 +651,13 @@ export const GameCanvas: React.FC = () => {
       // Ambient synthesizer mood
       ambientSynth.update(dt);
       ambientSynth.setMood(atmosphere.mood);
+
+      // Procedural music system
+      const settings = useSettingsStore.getState();
+      const buildingActive = buildingPreview.active;
+      musicSystem.setVolume(settings.musicVolume / 100);
+      musicSystem.setEnabled(settings.musicEnabled);
+      musicSystem.update(dt, worldTime, false, buildingActive);
 
       // Supply drop crates
       supplyDropRenderer.update(dt);

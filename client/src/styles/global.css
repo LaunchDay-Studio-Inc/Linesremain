@@ -1,21 +1,67 @@
-/* ─── CSS Custom Properties ─── */
+/* ═══════════════════════════════════════════════════
+   LINEREMAIN — Global Design System
+   ═══════════════════════════════════════════════════ */
+
 :root {
-  --bg-dark: #0A0A1A;
-  --bg-panel: rgba(26, 26, 46, 0.85);
-  --bg-card: rgba(255, 255, 255, 0.05);
-  --border-subtle: rgba(255, 255, 255, 0.1);
-  --accent: #F0A500;
-  --accent-hover: #FFB830;
-  --accent-light: #FFD166;
-  --accent-glow: rgba(240, 165, 0, 0.3);
-  --danger: #E74C3C;
-  --danger-light: #FF6B6B;
-  --success: #2ECC71;
-  --text-primary: #FFFFFF;
-  --text-secondary: #A0A0B0;
-  --text-muted: rgba(255, 255, 255, 0.5);
-  --text-faint: rgba(255, 255, 255, 0.4);
-  --font-ui: 'Inter', system-ui, sans-serif;
+  /* ─── Core Palette ─── */
+  --bg-dark: #0a0a1a;
+  --bg-darker: #06060f;
+  --bg-panel: rgba(14, 14, 30, 0.92);
+  --bg-card: rgba(255, 255, 255, 0.04);
+  --bg-card-hover: rgba(255, 255, 255, 0.08);
+
+  /* ─── Borders ─── */
+  --border-subtle: rgba(255, 255, 255, 0.06);
+  --border-medium: rgba(255, 255, 255, 0.12);
+  --border-strong: rgba(255, 255, 255, 0.2);
+  --border-accent: rgba(240, 165, 0, 0.3);
+
+  /* ─── Accent (Burning Amber) ─── */
+  --accent: #f0a500;
+  --accent-hover: #ffb830;
+  --accent-light: #ffd166;
+  --accent-dim: #c48800;
+  --accent-glow: rgba(240, 165, 0, 0.25);
+  --accent-glow-strong: rgba(240, 165, 0, 0.5);
+
+  /* ─── Semantic ─── */
+  --danger: #e74c3c;
+  --danger-light: #ff6b6b;
+  --danger-glow: rgba(231, 76, 60, 0.3);
+  --success: #2ecc71;
+  --success-glow: rgba(46, 204, 113, 0.3);
+  --info: #4a90d9;
+  --warning: #f39c12;
+
+  /* ─── Text ─── */
+  --text-primary: #eeeef2;
+  --text-secondary: #a0a0b8;
+  --text-muted: rgba(255, 255, 255, 0.45);
+  --text-faint: rgba(255, 255, 255, 0.25);
+  --text-accent: var(--accent);
+
+  /* ─── Typography ─── */
+  --font-ui: 'Inter', system-ui, -apple-system, sans-serif;
+
+  /* ─── Spacing ─── */
+  --radius-sm: 4px;
+  --radius-md: 8px;
+  --radius-lg: 12px;
+  --radius-xl: 16px;
+
+  /* ─── Shadows ─── */
+  --shadow-sm: 0 2px 8px rgba(0, 0, 0, 0.3);
+  --shadow-md: 0 4px 16px rgba(0, 0, 0, 0.4);
+  --shadow-lg: 0 8px 32px rgba(0, 0, 0, 0.6);
+  --shadow-glow: 0 0 20px var(--accent-glow);
+  --shadow-inset: inset 0 1px 0 rgba(255, 255, 255, 0.04);
+
+  /* ─── Transitions ─── */
+  --ease-out: cubic-bezier(0.25, 0.46, 0.45, 0.94);
+  --ease-spring: cubic-bezier(0.34, 1.56, 0.64, 1);
+  --transition-fast: 0.12s var(--ease-out);
+  --transition-normal: 0.2s var(--ease-out);
+  --transition-slow: 0.4s var(--ease-out);
 }
 
 /* ─── Reset ─── */
@@ -33,11 +79,12 @@ body {
   overflow: hidden;
   width: 100vw;
   height: 100vh;
-  font-family: 'Inter', -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
-  background: #0A0A1A;
+  font-family: var(--font-ui);
+  background: var(--bg-dark);
   color: var(--text-primary);
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
+  text-rendering: optimizeLegibility;
 }
 
 #root {
@@ -46,28 +93,44 @@ body {
   position: relative;
 }
 
-/* ─── Hide Scrollbars ─── */
+/* ─── Scrollbars (subtle, only when needed) ─── */
 ::-webkit-scrollbar {
-  display: none;
+  width: 4px;
+  height: 4px;
 }
-
+::-webkit-scrollbar-track {
+  background: transparent;
+}
+::-webkit-scrollbar-thumb {
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
 * {
-  -ms-overflow-style: none;
-  scrollbar-width: none;
+  scrollbar-width: thin;
+  scrollbar-color: rgba(255, 255, 255, 0.1) transparent;
 }
 
 /* ─── Selection ─── */
 ::selection {
   background: var(--accent);
-  color: #0A0A1A;
+  color: var(--bg-dark);
+}
+
+/* ─── Focus ─── */
+:focus-visible {
+  outline: 2px solid var(--accent);
+  outline-offset: 2px;
 }
 
 /* ─── Links ─── */
 a {
   color: var(--accent);
   text-decoration: none;
+  transition: color var(--transition-fast);
 }
-
 a:hover {
   color: var(--accent-hover);
 }
@@ -80,13 +143,102 @@ select {
   font-family: inherit;
   font-size: inherit;
 }
-
 button {
   cursor: pointer;
   border: none;
   outline: none;
 }
-
 input {
   outline: none;
+}
+
+/* ─── Utility: Glass Panel ─── */
+.glass {
+  background: var(--bg-panel);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-lg);
+  backdrop-filter: blur(20px);
+  box-shadow: var(--shadow-lg), var(--shadow-inset);
+}
+
+/* ─── Utility: Glow Text ─── */
+.glow-text {
+  text-shadow:
+    0 0 10px var(--accent-glow),
+    0 0 30px var(--accent-glow);
+}
+
+/* ─── Utility: Accent Border Glow ─── */
+.glow-border {
+  box-shadow:
+    0 0 12px var(--accent-glow),
+    inset 0 0 12px rgba(240, 165, 0, 0.05);
+  border-color: rgba(240, 165, 0, 0.4) !important;
+}
+
+/* ─── Global Keyframes ─── */
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes slide-up {
+  from {
+    transform: translateY(12px);
+    opacity: 0;
+  }
+  to {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+@keyframes panel-slide-in {
+  from {
+    transform: scale(0.96);
+    opacity: 0;
+  }
+  to {
+    transform: scale(1);
+    opacity: 1;
+  }
+}
+
+@keyframes pulse-glow {
+  0%,
+  100% {
+    box-shadow: 0 0 12px var(--accent-glow);
+  }
+  50% {
+    box-shadow: 0 0 24px var(--accent-glow-strong);
+  }
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -200% center;
+  }
+  100% {
+    background-position: 200% center;
+  }
+}
+
+@keyframes breathe {
+  0%,
+  100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
 }

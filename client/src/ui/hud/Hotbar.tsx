@@ -1,13 +1,14 @@
 // ─── Hotbar ───
 
-import React, { useEffect } from 'react';
-import { usePlayerStore } from '../../stores/usePlayerStore';
-import { useChatStore } from '../../stores/useChatStore';
-import { ITEM_REGISTRY } from '@shared/constants/items';
 import { HOTBAR_SLOTS } from '@shared/constants/game';
-import { getItemIcon } from '../../utils/itemIcons';
-import { Tooltip, useTooltip } from '../common/Tooltip';
+import { ITEM_REGISTRY } from '@shared/constants/items';
+import React, { useEffect } from 'react';
+import { useChatStore } from '../../stores/useChatStore';
+import { usePlayerStore } from '../../stores/usePlayerStore';
 import '../../styles/hud.css';
+import { getItemIconName } from '../../utils/itemIcons';
+import { GameIcon } from '../common/GameIcon';
+import { Tooltip, useTooltip } from '../common/Tooltip';
 
 export const Hotbar: React.FC = () => {
   const inventory = usePlayerStore((s) => s.inventory);
@@ -42,7 +43,6 @@ export const Hotbar: React.FC = () => {
       <div className="hotbar">
         {hotbarItems.map((item, i) => {
           const def = item ? ITEM_REGISTRY[item.itemId] : undefined;
-          const icon = def ? getItemIcon(def.category) : '';
 
           return (
             <div
@@ -58,10 +58,10 @@ export const Hotbar: React.FC = () => {
               <span className="hotbar__slot-key">{i + 1}</span>
               {item && (
                 <>
-                  <span className="hotbar__slot-icon">{icon}</span>
-                  {item.quantity > 1 && (
-                    <span className="hotbar__slot-qty">{item.quantity}</span>
-                  )}
+                  <span className="hotbar__slot-icon">
+                    <GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} />
+                  </span>
+                  {item.quantity > 1 && <span className="hotbar__slot-qty">{item.quantity}</span>}
                 </>
               )}
             </div>

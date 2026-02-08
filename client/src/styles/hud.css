@@ -50,27 +50,27 @@
 }
 
 .stat-bar__fill--health {
-  background: linear-gradient(90deg, #C0392B, #E74C3C);
+  background: linear-gradient(90deg, #c0392b, #e74c3c);
 }
 
 .stat-bar__fill--hunger {
-  background: linear-gradient(90deg, #E67E22, #F39C12);
+  background: linear-gradient(90deg, #e67e22, #f39c12);
 }
 
 .stat-bar__fill--thirst {
-  background: linear-gradient(90deg, #2980B9, #3498DB);
+  background: linear-gradient(90deg, #2980b9, #3498db);
 }
 
 .stat-bar__fill--temp-cold {
-  background: linear-gradient(90deg, #2980B9, #5DADE2);
+  background: linear-gradient(90deg, #2980b9, #5dade2);
 }
 
 .stat-bar__fill--temp-normal {
-  background: linear-gradient(90deg, #27AE60, #2ECC71);
+  background: linear-gradient(90deg, #27ae60, #2ecc71);
 }
 
 .stat-bar__fill--temp-hot {
-  background: linear-gradient(90deg, #E74C3C, #F39C12);
+  background: linear-gradient(90deg, #e74c3c, #f39c12);
 }
 
 .stat-bar__label {
@@ -91,8 +91,13 @@
 }
 
 @keyframes pulse-low {
-  0%, 100% { opacity: 1; }
-  50% { opacity: 0.5; }
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0.5;
+  }
 }
 
 /* ─── Hotbar ─── */
@@ -133,7 +138,9 @@
 
 .hotbar__slot--active {
   border-color: var(--accent);
-  box-shadow: 0 0 8px var(--accent-glow), inset 0 0 8px rgba(240, 165, 0, 0.1);
+  box-shadow:
+    0 0 8px var(--accent-glow),
+    inset 0 0 8px rgba(240, 165, 0, 0.1);
 }
 
 .hotbar__slot-icon {
@@ -290,11 +297,22 @@
   transition: opacity 0.5s ease;
 }
 
-.chat-message--global { color: rgba(255, 255, 255, 0.9); }
-.chat-message--team { color: #2ECC71; }
-.chat-message--local { color: #F1C40F; }
-.chat-message--system { color: rgba(160, 160, 176, 0.8); font-style: italic; }
-.chat-message--faded { opacity: 0.2; }
+.chat-message--global {
+  color: rgba(255, 255, 255, 0.9);
+}
+.chat-message--team {
+  color: #2ecc71;
+}
+.chat-message--local {
+  color: #f1c40f;
+}
+.chat-message--system {
+  color: rgba(160, 160, 176, 0.8);
+  font-style: italic;
+}
+.chat-message--faded {
+  opacity: 0.2;
+}
 
 .chat-input-wrap {
   display: flex;
@@ -374,6 +392,103 @@
 }
 
 @keyframes damage-flash {
-  0% { opacity: 1; }
-  100% { opacity: 0; }
+  0% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+/* ═══════════════════════════════════════════════════
+   PREMIUM HUD UPGRADES
+   ═══════════════════════════════════════════════════ */
+
+/* ─── Health Bar Premium ─── */
+.health-bar-container {
+  position: relative;
+}
+
+.health-bar-container::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  pointer-events: none;
+  box-shadow: inset 0 1px 0 rgba(255, 255, 255, 0.08);
+}
+
+/* ─── Hotbar Premium ─── */
+.hotbar-slot {
+  transition: all 0.15s var(--ease-out);
+}
+
+.hotbar-slot:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.hotbar-slot--active {
+  border-color: var(--accent) !important;
+  box-shadow:
+    0 0 12px var(--accent-glow),
+    inset 0 0 8px rgba(240, 165, 0, 0.08) !important;
+  transform: translateY(-3px);
+}
+
+/* ─── Minimap Premium ─── */
+.minimap-container {
+  box-shadow:
+    0 0 0 2px rgba(255, 255, 255, 0.06),
+    0 4px 16px rgba(0, 0, 0, 0.5);
+}
+
+/* ─── Crosshair Premium ─── */
+.crosshair--hit {
+  animation: crosshair-hit 0.15s ease;
+}
+
+@keyframes crosshair-hit {
+  0% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+  50% {
+    transform: translate(-50%, -50%) scale(1.5);
+    filter: brightness(2);
+  }
+  100% {
+    transform: translate(-50%, -50%) scale(1);
+  }
+}
+
+/* ─── Status Effect Icons ─── */
+.status-effect {
+  transition: all 0.2s var(--ease-out);
+}
+
+.status-effect:hover {
+  transform: scale(1.1);
+}
+
+.status-effect--critical {
+  animation: breathe 1s ease-in-out infinite;
+}
+
+/* ─── Pickup Notification Premium ─── */
+.pickup-notification {
+  animation: slide-up 0.3s var(--ease-spring);
+}
+
+/* ─── Chat Premium ─── */
+.chat-container {
+  transition: opacity 0.3s ease;
+}
+
+.chat-container--inactive {
+  opacity: 0.3;
+}
+
+.chat-container:hover,
+.chat-container--active {
+  opacity: 1;
 }

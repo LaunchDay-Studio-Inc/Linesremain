@@ -15,7 +15,7 @@ import {
   type CustomizationUpdatedPayload,
   type DeathPayload,
   type DeltaPayload,
-  type ExplosionPayload,
+  type GameNotificationPayload,
   type InventoryUpdatePayload,
   type LevelUpPayload,
   type NotificationPayload,
@@ -25,7 +25,6 @@ import {
   type ServerChatPayload,
   type SnapshotPayload,
   type TutorialStepPayload,
-  type GameNotificationPayload,
   type WipeWarningPayload,
   type WorldTimePayload,
   type XpGainPayload,
@@ -145,6 +144,7 @@ export function initializeMessageHandlers(): void {
     const payload = data as CustomizationUpdatedPayload;
     useAchievementStore.getState().setCustomization({
       bodyColor: payload.bodyColor,
+      bodyType: (payload.bodyType as import('@shared/types/customization').BodyType) ?? 'striker',
       accessory: payload.accessory ?? 'none',
       trail: payload.trail ?? 'none',
       deathEffect: payload.deathEffect ?? 'none',

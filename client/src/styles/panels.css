@@ -1040,3 +1040,139 @@
   border-color: rgba(46, 204, 113, 0.4);
   color: #2ecc71;
 }
+
+/* ═══════════════════════════════════════════════════
+   PREMIUM PANEL UPGRADES
+   ═══════════════════════════════════════════════════ */
+
+/* ─── Panel Glass Upgrade ─── */
+.panel {
+  box-shadow: var(--shadow-lg), var(--shadow-inset);
+}
+
+/* ─── Inventory Slot Premium ─── */
+.inv-slot {
+  transition: all 0.15s var(--ease-out);
+}
+
+.inv-slot:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.3);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.inv-slot--selected {
+  box-shadow:
+    0 0 12px var(--accent-glow),
+    inset 0 0 12px rgba(240, 165, 0, 0.06);
+}
+
+/* ─── Craft Button Premium ─── */
+.craft-btn {
+  position: relative;
+  overflow: hidden;
+}
+
+.craft-btn::before {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(
+    90deg,
+    transparent 0%,
+    rgba(255, 255, 255, 0.15) 50%,
+    transparent 100%
+  );
+  background-size: 200% 100%;
+  animation: shimmer 3s ease-in-out infinite;
+  pointer-events: none;
+}
+
+.craft-btn:disabled::before {
+  display: none;
+}
+
+/* ─── Recipe Card Premium ─── */
+.crafting-recipe {
+  border-left: 3px solid transparent;
+}
+
+.crafting-recipe:hover {
+  border-left-color: rgba(255, 255, 255, 0.15);
+}
+
+.crafting-recipe--selected {
+  border-left-color: var(--accent) !important;
+  background: rgba(240, 165, 0, 0.06) !important;
+}
+
+/* ─── Equipment Slot Premium ─── */
+.equip-slot {
+  transition: all 0.2s var(--ease-out);
+}
+
+.equip-slot:hover {
+  border-color: var(--accent) !important;
+  box-shadow: 0 0 16px var(--accent-glow);
+}
+
+.equip-slot--has-item {
+  background: rgba(240, 165, 0, 0.04);
+}
+
+/* ─── Tooltip Premium ─── */
+.tooltip {
+  box-shadow:
+    0 8px 24px rgba(0, 0, 0, 0.6),
+    0 0 0 1px rgba(240, 165, 0, 0.2);
+  backdrop-filter: blur(16px);
+}
+
+/* ─── Map Premium ─── */
+.map-canvas-wrap {
+  box-shadow: inset 0 0 60px rgba(0, 0, 0, 0.4);
+}
+
+/* ─── Container Transfer Glow ─── */
+.container-take-all {
+  position: relative;
+  overflow: hidden;
+}
+
+.container-take-all:hover::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(90deg, transparent, rgba(240, 165, 0, 0.1), transparent);
+  animation: shimmer 1.5s ease infinite;
+  pointer-events: none;
+}
+
+/* ─── Settings Panel Premium ─── */
+.settings-slider::-webkit-slider-thumb {
+  box-shadow: 0 0 6px var(--accent-glow);
+  transition: box-shadow 0.15s ease;
+}
+
+.settings-slider::-webkit-slider-thumb:hover {
+  box-shadow: 0 0 12px var(--accent-glow-strong);
+}
+
+.settings-toggle {
+  transition: all 0.2s var(--ease-out);
+}
+
+.settings-toggle--on {
+  box-shadow: 0 0 8px var(--success-glow);
+}
+
+/* ─── Modal Premium ─── */
+.modal {
+  box-shadow:
+    var(--shadow-lg),
+    0 0 60px rgba(0, 0, 0, 0.3);
+}
+
+.modal-backdrop {
+  backdrop-filter: blur(4px);
+}

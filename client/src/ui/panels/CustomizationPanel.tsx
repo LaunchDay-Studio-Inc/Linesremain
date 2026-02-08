@@ -4,7 +4,7 @@
 import type { LevelReward } from '@shared/constants/progression';
 import { LEVEL_REWARDS } from '@shared/constants/progression';
 import type { PlayerCustomization } from '@shared/types/customization';
-import { FREE_COLORS } from '@shared/types/customization';
+import { BODY_TYPES, BODY_TYPE_DEFINITIONS, FREE_COLORS } from '@shared/types/customization';
 import { ClientMessage } from '@shared/types/network';
 import React, { useCallback, useMemo, useState } from 'react';
 import { socketClient } from '../../network/SocketClient';
@@ -34,6 +34,7 @@ export const CustomizationPanel: React.FC = () => {
     setCustomization(draft);
     socketClient.emit(ClientMessage.Customize, {
       bodyColor: draft.bodyColor,
+      bodyType: draft.bodyType,
       accessory: draft.accessory,
       trail: draft.trail,
       deathEffect: draft.deathEffect,
@@ -57,6 +58,30 @@ export const CustomizationPanel: React.FC = () => {
           <button className="panel__close" onClick={toggle}>
             X
           </button>
+        </div>
+
+        {/* Body Type */}
+        <div className="custom-section">
+          <div className="custom-section__title">Body Type</div>
+          <div
+            className="custom-option-grid"
+            style={{ display: 'grid', gridTemplateColumns: 'repeat(7, 1fr)', gap: '4px' }}
+          >
+            {BODY_TYPES.map((type) => {
+              const def = BODY_TYPE_DEFINITIONS[type];
+              return (
+                <button
+                  key={type}
+                  className={`custom-option ${draft.bodyType === type ? 'custom-option--selected' : ''}`}
+                  onClick={() => setDraft({ ...draft, bodyType: type })}
+                  title={def.description}
+                  style={{ padding: '6px 4px', fontSize: '10px' }}
+                >
+                  {def.displayName}
+                </button>
+              );
+            })}
+          </div>
         </div>
 
         {/* Body Color */}

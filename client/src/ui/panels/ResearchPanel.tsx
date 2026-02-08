@@ -9,7 +9,8 @@ import { socketClient } from '../../network/SocketClient';
 import { useEndgameStore } from '../../stores/useEndgameStore';
 import { usePlayerStore } from '../../stores/usePlayerStore';
 import '../../styles/panels.css';
-import { getItemIcon } from '../../utils/itemIcons';
+import { getItemIconName } from '../../utils/itemIcons';
+import { GameIcon } from '../common/GameIcon';
 
 const SCRAP_ITEM_ID = 96;
 const RESEARCH_COST = 100;
@@ -99,7 +100,6 @@ export const ResearchPanel: React.FC<ResearchPanelProps> = ({ isOpen, onClose, e
             <div className="inv-grid">
               {playerSlots.map((item, i) => {
                 const def = item ? ITEM_REGISTRY[item.itemId] : undefined;
-                const icon = def ? getItemIcon(def.category) : '';
                 const isSelected = selectedSlot === i;
 
                 return (
@@ -115,7 +115,7 @@ export const ResearchPanel: React.FC<ResearchPanelProps> = ({ isOpen, onClose, e
                   >
                     {item && (
                       <>
-                        <span className="inv-slot__icon">{icon}</span>
+                        <span className="inv-slot__icon"><GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} /></span>
                         {item.quantity > 1 && (
                           <span className="inv-slot__qty">{item.quantity}</span>
                         )}
@@ -154,7 +154,7 @@ export const ResearchPanel: React.FC<ResearchPanelProps> = ({ isOpen, onClose, e
                 fontSize: 28,
               }}
             >
-              {selectedDef ? getItemIcon(selectedDef.category) : '?'}
+              {selectedItem ? <GameIcon name={getItemIconName(selectedItem.itemId, selectedDef?.category)} size={28} /> : '?'}
             </div>
 
             <div

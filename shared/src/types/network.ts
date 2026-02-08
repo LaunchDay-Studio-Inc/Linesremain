@@ -195,6 +195,7 @@ export interface RespawnPayload {
 
 export interface CustomizePayload {
   bodyColor?: string;
+  bodyType?: string;
   accessory?: string | null;
   trail?: string | null;
   deathEffect?: string | null;
@@ -347,6 +348,7 @@ export interface XpGainPayload {
 
 export interface CustomizationUpdatedPayload {
   bodyColor: string;
+  bodyType: string;
   accessory: string | null;
   trail: string | null;
   deathEffect: string | null;
@@ -495,9 +497,27 @@ export interface ExplosionPayload {
 
 // ─── Monetization Payload Interfaces ───
 
-export interface StoreItemsPayload { items: import('../types/monetization.js').StoreItem[] }
-export interface StorePurchasePayload { itemId: string }
-export interface StorePurchaseResultPayload { success: boolean; message: string; itemId: string }
-export interface BattlePassStatePayload { state: import('../types/monetization.js').BattlePassState }
-export interface BattlePassClaimPayload { tier: number; track: 'free' | 'premium' }
-export interface GameNotificationPayload { type: import('../types/monetization.js').NotificationType; title: string; message?: string; duration?: number }
+export interface StoreItemsPayload {
+  items: import('../types/monetization.js').StoreItem[];
+}
+export interface StorePurchasePayload {
+  itemId: string;
+}
+export interface StorePurchaseResultPayload {
+  success: boolean;
+  message: string;
+  itemId: string;
+}
+export interface BattlePassStatePayload {
+  state: import('../types/monetization.js').BattlePassState;
+}
+export interface BattlePassClaimPayload {
+  tier: number;
+  track: 'free' | 'premium';
+}
+export interface GameNotificationPayload {
+  type: import('../types/monetization.js').NotificationType;
+  title: string;
+  message?: string;
+  duration?: number;
+}

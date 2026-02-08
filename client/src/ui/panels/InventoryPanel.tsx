@@ -1,17 +1,18 @@
 // ─── Inventory Panel ───
 
-import React, { useCallback } from 'react';
-import { useUIStore } from '../../stores/useUIStore';
-import { usePlayerStore } from '../../stores/usePlayerStore';
-import { ITEM_REGISTRY } from '@shared/constants/items';
 import { HOTBAR_SLOTS, PLAYER_INVENTORY_SLOTS } from '@shared/constants/game';
+import { ITEM_REGISTRY } from '@shared/constants/items';
 import { EquipSlot } from '@shared/types/items';
 import { ClientMessage } from '@shared/types/network';
-import { getItemIcon } from '../../utils/itemIcons';
-import { Tooltip, useTooltip } from '../common/Tooltip';
-import { DragDropProvider, useDragDrop } from '../common/DragDrop';
+import React, { useCallback } from 'react';
 import { socketClient } from '../../network/SocketClient';
+import { usePlayerStore } from '../../stores/usePlayerStore';
+import { useUIStore } from '../../stores/useUIStore';
 import '../../styles/panels.css';
+import { getItemIconName } from '../../utils/itemIcons';
+import { GameIcon } from '../common/GameIcon';
+import { DragDropProvider, useDragDrop } from '../common/DragDrop';
+import { Tooltip, useTooltip } from '../common/Tooltip';
 
 const EQUIP_SLOTS: { slot: EquipSlot; label: string }[] = [
   { slot: EquipSlot.Head, label: 'Head' },
@@ -45,7 +46,9 @@ export const InventoryPanel: React.FC = () => {
       <div className="panel" onClick={(e) => e.stopPropagation()} style={{ minWidth: 480 }}>
         <div className="panel__header">
           <span className="panel__title">Inventory</span>
-          <button className="panel__close" onClick={toggleInventory}>✕</button>
+          <button className="panel__close" onClick={toggleInventory}>
+            ✕
+          </button>
         </div>
         <DragDropProvider onDrop={handleDrop}>
           <InventoryContent />
@@ -78,7 +81,6 @@ const InventoryContent: React.FC = () => {
         {EQUIP_SLOTS.map(({ slot, label }) => {
           const item = equipment[slot] ?? null;
           const def = item ? ITEM_REGISTRY[item.itemId] : undefined;
-          const icon = def ? getItemIcon(def.category) : '';
 
           return (
             <div
@@ -91,7 +93,7 @@ const InventoryContent: React.FC = () => {
               onMouseLeave={hideTooltip}
             >
               {item ? (
-                <span style={{ fontSize: 20 }}>{icon}</span>
+                <GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} />
               ) : (
                 <span style={{ fontSize: 10, color: 'rgba(255,255,255,0.2)' }}>
                   {label.charAt(0)}
@@ -110,7 +112,6 @@ const InventoryContent: React.FC = () => {
           {mainItems.map((item, i) => {
             const slotIndex = HOTBAR_SLOTS + i;
             const def = item ? ITEM_REGISTRY[item.itemId] : undefined;
-            const icon = def ? getItemIcon(def.category) : '';
 
             return (
               <div
@@ -131,10 +132,8 @@ const InventoryContent: React.FC = () => {
               >
                 {item && (
                   <>
-                    <span className="inv-slot__icon">{icon}</span>
-                    {item.quantity > 1 && (
-                      <span className="inv-slot__qty">{item.quantity}</span>
-                    )}
+                    <span className="inv-slot__icon"><GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} /></span>
+                    {item.quantity > 1 && <span className="inv-slot__qty">{item.quantity}</span>}
                     {def?.durability != null && item.durability != null && (
                       <div className="inv-slot__durability">
                         <div
@@ -163,10 +162,12 @@ const InventoryContent: React.FC = () => {
           >
             Hotbar
           </div>
-          <div className="inv-grid" style={{ gridTemplateColumns: `repeat(${HOTBAR_SLOTS}, 50px)` }}>
+          <div
+            className="inv-grid"
+            style={{ gridTemplateColumns: `repeat(${HOTBAR_SLOTS}, 50px)` }}
+          >
             {hotbarItems.map((item, i) => {
               const def = item ? ITEM_REGISTRY[item.itemId] : undefined;
-              const icon = def ? getItemIcon(def.category) : '';
 
               return (
                 <div
@@ -187,10 +188,8 @@ const InventoryContent: React.FC = () => {
                 >
                   {item && (
                     <>
-                      <span className="inv-slot__icon">{icon}</span>
-                      {item.quantity > 1 && (
-                        <span className="inv-slot__qty">{item.quantity}</span>
-                      )}
+                      <span className="inv-slot__icon"><GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} /></span>
+                      {item.quantity > 1 && <span className="inv-slot__qty">{item.quantity}</span>}
                     </>
                   )}
                 </div>

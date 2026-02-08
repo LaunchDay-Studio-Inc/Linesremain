@@ -1,14 +1,15 @@
 // ─── App Root ───
 
 import React, { useEffect, useRef } from 'react';
-import { useGameStore } from './stores/useGameStore';
-import { MainMenu } from './ui/screens/MainMenu';
-import { LoadingScreen } from './ui/screens/LoadingScreen';
-import { GameCanvas } from './ui/screens/GameCanvas';
-import { DeathScreen } from './ui/screens/DeathScreen';
-import { socketClient } from './network/SocketClient';
-import { initializeMessageHandlers } from './network/MessageHandler';
 import { startInputSender, stopInputSender } from './network/InputSender';
+import { initializeMessageHandlers } from './network/MessageHandler';
+import { socketClient } from './network/SocketClient';
+import { useGameStore } from './stores/useGameStore';
+import { CharacterSelect } from './ui/screens/CharacterSelect';
+import { DeathScreen } from './ui/screens/DeathScreen';
+import { GameCanvas } from './ui/screens/GameCanvas';
+import { LoadingScreen } from './ui/screens/LoadingScreen';
+import { MainMenu } from './ui/screens/MainMenu';
 
 // ─── Network Initialization ───
 
@@ -33,7 +34,11 @@ export const App: React.FC = () => {
 
   // Connect to server when transitioning to 'loading' with a valid token
   useEffect(() => {
-    if (screen === 'loading' && prevScreenRef.current === 'menu' && accessToken) {
+    if (
+      screen === 'loading' &&
+      (prevScreenRef.current === 'menu' || prevScreenRef.current === 'character-select') &&
+      accessToken
+    ) {
       // Derive server URL from current page origin (same host)
       const serverUrl = window.location.origin;
       socketClient.connect(serverUrl, accessToken);
@@ -62,6 +67,8 @@ export const App: React.FC = () => {
   switch (screen) {
     case 'menu':
       return <MainMenu />;
+    case 'character-select':
+      return <CharacterSelect />;
     case 'loading':
       return <LoadingScreen />;
     case 'playing':

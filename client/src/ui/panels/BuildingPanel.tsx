@@ -5,6 +5,7 @@ import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
 import { useCallback, useState } from 'react';
 import { useUIStore } from '../../stores/useUIStore';
 import '../../styles/panels.css';
+import { GameIcon, type IconName } from '../common/GameIcon';
 
 // ─── Tier Config ───
 
@@ -29,25 +30,25 @@ const ITEM_NAMES: Record<number, string> = {
 
 interface BuildingPieceUI {
   type: BuildingPieceType;
-  icon: string;
+  iconName: IconName;
   label: string;
 }
 
 const BUILDING_PIECES: BuildingPieceUI[] = [
-  { type: BuildingPieceType.Foundation, icon: '⬜', label: 'Foundation' },
-  { type: BuildingPieceType.FoundationTriangle, icon: '🔻', label: 'Tri Foundation' },
-  { type: BuildingPieceType.Wall, icon: '🧱', label: 'Wall' },
-  { type: BuildingPieceType.HalfWall, icon: '▬', label: 'Half Wall' },
-  { type: BuildingPieceType.Doorway, icon: '🚪', label: 'Doorway' },
-  { type: BuildingPieceType.WindowFrame, icon: '🪟', label: 'Window' },
-  { type: BuildingPieceType.WallFrame, icon: '🖼️', label: 'Wall Frame' },
-  { type: BuildingPieceType.Floor, icon: '⬛', label: 'Floor' },
-  { type: BuildingPieceType.FloorTriangle, icon: '◢', label: 'Tri Floor' },
-  { type: BuildingPieceType.Stairs, icon: '📐', label: 'Stairs' },
-  { type: BuildingPieceType.Roof, icon: '🔺', label: 'Roof' },
-  { type: BuildingPieceType.Door, icon: '🚪', label: 'Door' },
-  { type: BuildingPieceType.Fence, icon: '🏗️', label: 'Fence' },
-  { type: BuildingPieceType.Pillar, icon: '🏛️', label: 'Pillar' },
+  { type: BuildingPieceType.Foundation, iconName: 'foundation', label: 'Foundation' },
+  { type: BuildingPieceType.FoundationTriangle, iconName: 'foundation-tri', label: 'Tri Found.' },
+  { type: BuildingPieceType.Wall, iconName: 'wall', label: 'Wall' },
+  { type: BuildingPieceType.HalfWall, iconName: 'half-wall', label: 'Half Wall' },
+  { type: BuildingPieceType.Doorway, iconName: 'doorway', label: 'Doorway' },
+  { type: BuildingPieceType.WindowFrame, iconName: 'window', label: 'Window' },
+  { type: BuildingPieceType.WallFrame, iconName: 'wall-frame', label: 'Frame' },
+  { type: BuildingPieceType.Floor, iconName: 'floor', label: 'Floor' },
+  { type: BuildingPieceType.FloorTriangle, iconName: 'floor-tri', label: 'Tri Floor' },
+  { type: BuildingPieceType.Stairs, iconName: 'stairs', label: 'Stairs' },
+  { type: BuildingPieceType.Roof, iconName: 'roof', label: 'Roof' },
+  { type: BuildingPieceType.Door, iconName: 'door', label: 'Door' },
+  { type: BuildingPieceType.Fence, iconName: 'fence', label: 'Fence' },
+  { type: BuildingPieceType.Pillar, iconName: 'pillar', label: 'Pillar' },
 ];
 
 // ─── Props ───
@@ -101,7 +102,9 @@ export const BuildingPanel: React.FC<BuildingPanelProps> = ({ onSelectPiece, onC
     <div className="building-panel">
       {/* Header */}
       <div className="bp-header">
-        <span className="bp-header__icon">🔨</span>
+        <span className="bp-header__icon">
+          <GameIcon name="hammer" size={16} />
+        </span>
         <span className="bp-header__title">BUILDING</span>
         <span className="bp-header__tier" style={{ color: activeTierConfig?.color }}>
           {activeTierConfig?.label}
@@ -141,7 +144,19 @@ export const BuildingPanel: React.FC<BuildingPanelProps> = ({ onSelectPiece, onC
               onClick={() => isAvailable && handlePieceClick(piece)}
               title={isAvailable ? `${piece.label} — ${hp} HP` : `${piece.label} — Not available`}
             >
-              <span className="bp-piece__icon">{piece.icon}</span>
+              <span className="bp-piece__icon">
+                <GameIcon
+                  name={piece.iconName}
+                  size={22}
+                  color={
+                    !isAvailable
+                      ? 'rgba(255,255,255,0.2)'
+                      : isSelected
+                        ? 'var(--accent)'
+                        : 'rgba(255,255,255,0.8)'
+                  }
+                />
+              </span>
               <span className="bp-piece__label">{piece.label}</span>
               {isAvailable ? (
                 <span className="bp-piece__hp">
@@ -149,7 +164,9 @@ export const BuildingPanel: React.FC<BuildingPanelProps> = ({ onSelectPiece, onC
                   <small> HP</small>
                 </span>
               ) : (
-                <span className="bp-piece__lock">🔒</span>
+                <span className="bp-piece__lock">
+                  <GameIcon name="lock" size={14} />
+                </span>
               )}
             </div>
           );
@@ -160,7 +177,7 @@ export const BuildingPanel: React.FC<BuildingPanelProps> = ({ onSelectPiece, onC
       {selectedPiece && selectedStats && (
         <div className="bp-detail">
           <div className="bp-detail__name">
-            🛡️ <strong>{selectedPiece}</strong>
+            <GameIcon name="shield" size={16} /> <strong>{selectedPiece}</strong>
           </div>
           <div className="bp-detail__hp">{healthAtTier} HP</div>
           <div className="bp-detail__cost">
@@ -179,7 +196,7 @@ export const BuildingPanel: React.FC<BuildingPanelProps> = ({ onSelectPiece, onC
 
       {/* Controls */}
       <div className="bp-controls">
-        <span>🖱️ Click to place</span>
+        <span>Click to place</span>
         <span className="bp-controls__sep">•</span>
         <span>R — Rotate</span>
         <span className="bp-controls__sep">•</span>

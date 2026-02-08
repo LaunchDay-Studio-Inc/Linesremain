@@ -2,7 +2,10 @@
 // Polished main menu with parallax background, gradient title, and full navigation.
 
 import React, { useEffect, useRef, useState } from 'react';
+import { musicSystem } from '../../engine/MusicSystem';
+import { useAchievementStore } from '../../stores/useAchievementStore';
 import { useGameStore } from '../../stores/useGameStore';
+import { useSettingsStore } from '../../stores/useSettingsStore';
 import { useUIStore } from '../../stores/useUIStore';
 
 type AuthMode = 'login' | 'register';
@@ -186,6 +189,35 @@ export const MainMenu: React.FC = () => {
     if (accessToken) setView('main');
   }, [accessToken]);
 
+  // Start menu music on mount
+  useEffect(() => {
+    const settings = useSettingsStore.getState();
+    musicSystem.setVolume(settings.musicVolume / 100);
+    musicSystem.setEnabled(settings.musicEnabled);
+    musicSystem.setMood('menu');
+    // Init on first click (AudioContext requires user gesture)
+    const initAudio = () => {
+      musicSystem.init();
+      musicSystem.setMood('menu');
+    };
+    window.addEventListener('click', initAudio, { once: true });
+    // Drive music system updates on menu screen
+    let lastTime = performance.now();
+    let rafId: number;
+    const tick = () => {
+      const now = performance.now();
+      const dt = (now - lastTime) / 1000;
+      lastTime = now;
+      musicSystem.update(dt);
+      rafId = requestAnimationFrame(tick);
+    };
+    rafId = requestAnimationFrame(tick);
+    return () => {
+      window.removeEventListener('click', initAudio);
+      cancelAnimationFrame(rafId);
+    };
+  }, []);
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError(null);
@@ -227,7 +259,12 @@ export const MainMenu: React.FC = () => {
 
   const handleMenuClick = (id: string) => {
     if (id === 'play') {
-      setScreen('loading');
+      const customization = useAchievementStore.getState().customization;
+      if (customization.bodyType) {
+        setScreen('loading');
+      } else {
+        setScreen('character-select');
+      }
     } else if (id === 'settings') {
       useUIStore.getState().toggleSettings();
     } else if (id === 'leaderboard') {

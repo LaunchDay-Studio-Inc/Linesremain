@@ -1,13 +1,14 @@
 // ─── Container Panel ───
 
+import { HOTBAR_SLOTS, PLAYER_INVENTORY_SLOTS } from '@shared/constants/game';
+import { ITEM_REGISTRY } from '@shared/constants/items';
+import type { ItemStack } from '@shared/types/items';
 import React from 'react';
 import { usePlayerStore } from '../../stores/usePlayerStore';
-import { ITEM_REGISTRY } from '@shared/constants/items';
-import { HOTBAR_SLOTS, PLAYER_INVENTORY_SLOTS } from '@shared/constants/game';
-import type { ItemStack } from '@shared/types/items';
-import { getItemIcon } from '../../utils/itemIcons';
-import { Tooltip, useTooltip } from '../common/Tooltip';
 import '../../styles/panels.css';
+import { getItemIconName } from '../../utils/itemIcons';
+import { GameIcon } from '../common/GameIcon';
+import { Tooltip, useTooltip } from '../common/Tooltip';
 
 interface ContainerPanelProps {
   isOpen: boolean;
@@ -36,7 +37,9 @@ export const ContainerPanel: React.FC<ContainerPanelProps> = ({
       <div className="panel" onClick={(e) => e.stopPropagation()} style={{ minWidth: 640 }}>
         <div className="panel__header">
           <span className="panel__title">{containerName}</span>
-          <button className="panel__close" onClick={onClose}>✕</button>
+          <button className="panel__close" onClick={onClose}>
+            ✕
+          </button>
         </div>
 
         <div className="container-layout">
@@ -46,7 +49,6 @@ export const ContainerPanel: React.FC<ContainerPanelProps> = ({
             <div className="inv-grid">
               {containerSlots.map((item, i) => {
                 const def = item ? ITEM_REGISTRY[item.itemId] : undefined;
-                const icon = def ? getItemIcon(def.category) : '';
 
                 return (
                   <div
@@ -60,7 +62,9 @@ export const ContainerPanel: React.FC<ContainerPanelProps> = ({
                   >
                     {item && (
                       <>
-                        <span className="inv-slot__icon">{icon}</span>
+                        <span className="inv-slot__icon">
+                          <GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} />
+                        </span>
                         {item.quantity > 1 && (
                           <span className="inv-slot__qty">{item.quantity}</span>
                         )}
@@ -83,7 +87,6 @@ export const ContainerPanel: React.FC<ContainerPanelProps> = ({
             <div className="inv-grid">
               {playerSlots.map((item, i) => {
                 const def = item ? ITEM_REGISTRY[item.itemId] : undefined;
-                const icon = def ? getItemIcon(def.category) : '';
 
                 return (
                   <div
@@ -97,7 +100,9 @@ export const ContainerPanel: React.FC<ContainerPanelProps> = ({
                   >
                     {item && (
                       <>
-                        <span className="inv-slot__icon">{icon}</span>
+                        <span className="inv-slot__icon">
+                          <GameIcon name={getItemIconName(item.itemId, def?.category)} size={20} />
+                        </span>
                         {item.quantity > 1 && (
                           <span className="inv-slot__qty">{item.quantity}</span>
                         )}

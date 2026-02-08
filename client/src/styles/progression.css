@@ -505,3 +505,80 @@
   color: var(--text-muted);
   font-size: 13px;
 }
+
+/* ═══════════════════════════════════════════════════
+   PREMIUM PROGRESSION UPGRADES
+   ═══════════════════════════════════════════════════ */
+
+/* ─── Achievement Toast Premium ─── */
+.achievement-toast {
+  box-shadow:
+    0 4px 20px rgba(240, 165, 0, 0.2),
+    var(--shadow-inset);
+  border-left: 3px solid var(--accent);
+}
+
+/* ─── Level Up Notification Premium ─── */
+.levelup-overlay {
+  backdrop-filter: blur(8px);
+}
+
+/* ─── XP Bar Premium ─── */
+.xp-bar-fill {
+  position: relative;
+  overflow: hidden;
+}
+
+.xp-bar-fill::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: -100%;
+  width: 50%;
+  height: 100%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.2), transparent);
+  animation: shimmer 2s ease-in-out infinite;
+}
+
+/* ─── Tutorial Card Premium ─── */
+.tutorial-card {
+  box-shadow:
+    0 8px 32px rgba(0, 0, 0, 0.4),
+    0 0 0 1px rgba(240, 165, 0, 0.15);
+  pointer-events: auto;
+}
+
+.tutorial-card__key kbd {
+  background: rgba(240, 165, 0, 0.15);
+  border-color: rgba(240, 165, 0, 0.3);
+  color: var(--accent);
+}
+
+/* ─── Customization Swatches Premium ─── */
+.custom-color-swatch {
+  transition: all 0.2s var(--ease-spring);
+}
+
+.custom-color-swatch:hover {
+  transform: scale(1.15);
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+}
+
+.custom-color-swatch--selected {
+  transform: scale(1.1);
+  box-shadow: 0 0 12px var(--accent-glow);
+}
+
+/* ─── Achievement Item Premium ─── */
+.ach-item {
+  transition: all 0.15s var(--ease-out);
+}
+
+.ach-item:hover {
+  background: rgba(255, 255, 255, 0.04);
+  transform: translateX(2px);
+}
+
+.ach-item--unlocked .ach-item__icon {
+  filter: drop-shadow(0 0 4px var(--accent-glow));
+}
