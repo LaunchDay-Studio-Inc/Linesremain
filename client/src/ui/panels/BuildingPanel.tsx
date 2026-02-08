@@ -1,31 +1,31 @@
 // ─── Building Panel ───
 
-import { useState, useCallback } from 'react';
-import { useUIStore } from '../../stores/useUIStore';
-import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
 import { BUILDING_REGISTRY } from '@shared/constants/buildings';
+import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
+import { useCallback, useState } from 'react';
+import { useUIStore } from '../../stores/useUIStore';
 import '../../styles/panels.css';
 
-// ─── Tier Display Names ───
+// ─── Tier Config ───
 
-const BUILDING_TIERS: { tier: BuildingTier; label: string }[] = [
-  { tier: BuildingTier.Twig, label: 'Twig' },
-  { tier: BuildingTier.Wood, label: 'Wood' },
-  { tier: BuildingTier.Stone, label: 'Stone' },
-  { tier: BuildingTier.Metal, label: 'Metal' },
-  { tier: BuildingTier.Armored, label: 'Armored' },
+const BUILDING_TIERS: { tier: BuildingTier; label: string; color: string }[] = [
+  { tier: BuildingTier.Twig, label: 'Twig', color: '#a08060' },
+  { tier: BuildingTier.Wood, label: 'Wood', color: '#c49a6c' },
+  { tier: BuildingTier.Stone, label: 'Stone', color: '#8a8a9a' },
+  { tier: BuildingTier.Metal, label: 'Metal', color: '#7ec8e3' },
+  { tier: BuildingTier.Armored, label: 'Armored', color: '#e8c547' },
 ];
 
-// ─── Item Name Lookup (simplified) ───
+// ─── Item Names ───
 
 const ITEM_NAMES: Record<number, string> = {
   1: 'Wood',
   2: 'Stone',
-  10: 'Metal Fragments',
+  10: 'Metal Frags',
   12: 'HQM',
 };
 
-// ─── Building Piece Definitions for UI ───
+// ─── Piece Definitions ───
 
 interface BuildingPieceUI {
   type: BuildingPieceType;
@@ -59,20 +59,17 @@ interface BuildingPanelProps {
 
 // ─── Component ───
 
-export const BuildingPanel: React.FC<BuildingPanelProps> = ({
-  onSelectPiece,
-  onCancelPreview,
-}) => {
+export const BuildingPanel: React.FC<BuildingPanelProps> = ({ onSelectPiece, onCancelPreview }) => {
   const buildingMode = useUIStore((s) => s.buildingMode);
   const [activeTierIndex, setActiveTierIndex] = useState(0);
   const [selectedPiece, setSelectedPiece] = useState<BuildingPieceType | null>(null);
 
   const activeTier = BUILDING_TIERS[activeTierIndex]?.tier ?? BuildingTier.Twig;
+  const activeTierConfig = BUILDING_TIERS[activeTierIndex];
 
   const handlePieceClick = useCallback(
     (piece: BuildingPieceUI) => {
       if (selectedPiece === piece.type) {
-        // Deselect
         setSelectedPiece(null);
         onCancelPreview?.();
       } else {
@@ -87,7 +84,6 @@ export const BuildingPanel: React.FC<BuildingPanelProps> = ({
     (index: number) => {
       setActiveTierIndex(index);
       const newTier = BUILDING_TIERS[index]?.tier ?? BuildingTier.Twig;
-      // Re-trigger preview with new tier if a piece is selected
       if (selectedPiece) {
         onSelectPiece?.(selectedPiece, newTier);
       }
@@ -97,76 +93,96 @@ export const BuildingPanel: React.FC<BuildingPanelProps> = ({
 
   if (!buildingMode) return null;
 
-  // Get upgrade costs for selected piece at active tier
   const selectedStats = selectedPiece ? BUILDING_REGISTRY[selectedPiece] : null;
   const upgradeCosts = selectedStats?.upgradeCosts[activeTier] ?? [];
   const healthAtTier = selectedStats?.healthPerTier[activeTier] ?? 0;
 
   return (
     <div className="building-panel">
+      {/* Header */}
+      <div className="bp-header">
+        <span className="bp-header__icon">🔨</span>
+        <span className="bp-header__title">BUILDING</span>
+        <span className="bp-header__tier" style={{ color: activeTierConfig?.color }}>
+          {activeTierConfig?.label}
+        </span>
+      </div>
+
       {/* Tier Tabs */}
-      <div className="building-tiers">
+      <div className="bp-tiers">
         {BUILDING_TIERS.map((tier, i) => (
           <button
             key={tier.label}
-            className={`building-tier-tab${i === activeTierIndex ? ' building-tier-tab--active' : ''}`}
+            className={`bp-tier-tab${i === activeTierIndex ? ' bp-tier-tab--active' : ''}`}
             onClick={() => handleTierChange(i)}
+            style={
+              i === activeTierIndex
+                ? { borderBottomColor: tier.color, color: tier.color }
+                : undefined
+            }
           >
             {tier.label}
           </button>
         ))}
       </div>
 
-      {/* Building Pieces */}
-      <div className="building-pieces">
+      {/* Piece Grid */}
+      <div className="bp-grid">
         {BUILDING_PIECES.map((piece) => {
           const stats = BUILDING_REGISTRY[piece.type];
           const hp = stats?.healthPerTier[activeTier] ?? 0;
           const isAvailable = hp > 0;
+          const isSelected = selectedPiece === piece.type;
 
           return (
             <div
               key={piece.type}
-              className={`building-piece${selectedPiece === piece.type ? ' building-piece--selected' : ''}${!isAvailable ? ' building-piece--unavailable' : ''}`}
+              className={`bp-piece${isSelected ? ' bp-piece--selected' : ''}${!isAvailable ? ' bp-piece--locked' : ''}`}
               onClick={() => isAvailable && handlePieceClick(piece)}
-              title={isAvailable ? `${piece.label} — ${hp} HP` : `${piece.label} — Not available at this tier`}
+              title={isAvailable ? `${piece.label} — ${hp} HP` : `${piece.label} — Not available`}
             >
-              <span className="building-piece__icon">{piece.icon}</span>
-              <span className="building-piece__label">{piece.label}</span>
-              {isAvailable && <span className="building-piece__hp">{hp} HP</span>}
+              <span className="bp-piece__icon">{piece.icon}</span>
+              <span className="bp-piece__label">{piece.label}</span>
+              {isAvailable ? (
+                <span className="bp-piece__hp">
+                  {hp}
+                  <small> HP</small>
+                </span>
+              ) : (
+                <span className="bp-piece__lock">🔒</span>
+              )}
             </div>
           );
         })}
       </div>
 
-      {/* Material Cost Display */}
-      {selectedPiece && (
-        <div className="building-cost">
-          <div className="building-cost__header">
-            <strong>{selectedPiece}</strong> — {BUILDING_TIERS[activeTierIndex]?.label}
+      {/* Selected Piece Detail */}
+      {selectedPiece && selectedStats && (
+        <div className="bp-detail">
+          <div className="bp-detail__name">
+            🛡️ <strong>{selectedPiece}</strong>
           </div>
-          <div className="building-cost__hp">Health: {healthAtTier}</div>
-          {upgradeCosts.length > 0 ? (
-            <div className="building-cost__materials">
-              <span className="building-cost__label">Cost:</span>
-              {upgradeCosts.map((cost) => (
-                <span key={cost.itemId} className="building-cost__item">
-                  {ITEM_NAMES[cost.itemId] ?? `Item #${cost.itemId}`} × {cost.quantity}
+          <div className="bp-detail__hp">{healthAtTier} HP</div>
+          <div className="bp-detail__cost">
+            {upgradeCosts.length > 0 ? (
+              upgradeCosts.map((cost) => (
+                <span key={cost.itemId} className="bp-detail__mat">
+                  {ITEM_NAMES[cost.itemId] ?? `#${cost.itemId}`} ×{cost.quantity}
                 </span>
-              ))}
-            </div>
-          ) : (
-            <div className="building-cost__materials">
-              <span className="building-cost__label">Free (Twig)</span>
-            </div>
-          )}
+              ))
+            ) : (
+              <span className="bp-detail__free">Free</span>
+            )}
+          </div>
         </div>
       )}
 
-      {/* Controls Hint */}
-      <div className="building-controls">
+      {/* Controls */}
+      <div className="bp-controls">
         <span>🖱️ Click to place</span>
+        <span className="bp-controls__sep">•</span>
         <span>R — Rotate</span>
+        <span className="bp-controls__sep">•</span>
         <span>ESC — Cancel</span>
       </div>
     </div>
