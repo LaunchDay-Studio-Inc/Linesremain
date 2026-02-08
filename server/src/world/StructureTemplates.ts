@@ -33,15 +33,25 @@ export interface StructureTemplate {
 
 // ─── Helper Functions ───
 
-function addBlock(blocks: StructureBlock[], x: number, y: number, z: number, type: BlockType): void {
+function addBlock(
+  blocks: StructureBlock[],
+  x: number,
+  y: number,
+  z: number,
+  type: BlockType,
+): void {
   blocks.push({ localX: x, localY: y, localZ: z, blockType: type });
 }
 
 /** Build a filled rectangular box of blocks. */
 function fillBox(
   blocks: StructureBlock[],
-  x1: number, y1: number, z1: number,
-  x2: number, y2: number, z2: number,
+  x1: number,
+  y1: number,
+  z1: number,
+  x2: number,
+  y2: number,
+  z2: number,
   type: BlockType,
 ): void {
   for (let x = x1; x <= x2; x++) {
@@ -56,8 +66,12 @@ function fillBox(
 /** Build hollow walls of a rectangular room (floor included, no roof). */
 function hollowBox(
   blocks: StructureBlock[],
-  x1: number, y1: number, z1: number,
-  x2: number, y2: number, z2: number,
+  x1: number,
+  y1: number,
+  z1: number,
+  x2: number,
+  y2: number,
+  z2: number,
   wallType: BlockType,
   floorType: BlockType,
 ): void {
@@ -78,9 +92,11 @@ function hollowBox(
 /** Build a cylinder (approximated) centered at (cx, cz) with given radius and height range. */
 function cylinder(
   blocks: StructureBlock[],
-  cx: number, cz: number,
+  cx: number,
+  cz: number,
   radius: number,
-  yStart: number, yEnd: number,
+  yStart: number,
+  yEnd: number,
   type: BlockType,
   hollow: boolean,
 ): void {
@@ -104,7 +120,7 @@ function shouldCollapse(x: number, y: number, z: number, chance: number): boolea
   let h = (x * 374761393 + y * 668265263 + z * 1274126177) | 0;
   h = ((h ^ (h >> 13)) * 1103515245) | 0;
   h = (h ^ (h >> 16)) >>> 0;
-  return (h / 4294967296) < chance;
+  return h / 4294967296 < chance;
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -115,7 +131,9 @@ function buildAbandonedOutpost(): StructureTemplate {
   const blocks: StructureBlock[] = [];
   const spawns: EntitySpawn[] = [];
 
-  const sizeX = 24, sizeY = 8, sizeZ = 24;
+  const sizeX = 24,
+    sizeY = 8,
+    sizeZ = 24;
 
   // Stone floor
   fillBox(blocks, 0, 0, 0, sizeX - 1, 0, sizeZ - 1, BlockType.Stone);
@@ -170,8 +188,11 @@ function buildCollapsedSilo(): StructureTemplate {
   const blocks: StructureBlock[] = [];
   const spawns: EntitySpawn[] = [];
 
-  const sizeX = 12, sizeY = 20, sizeZ = 12;
-  const cx = 6, cz = 6;
+  const sizeX = 12,
+    sizeY = 20,
+    sizeZ = 12;
+  const cx = 6,
+    cz = 6;
   const radius = 5;
 
   // Base floor
@@ -239,7 +260,9 @@ function buildReclamationYard(): StructureTemplate {
   const blocks: StructureBlock[] = [];
   const spawns: EntitySpawn[] = [];
 
-  const sizeX = 32, sizeY = 6, sizeZ = 32;
+  const sizeX = 32,
+    sizeY = 6,
+    sizeZ = 32;
 
   // Gravel ground
   fillBox(blocks, 0, 0, 0, sizeX - 1, 0, sizeZ - 1, BlockType.Gravel);
@@ -332,7 +355,9 @@ function buildSignalTower(): StructureTemplate {
   const blocks: StructureBlock[] = [];
   const spawns: EntitySpawn[] = [];
 
-  const sizeX = 8, sizeY = 30, sizeZ = 8;
+  const sizeX = 8,
+    sizeY = 30,
+    sizeZ = 8;
 
   // Base building (8×4×8 cobblestone)
   hollowBox(blocks, 0, 0, 0, 7, 4, 7, BlockType.Cobblestone, BlockType.Stone);
@@ -366,7 +391,12 @@ function buildSignalTower(): StructureTemplate {
   fillBox(blocks, 0, 5, 0, 7, 5, 7, BlockType.Cobblestone);
 
   // Lattice tower pillars (4 corner pillars from y=5 to y=25)
-  const pillars: Array<[number, number]> = [[1, 1], [1, 6], [6, 1], [6, 6]];
+  const pillars: Array<[number, number]> = [
+    [1, 1],
+    [1, 6],
+    [6, 1],
+    [6, 6],
+  ];
   for (const [px, pz] of pillars) {
     for (let y = 5; y <= 25; y++) {
       addBlock(blocks, px, y, pz, BlockType.Cobblestone);
@@ -411,7 +441,9 @@ function buildHarborRuin(): StructureTemplate {
   const blocks: StructureBlock[] = [];
   const spawns: EntitySpawn[] = [];
 
-  const sizeX = 40, sizeY = 8, sizeZ = 20;
+  const sizeX = 40,
+    sizeY = 8,
+    sizeZ = 20;
 
   // Shore area (z=0..9): gravel ground
   fillBox(blocks, 0, 0, 0, sizeX - 1, 0, 9, BlockType.Gravel);
@@ -501,11 +533,192 @@ function buildHarborRuin(): StructureTemplate {
 
   return {
     name: 'Harbor Ruin',
-    sizeX, sizeY, sizeZ,
+    sizeX,
+    sizeY,
+    sizeZ,
     blocks,
     entitySpawns: spawns,
     requiresWater: true,
   };
+}
+
+// ═══════════════════════════════════════════════════════════
+// 6. Abandoned Camp (12×5×12)
+// ═══════════════════════════════════════════════════════════
+
+function buildAbandonedCamp(): StructureTemplate {
+  const blocks: StructureBlock[] = [];
+  const spawns: EntitySpawn[] = [];
+
+  const sizeX = 12,
+    sizeY = 5,
+    sizeZ = 12;
+
+  // Gravel ground pad
+  fillBox(blocks, 0, 0, 0, sizeX - 1, 0, sizeZ - 1, BlockType.Gravel);
+
+  // Tent frame: A-frame at the z=0 end using planks
+  // Two angled sides meeting at a peak
+  addBlock(blocks, 2, 1, 1, BlockType.Planks); // left base
+  addBlock(blocks, 3, 2, 1, BlockType.Planks); // peak
+  addBlock(blocks, 4, 1, 1, BlockType.Planks); // right base
+
+  // Extinguished campfire circle at center (x=5..6, z=5..6)
+  // 4 cobblestone blocks around center, gravel (ash) in center
+  addBlock(blocks, 5, 1, 5, BlockType.Cobblestone);
+  addBlock(blocks, 7, 1, 5, BlockType.Cobblestone);
+  addBlock(blocks, 5, 1, 7, BlockType.Cobblestone);
+  addBlock(blocks, 7, 1, 7, BlockType.Cobblestone);
+  addBlock(blocks, 6, 1, 6, BlockType.Gravel); // ash
+
+  // Log "seats" near the fire
+  addBlock(blocks, 4, 1, 6, BlockType.Log);
+  addBlock(blocks, 8, 1, 6, BlockType.Log);
+
+  // Collapsed supply crate: stacked planks blocks
+  addBlock(blocks, 9, 1, 2, BlockType.Planks);
+  addBlock(blocks, 10, 1, 2, BlockType.Planks);
+  addBlock(blocks, 9, 2, 2, BlockType.Planks);
+
+  // Loot container spawns (2)
+  spawns.push({ localX: 10, localY: 1, localZ: 3, entityType: 'loot_container' }); // near crate/fire area
+  spawns.push({ localX: 5, localY: 1, localZ: 8, entityType: 'loot_container' }); // near fire
+
+  // Journal loot spawn (near the tent)
+  spawns.push({ localX: 3, localY: 1, localZ: 2, entityType: 'journal_loot' });
+
+  return { name: 'Abandoned Camp', sizeX, sizeY, sizeZ, blocks, entitySpawns: spawns };
+}
+
+// ═══════════════════════════════════════════════════════════
+// 7. The Last Line (50×12×20)
+// ═══════════════════════════════════════════════════════════
+
+function buildTheLastLine(): StructureTemplate {
+  const blocks: StructureBlock[] = [];
+  const spawns: EntitySpawn[] = [];
+
+  const sizeX = 50,
+    sizeY = 12,
+    sizeZ = 20;
+
+  // ── Main wall: 50 blocks long (x=0..49), 8 blocks high, 3 blocks thick (z=8..10) ──
+  for (let x = 0; x < sizeX; x++) {
+    for (let y = 0; y <= 7; y++) {
+      for (let z = 8; z <= 10; z++) {
+        // Gateway gap in center (x=22..26, y=0..3)
+        if (x >= 22 && x <= 26 && y <= 3) continue;
+
+        // Apply collapse damage to upper rows
+        if (y >= 6 && shouldCollapse(x, y, z, 0.15)) continue;
+
+        addBlock(blocks, x, y, z, BlockType.Stone);
+      }
+    }
+  }
+
+  // ── Walkway along the top of the wall (planks at y=8, z=8..10) ──
+  for (let x = 0; x < sizeX; x++) {
+    for (let z = 8; z <= 10; z++) {
+      // Skip gateway area
+      if (x >= 22 && x <= 26) continue;
+      if (shouldCollapse(x, 8, z, 0.1)) continue;
+      addBlock(blocks, x, 8, z, BlockType.Planks);
+    }
+  }
+
+  // ── Left guard tower (x=0..7, z=6..13, cobblestone, 12 high) ──
+  for (let y = 0; y <= 11; y++) {
+    for (let x = 0; x <= 7; x++) {
+      for (let z = 6; z <= 13; z++) {
+        const isEdge = x === 0 || x === 7 || z === 6 || z === 13;
+        if (!isEdge) continue;
+
+        // Open top: leave gaps at y >= 10 on partial walls
+        if (y >= 10 && shouldCollapse(x, y, z, 0.35)) continue;
+        // General collapse damage
+        if (y >= 8 && shouldCollapse(x, y, z, 0.12)) continue;
+
+        addBlock(blocks, x, y, z, BlockType.Cobblestone);
+      }
+    }
+  }
+  // Tower floors at y=0 and y=5
+  fillBox(blocks, 1, 0, 7, 6, 0, 12, BlockType.Stone);
+  fillBox(blocks, 1, 5, 7, 6, 5, 12, BlockType.Planks);
+
+  // ── Right guard tower (x=42..49, z=6..13, cobblestone, 12 high) ──
+  for (let y = 0; y <= 11; y++) {
+    for (let x = 42; x <= 49; x++) {
+      for (let z = 6; z <= 13; z++) {
+        const isEdge = x === 42 || x === 49 || z === 6 || z === 13;
+        if (!isEdge) continue;
+
+        // Open top: leave gaps at y >= 10
+        if (y >= 10 && shouldCollapse(x, y, z, 0.35)) continue;
+        // General collapse damage
+        if (y >= 8 && shouldCollapse(x, y, z, 0.12)) continue;
+
+        addBlock(blocks, x, y, z, BlockType.Cobblestone);
+      }
+    }
+  }
+  // Tower floors at y=0 and y=5
+  fillBox(blocks, 43, 0, 7, 48, 0, 12, BlockType.Stone);
+  fillBox(blocks, 43, 5, 7, 48, 5, 12, BlockType.Planks);
+
+  // ── Scattered defensive barriers in front of wall (z=2..6) ──
+  // Barrier cluster 1 (x=10..13)
+  for (let x = 10; x <= 13; x++) {
+    for (let y = 1; y <= 2; y++) {
+      if (shouldCollapse(x, y, 4, 0.15)) continue;
+      addBlock(blocks, x, y, 4, BlockType.Stone);
+    }
+  }
+  // Barrier cluster 2 (x=18..20)
+  for (let x = 18; x <= 20; x++) {
+    for (let y = 1; y <= 3; y++) {
+      if (shouldCollapse(x, y, 3, 0.2)) continue;
+      addBlock(blocks, x, y, 3, BlockType.Stone);
+    }
+  }
+  // Barrier cluster 3 (x=28..31)
+  for (let x = 28; x <= 31; x++) {
+    for (let y = 1; y <= 2; y++) {
+      if (shouldCollapse(x, y, 5, 0.15)) continue;
+      addBlock(blocks, x, y, 5, BlockType.Stone);
+    }
+  }
+  // Barrier cluster 4 (x=36..38)
+  for (let x = 36; x <= 38; x++) {
+    for (let y = 1; y <= 3; y++) {
+      if (shouldCollapse(x, y, 2, 0.2)) continue;
+      addBlock(blocks, x, y, 2, BlockType.Stone);
+    }
+  }
+
+  // ── Loot container spawns (4: 2 in guard towers, 2 along wall) ──
+  spawns.push({ localX: 3, localY: 1, localZ: 9, entityType: 'loot_container' }); // left tower ground
+  spawns.push({ localX: 4, localY: 6, localZ: 10, entityType: 'loot_container' }); // left tower upper
+  spawns.push({ localX: 45, localY: 1, localZ: 9, entityType: 'loot_container' }); // right tower ground
+  spawns.push({ localX: 46, localY: 6, localZ: 10, entityType: 'loot_container' }); // right tower upper
+
+  // ── Hostile NPC spawns (8: 6 HuskWalkers, 2 MireBrutes) ──
+  // HuskWalkers along and in front of the wall
+  spawns.push({ localX: 8, localY: 1, localZ: 5, entityType: 'hostile_npc' });
+  spawns.push({ localX: 16, localY: 1, localZ: 3, entityType: 'hostile_npc' });
+  spawns.push({ localX: 24, localY: 1, localZ: 2, entityType: 'hostile_npc' });
+  spawns.push({ localX: 30, localY: 1, localZ: 4, entityType: 'hostile_npc' });
+  spawns.push({ localX: 38, localY: 1, localZ: 3, entityType: 'hostile_npc' });
+  spawns.push({ localX: 44, localY: 1, localZ: 5, entityType: 'hostile_npc' });
+  // MireBrutes (tougher, near the gateway)
+  spawns.push({ localX: 20, localY: 1, localZ: 6, entityType: 'hostile_npc' });
+  spawns.push({ localX: 28, localY: 1, localZ: 6, entityType: 'hostile_npc' });
+
+  // ── Cinematic trigger at the gateway center ──
+  spawns.push({ localX: 24, localY: 1, localZ: 9, entityType: 'cinematic_trigger' });
+
+  return { name: 'The Last Line', sizeX, sizeY, sizeZ, blocks, entitySpawns: spawns };
 }
 
 // ═══════════════════════════════════════════════════════════
@@ -518,4 +731,6 @@ export const MONUMENT_TEMPLATES: Record<string, StructureTemplate> = {
   reclamation_yard: buildReclamationYard(),
   signal_tower: buildSignalTower(),
   harbor_ruin: buildHarborRuin(),
+  abandoned_camp: buildAbandonedCamp(),
+  the_last_line: buildTheLastLine(),
 };

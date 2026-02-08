@@ -159,6 +159,8 @@ export enum NPCCreatureType {
   SporeCrawler = 'SporeCrawler',
   MireBrute = 'MireBrute',
   ShoreSnapper = 'ShoreSnapper',
+  FrostStalker = 'FrostStalker',
+  CrimsonHusk = 'CrimsonHusk',
 }
 
 export enum AIBehavior {

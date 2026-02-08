@@ -11,6 +11,7 @@ import { Minimap } from './Minimap';
 import { PickupNotifications } from './PickupNotifications';
 import { ReconnectOverlay } from './ReconnectOverlay';
 import { StatusEffects } from './StatusEffects';
+import { JournalPanel } from '../panels/JournalPanel';
 
 export const HUD: React.FC = () => {
   return (
@@ -24,6 +25,7 @@ export const HUD: React.FC = () => {
       <DamageIndicator />
       <PickupNotifications />
       <ReconnectOverlay />
+      <JournalPanel />
     </div>
   );
 };

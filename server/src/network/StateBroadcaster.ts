@@ -2,28 +2,32 @@
 // Delta computation, per-client relevance filtering, and changelog management.
 // Broadcasts entity state changes to connected players each tick.
 
-import type { GameWorld } from '../game/World.js';
-import type { SocketServer } from './SocketServer.js';
-import { gameLoop } from '../game/GameLoop.js';
 import {
+  CHUNK_SIZE_X,
   ComponentType,
   ServerMessage,
   SNAPSHOT_SEND_RATE,
   TICK_RATE,
   VIEW_DISTANCE_CHUNKS,
-  CHUNK_SIZE_X,
-  type PositionComponent,
+  type DeathPayload,
+  type DeltaPayload,
+  type EntitySnapshot,
+  type JournalFoundPayload,
   type HealthComponent,
   type HungerComponent,
-  type ThirstComponent,
-  type TemperatureComponent,
-  type EntitySnapshot,
-  type DeltaPayload,
   type PlayerStatsPayload,
+  type PositionComponent,
+  type TemperatureComponent,
+  type ThirstComponent,
+  type WorldEventPayload,
   type WorldTimePayload,
-  type DeathPayload,
 } from '@lineremain/shared';
+import { gameLoop } from '../game/GameLoop.js';
 import { drainDeathNotifications } from '../game/systems/DeathSystem.js';
+import { drainJournalFinds } from '../game/systems/JournalSystem.js';
+import { drainWorldEvents } from '../game/systems/WorldEventSystem.js';
+import type { GameWorld } from '../game/World.js';
+import type { SocketServer } from './SocketServer.js';
 
 // ─── Types ───
 
@@ -86,6 +90,12 @@ export class StateBroadcaster {
   private onTick(world: GameWorld, tick: number): void {
     // Broadcast death notifications (every tick — deaths should be immediate)
     this.broadcastDeathNotifications();
+
+    // Broadcast world events (every tick — events should be immediate)
+    this.broadcastWorldEvents();
+
+    // Broadcast journal finds (every tick — pickups should be immediate)
+    this.broadcastJournalFinds();
 
     // Delta broadcast at configured interval
     if (tick % DELTA_INTERVAL === 0) {
@@ -181,12 +191,20 @@ export class StateBroadcaster {
       const viewDistSq = viewDistBlocks * viewDistBlocks;
 
       // Filter entities by relevance (distance from player)
-      const relevantCreated = created.filter((e) => this.isRelevant(e, playerPos, viewDistSq, world));
-      const relevantUpdated = updated.filter((e) => this.isRelevant(e, playerPos, viewDistSq, world));
+      const relevantCreated = created.filter((e) =>
+        this.isRelevant(e, playerPos, viewDistSq, world),
+      );
+      const relevantUpdated = updated.filter((e) =>
+        this.isRelevant(e, playerPos, viewDistSq, world),
+      );
       // Always send all removals — client needs to know about despawned entities
       const relevantRemoved = removed;
 
-      if (relevantCreated.length === 0 && relevantUpdated.length === 0 && relevantRemoved.length === 0) {
+      if (
+        relevantCreated.length === 0 &&
+        relevantUpdated.length === 0 &&
+        relevantRemoved.length === 0
+      ) {
         continue;
       }
 
@@ -259,7 +277,10 @@ export class StateBroadcaster {
       const health = world.ecs.getComponent<HealthComponent>(player.entityId, ComponentType.Health);
       const hunger = world.ecs.getComponent<HungerComponent>(player.entityId, ComponentType.Hunger);
       const thirst = world.ecs.getComponent<ThirstComponent>(player.entityId, ComponentType.Thirst);
-      const temp = world.ecs.getComponent<TemperatureComponent>(player.entityId, ComponentType.Temperature);
+      const temp = world.ecs.getComponent<TemperatureComponent>(
+        player.entityId,
+        ComponentType.Temperature,
+      );
 
       if (!health) continue;
 
@@ -310,6 +331,40 @@ export class StateBroadcaster {
       };
 
       this.socketServer.emitToPlayer(death.playerId, ServerMessage.Death, payload);
+    }
+  }
+
+  // ─── World Event Broadcast ───
+
+  private broadcastWorldEvents(): void {
+    const events = drainWorldEvents();
+    if (events.length === 0) return;
+
+    for (const event of events) {
+      const payload: WorldEventPayload = {
+        eventType: event.eventType,
+        active: event.active,
+        position: event.position,
+      };
+
+      this.socketServer.broadcast(ServerMessage.WorldEvent, payload);
+    }
+  }
+
+  // ─── Journal Find Broadcast ───
+
+  private broadcastJournalFinds(): void {
+    const finds = drainJournalFinds();
+    if (finds.length === 0) return;
+
+    for (const find of finds) {
+      const payload: JournalFoundPayload = {
+        fragmentId: find.fragmentId,
+        title: find.title,
+        text: find.text,
+      };
+
+      this.socketServer.emitToPlayer(find.playerId, ServerMessage.JournalFound, payload);
     }
   }
 }

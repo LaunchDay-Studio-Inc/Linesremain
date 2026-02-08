@@ -2,18 +2,18 @@
 // Places pre-designed structures (monuments) in the world during initial generation.
 
 import {
+  BlockType,
   CHUNK_SIZE_Y,
-  WORLD_SIZE,
   SEA_LEVEL,
+  WORLD_SIZE,
   getBlockIndex,
   worldToChunk,
   worldToLocal,
 } from '@lineremain/shared';
-import { BlockType } from '@lineremain/shared';
 import { logger } from '../utils/logger.js';
 import type { ChunkStore } from './ChunkStore.js';
-import type { TerrainGenerator } from './TerrainGenerator.js';
 import { MONUMENT_TEMPLATES } from './StructureTemplates.js';
+import type { TerrainGenerator } from './TerrainGenerator.js';
 
 // ─── Types ───
 
@@ -312,10 +312,11 @@ export class MonumentPlacer {
 
   /**
    * Find and place all monuments in the world.
-   * Finds 5-8 suitable sites and places a monument at each.
+   * Finds 8-12 suitable sites and places a monument at each.
+   * Then performs a second pass to scatter additional abandoned camps.
    */
   placeAllMonuments(chunkStore: ChunkStore, generator: TerrainGenerator): MonumentSite[] {
-    const targetCount = 5 + Math.floor(Math.random() * 4); // 5-8 monuments
+    const targetCount = 8 + Math.floor(Math.random() * 5); // 8-12 monuments
     const sites = this.findSuitableSites(chunkStore, generator, targetCount);
 
     for (const site of sites) {
@@ -331,7 +332,72 @@ export class MonumentPlacer {
       );
     }
 
-    logger.info({ count: sites.length }, 'Monument placement complete');
+    // ── Second pass: scatter additional abandoned camps ──
+    // Uses smaller scan interval and minimum distance for denser camp coverage.
+    const campScanInterval = 200;
+    const campMinDistance = 150;
+    const maxCamps = 6;
+    const margin = 64;
+
+    interface CampCandidate {
+      x: number;
+      z: number;
+      score: number;
+    }
+
+    const campCandidates: CampCandidate[] = [];
+
+    for (let x = margin; x < WORLD_SIZE - margin; x += campScanInterval) {
+      for (let z = margin; z < WORLD_SIZE - margin; z += campScanInterval) {
+        const result = this.scoreSite(chunkStore, generator, x, z);
+        if (result.score > 0) {
+          campCandidates.push({ x, z, score: result.score });
+        }
+      }
+    }
+
+    campCandidates.sort((a, b) => b.score - a.score);
+
+    const campSites: MonumentSite[] = [];
+
+    for (const candidate of campCandidates) {
+      if (campSites.length >= maxCamps) break;
+
+      // Check minimum distance to all existing monuments and other camps
+      const tooCloseToMonument = sites.some((s) => {
+        const dx = s.x - candidate.x;
+        const dz = s.z - candidate.z;
+        return Math.sqrt(dx * dx + dz * dz) < campMinDistance;
+      });
+
+      const tooCloseToCamp = campSites.some((s) => {
+        const dx = s.x - candidate.x;
+        const dz = s.z - candidate.z;
+        return Math.sqrt(dx * dx + dz * dz) < campMinDistance;
+      });
+
+      if (tooCloseToMonument || tooCloseToCamp) continue;
+
+      const campSite: MonumentSite = {
+        x: candidate.x,
+        z: candidate.z,
+        monumentType: 'abandoned_camp',
+      };
+      this.placeMonument(chunkStore, generator, campSite);
+      campSites.push(campSite);
+      sites.push(campSite);
+
+      logger.info(
+        {
+          monument: 'Abandoned Camp',
+          x: candidate.x,
+          z: candidate.z,
+        },
+        'Placed abandoned camp',
+      );
+    }
+
+    logger.info({ count: sites.length, camps: campSites.length }, 'Monument placement complete');
     return sites;
   }
 }

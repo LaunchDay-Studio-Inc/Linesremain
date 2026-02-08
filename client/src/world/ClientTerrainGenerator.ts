@@ -3,18 +3,18 @@
 // for offline/local chunk generation with full biome variety, trees,
 // caves, ores, and decorations.
 
-import { createNoise2D, createNoise3D } from 'simplex-noise';
 import {
-  BlockType,
+  BLOCKS_PER_CHUNK,
   BiomeType,
+  BlockType,
   CHUNK_SIZE_X,
   CHUNK_SIZE_Y,
   CHUNK_SIZE_Z,
   SEA_LEVEL,
   WORLD_SIZE,
   getBlockIndex,
-  BLOCKS_PER_CHUNK,
 } from '@lineremain/shared';
+import { createNoise2D, createNoise3D } from 'simplex-noise';
 
 // ─── Seeded PRNG ───
 
@@ -127,8 +127,16 @@ const BIOME_PROPS: Record<BiomeType, BiomeProps> = {
 
 // ─── Biome Classification ───
 
-const enum Climate { Cold, Temperate, Hot }
-const enum Moisture { Dry, Medium, Wet }
+const enum Climate {
+  Cold,
+  Temperate,
+  Hot,
+}
+const enum Moisture {
+  Dry,
+  Medium,
+  Wet,
+}
 
 const BIOME_GRID: Record<Climate, Record<Moisture, BiomeType>> = {
   [Climate.Hot]: {
@@ -177,7 +185,7 @@ export class ClientTerrainGenerator {
 
   // ─── Biome lookup ───
 
-  private getBiome(x: number, z: number): BiomeType {
+  public getBiome(x: number, z: number): BiomeType {
     const distFromCenter = Math.abs(z - this.halfWorld) / this.halfWorld;
     const latGradient = 1 - distFromCenter;
     const tempNoise = (this.temperatureNoise.noise2D(x, z, 0.0008, 1) + 1) / 2;
@@ -229,12 +237,9 @@ export class ClientTerrainGenerator {
         const worldX = chunkX * CHUNK_SIZE_X + lx;
         const worldZ = chunkZ * CHUNK_SIZE_Z + lz;
 
-        const continental =
-          this.continentNoise.noise2D(worldX, worldZ, 0.0005, 1) * 15 + 35;
-        const elevation =
-          this.elevationNoise.octaveNoise2D(worldX, worldZ, 0.003, 15, 4);
-        const detail =
-          this.detailNoise.octaveNoise2D(worldX, worldZ, 0.02, 1.5, 2);
+        const continental = this.continentNoise.noise2D(worldX, worldZ, 0.0005, 1) * 15 + 35;
+        const elevation = this.elevationNoise.octaveNoise2D(worldX, worldZ, 0.003, 15, 4);
+        const detail = this.detailNoise.octaveNoise2D(worldX, worldZ, 0.02, 1.5, 2);
 
         let finalHeight = Math.floor(continental + elevation + detail);
         finalHeight = Math.max(1, Math.min(finalHeight, CHUNK_SIZE_Y - 2));
@@ -312,15 +317,15 @@ export class ClientTerrainGenerator {
           surfaceBlock === BlockType.Snow ||
           surfaceBlock === BlockType.Ice ||
           surfaceBlock === BlockType.Water
-        ) continue;
+        )
+          continue;
 
         const treeVal = (this.treeNoise.noise2D(worldX, worldZ, 0.4, 1) + 1) / 2;
         const threshold = 1 - props.treeFrequency * 0.15;
         if (treeVal < threshold) continue;
 
-        const trunkHeight = 5 + Math.floor(
-          ((this.treeNoise.noise2D(worldX, worldZ, 1.7, 1) + 1) / 2) * 3,
-        );
+        const trunkHeight =
+          5 + Math.floor(((this.treeNoise.noise2D(worldX, worldZ, 1.7, 1) + 1) / 2) * 3);
         const leafRadius = 2;
 
         // Build trunk

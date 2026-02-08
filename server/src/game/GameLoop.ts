@@ -2,41 +2,43 @@
 // Fixed-timestep server tick loop running at TICK_RATE ticks/second.
 // Manages system ordering, input queue processing, tick monitoring, and world saving.
 
-import { GameWorld } from './World.js';
-import { config } from '../config.js';
-import { logger } from '../utils/logger.js';
 import {
-  TICK_RATE,
   ComponentType,
-  PLAYER_WALK_SPEED,
-  PLAYER_SPRINT_SPEED,
   PLAYER_CROUCH_SPEED,
   PLAYER_JUMP_VELOCITY,
+  PLAYER_SPRINT_SPEED,
+  PLAYER_WALK_SPEED,
+  TICK_RATE,
   type InputPayload,
-  type VelocityComponent,
   type PositionComponent,
+  type VelocityComponent,
 } from '@lineremain/shared';
+import { config } from '../config.js';
+import { logger } from '../utils/logger.js';
+import { GameWorld } from './World.js';
 
 // ─── Import Systems ───
-import { dayNightSystem } from './systems/DayNightSystem.js';
-import { physicsSystem } from './systems/PhysicsSystem.js';
-import { movementSystem } from './systems/MovementSystem.js';
-import { hungerSystem } from './systems/HungerSystem.js';
-import { thirstSystem } from './systems/ThirstSystem.js';
-import { temperatureSystem } from './systems/TemperatureSystem.js';
 import { aiSystem } from './systems/AISystem.js';
+import { buildingPlacementSystem } from './systems/BuildingPlacementSystem.js';
 import { combatSystem } from './systems/CombatSystem.js';
-import { projectileSystem } from './systems/ProjectileSystem.js';
+import { craftingSystem } from './systems/CraftingSystem.js';
+import { dayNightSystem } from './systems/DayNightSystem.js';
+import { deathSystem } from './systems/DeathSystem.js';
 import { decaySystem } from './systems/DecaySystem.js';
+import { hungerSystem } from './systems/HungerSystem.js';
+import { itemPickupSystem } from './systems/ItemPickupSystem.js';
 import { lootDespawnSystem } from './systems/LootDespawnSystem.js';
 import { lootSpawnSystem } from './systems/LootSpawnSystem.js';
-import { resourceRespawnSystem } from './systems/ResourceRespawnSystem.js';
-import { buildingPlacementSystem } from './systems/BuildingPlacementSystem.js';
-import { toolCupboardSystem } from './systems/ToolCupboardSystem.js';
-import { craftingSystem } from './systems/CraftingSystem.js';
-import { itemPickupSystem } from './systems/ItemPickupSystem.js';
-import { deathSystem } from './systems/DeathSystem.js';
+import { movementSystem } from './systems/MovementSystem.js';
 import { npcSpawnSystem } from './systems/NPCSpawnSystem.js';
+import { physicsSystem } from './systems/PhysicsSystem.js';
+import { projectileSystem } from './systems/ProjectileSystem.js';
+import { resourceRespawnSystem } from './systems/ResourceRespawnSystem.js';
+import { temperatureSystem } from './systems/TemperatureSystem.js';
+import { thirstSystem } from './systems/ThirstSystem.js';
+import { toolCupboardSystem } from './systems/ToolCupboardSystem.js';
+import { worldEventSystem } from './systems/WorldEventSystem.js';
+import { journalSystem } from './systems/JournalSystem.js';
 
 // ─── Input Queue ───
 
@@ -84,6 +86,9 @@ export class GameLoop {
     // 1. Day/night cycle (time progression)
     this.world.addSystem(dayNightSystem);
 
+    // 1b. World events (blood moon, fog, supply drops)
+    this.world.addSystem(worldEventSystem);
+
     // 2. AI (NPC state machine: wander, chase, attack, flee)
     this.world.addSystem(aiSystem);
 
@@ -126,7 +131,10 @@ export class GameLoop {
     // 12. NPC spawning (proximity-based creature population)
     this.world.addSystem(npcSpawnSystem);
 
-    logger.info({ systemCount: 18 }, 'GameLoop initialized with all systems');
+    // 13. Journal system (event-driven journal fragment tracking)
+    this.world.addSystem(journalSystem);
+
+    logger.info({ systemCount: 20 }, 'GameLoop initialized with all systems');
   }
 
   // ─── Input Queue ───

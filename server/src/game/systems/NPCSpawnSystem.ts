@@ -4,17 +4,18 @@
 // Passive/neutral creatures spawn any time; hostile creatures only at night.
 // Hostiles despawn during the day if far from players.
 
-import type { GameWorld } from '../World.js';
 import {
+  AIBehavior,
   ComponentType,
   NPCCreatureType,
-  AIBehavior,
-  type PositionComponent,
   type LootTableEntry,
   type NPCTypeComponent,
+  type PositionComponent,
 } from '@lineremain/shared';
-import { isDaytime } from './DayNightSystem.js';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld } from '../World.js';
+import { isDaytime } from './DayNightSystem.js';
+import { isBloodMoon } from './WorldEventSystem.js';
 
 // ─── Constants ───
 
@@ -77,9 +78,9 @@ const PASSIVE_TEMPLATES: CreatureTemplate[] = [
     colliderWidth: 0.6,
     colliderHeight: 0.8,
     lootTable: [
-      { itemId: 53, quantity: 2, chance: 1.0 },  // Raw Meat
-      { itemId: 9, quantity: 1, chance: 0.5 },    // Bone
-      { itemId: 8, quantity: 1, chance: 0.3 },    // Animal Fat
+      { itemId: 53, quantity: 2, chance: 1.0 }, // Raw Meat
+      { itemId: 9, quantity: 1, chance: 0.5 }, // Bone
+      { itemId: 8, quantity: 1, chance: 0.3 }, // Animal Fat
     ],
     weight: 30,
     groupSize: { min: 2, max: 4 },
@@ -98,10 +99,10 @@ const PASSIVE_TEMPLATES: CreatureTemplate[] = [
     colliderWidth: 1.0,
     colliderHeight: 1.5,
     lootTable: [
-      { itemId: 53, quantity: 4, chance: 1.0 },  // Raw Meat
-      { itemId: 7, quantity: 2, chance: 0.8 },    // Leather
-      { itemId: 8, quantity: 2, chance: 0.6 },    // Animal Fat
-      { itemId: 9, quantity: 2, chance: 0.5 },    // Bone
+      { itemId: 53, quantity: 4, chance: 1.0 }, // Raw Meat
+      { itemId: 7, quantity: 2, chance: 0.8 }, // Leather
+      { itemId: 8, quantity: 2, chance: 0.6 }, // Animal Fat
+      { itemId: 9, quantity: 2, chance: 0.5 }, // Bone
     ],
     weight: 20,
     groupSize: { min: 3, max: 5 },
@@ -123,10 +124,10 @@ const NEUTRAL_TEMPLATES: CreatureTemplate[] = [
     colliderWidth: 1.2,
     colliderHeight: 1.4,
     lootTable: [
-      { itemId: 53, quantity: 5, chance: 1.0 },  // Raw Meat
-      { itemId: 7, quantity: 3, chance: 0.9 },    // Leather
-      { itemId: 8, quantity: 3, chance: 0.7 },    // Animal Fat
-      { itemId: 9, quantity: 3, chance: 0.8 },    // Bone
+      { itemId: 53, quantity: 5, chance: 1.0 }, // Raw Meat
+      { itemId: 7, quantity: 3, chance: 0.9 }, // Leather
+      { itemId: 8, quantity: 3, chance: 0.7 }, // Animal Fat
+      { itemId: 9, quantity: 3, chance: 0.8 }, // Bone
     ],
     weight: 10,
   },
@@ -144,9 +145,9 @@ const NEUTRAL_TEMPLATES: CreatureTemplate[] = [
     colliderWidth: 0.9,
     colliderHeight: 0.7,
     lootTable: [
-      { itemId: 53, quantity: 3, chance: 1.0 },  // Raw Meat
-      { itemId: 7, quantity: 2, chance: 0.6 },    // Leather
-      { itemId: 9, quantity: 2, chance: 0.4 },    // Bone
+      { itemId: 53, quantity: 3, chance: 1.0 }, // Raw Meat
+      { itemId: 7, quantity: 2, chance: 0.6 }, // Leather
+      { itemId: 9, quantity: 2, chance: 0.4 }, // Bone
     ],
     weight: 8,
   },
@@ -167,9 +168,9 @@ const HOSTILE_TEMPLATES: CreatureTemplate[] = [
     colliderWidth: 0.8,
     colliderHeight: 1.8,
     lootTable: [
-      { itemId: 6, quantity: 5, chance: 0.6 },    // Cloth
-      { itemId: 9, quantity: 2, chance: 0.5 },     // Bone
-      { itemId: 10, quantity: 3, chance: 0.2 },    // Metal Fragments
+      { itemId: 6, quantity: 5, chance: 0.6 }, // Cloth
+      { itemId: 9, quantity: 2, chance: 0.5 }, // Bone
+      { itemId: 10, quantity: 3, chance: 0.2 }, // Metal Fragments
     ],
     weight: 15,
   },
@@ -187,8 +188,8 @@ const HOSTILE_TEMPLATES: CreatureTemplate[] = [
     colliderWidth: 0.7,
     colliderHeight: 0.6,
     lootTable: [
-      { itemId: 6, quantity: 3, chance: 0.5 },    // Cloth
-      { itemId: 8, quantity: 1, chance: 0.4 },     // Animal Fat
+      { itemId: 6, quantity: 3, chance: 0.5 }, // Cloth
+      { itemId: 8, quantity: 1, chance: 0.4 }, // Animal Fat
     ],
     weight: 12,
   },
@@ -206,13 +207,58 @@ const HOSTILE_TEMPLATES: CreatureTemplate[] = [
     colliderWidth: 1.4,
     colliderHeight: 2.0,
     lootTable: [
-      { itemId: 53, quantity: 6, chance: 1.0 },   // Raw Meat
-      { itemId: 7, quantity: 4, chance: 0.8 },     // Leather
-      { itemId: 8, quantity: 3, chance: 0.7 },     // Animal Fat
-      { itemId: 9, quantity: 4, chance: 0.9 },     // Bone
-      { itemId: 10, quantity: 5, chance: 0.3 },    // Metal Fragments
+      { itemId: 53, quantity: 6, chance: 1.0 }, // Raw Meat
+      { itemId: 7, quantity: 4, chance: 0.8 }, // Leather
+      { itemId: 8, quantity: 3, chance: 0.7 }, // Animal Fat
+      { itemId: 9, quantity: 4, chance: 0.9 }, // Bone
+      { itemId: 10, quantity: 5, chance: 0.3 }, // Metal Fragments
     ],
     weight: 5,
+  },
+  {
+    creatureType: NPCCreatureType.FrostStalker,
+    behavior: AIBehavior.Hostile,
+    health: 120,
+    damage: 25,
+    walkSpeed: 2.5,
+    runSpeed: 6.5,
+    aggroRange: 22,
+    attackRange: 2.0,
+    attackCooldown: 1.2,
+    wanderRadius: 30,
+    colliderWidth: 0.7,
+    colliderHeight: 1.2,
+    lootTable: [
+      { itemId: 53, quantity: 2, chance: 1.0 }, // Raw Meat
+      { itemId: 7, quantity: 2, chance: 0.7 }, // Leather
+      { itemId: 88, quantity: 1, chance: 0.4 }, // Frost Fang
+    ],
+    weight: 8,
+    groupSize: { min: 2, max: 3 },
+  },
+];
+
+const BLOOD_MOON_TEMPLATES: CreatureTemplate[] = [
+  {
+    creatureType: NPCCreatureType.CrimsonHusk,
+    behavior: AIBehavior.Hostile,
+    health: 120,
+    damage: 35,
+    walkSpeed: 2.5,
+    runSpeed: 6.0,
+    aggroRange: 25,
+    attackRange: 2.0,
+    attackCooldown: 1.3,
+    wanderRadius: 30,
+    colliderWidth: 0.9,
+    colliderHeight: 1.9,
+    lootTable: [
+      { itemId: 6, quantity: 5, chance: 0.8 }, // Cloth
+      { itemId: 9, quantity: 3, chance: 0.6 }, // Bone
+      { itemId: 10, quantity: 5, chance: 0.4 }, // Metal Fragments
+      { itemId: 89, quantity: 1, chance: 0.15 }, // Crimson Core
+    ],
+    weight: 20,
   },
 ];
 
@@ -292,7 +338,8 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
 
       // Group spawning for passive animals
       const groupSize = template.groupSize
-        ? template.groupSize.min + Math.floor(Math.random() * (template.groupSize.max - template.groupSize.min + 1))
+        ? template.groupSize.min +
+          Math.floor(Math.random() * (template.groupSize.max - template.groupSize.min + 1))
         : 1;
 
       for (let g = 0; g < groupSize; g++) {
@@ -308,21 +355,25 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
         const memberY = findSurfaceY(world, Math.floor(memberX), Math.floor(memberZ));
         if (memberY === null) continue;
 
-        world.createNPCEntity(template.creatureType, { x: memberX, y: memberY + 1, z: memberZ }, {
-          creatureType: template.creatureType,
-          behavior: template.behavior,
-          health: template.health,
-          damage: template.damage,
-          walkSpeed: template.walkSpeed,
-          runSpeed: template.runSpeed,
-          aggroRange: template.aggroRange,
-          attackRange: template.attackRange,
-          attackCooldown: template.attackCooldown,
-          wanderRadius: template.wanderRadius,
-          colliderWidth: template.colliderWidth,
-          colliderHeight: template.colliderHeight,
-          lootTable: template.lootTable,
-        });
+        world.createNPCEntity(
+          template.creatureType,
+          { x: memberX, y: memberY + 1, z: memberZ },
+          {
+            creatureType: template.creatureType,
+            behavior: template.behavior,
+            health: template.health,
+            damage: template.damage,
+            walkSpeed: template.walkSpeed,
+            runSpeed: template.runSpeed,
+            aggroRange: template.aggroRange,
+            attackRange: template.attackRange,
+            attackCooldown: template.attackCooldown,
+            wanderRadius: template.wanderRadius,
+            colliderWidth: template.colliderWidth,
+            colliderHeight: template.colliderHeight,
+            lootTable: template.lootTable,
+          },
+        );
 
         if (template.behavior === AIBehavior.Hostile) {
           hostileCount++;
@@ -346,6 +397,14 @@ function pickTemplate(
   passiveCount: number,
   hostileCount: number,
 ): CreatureTemplate | null {
+  // During Blood Moon: heavily favor hostile and blood moon creatures
+  if (isBloodMoon()) {
+    if (hostileCount >= MAX_HOSTILE_NPCS * 3) return null; // 3x cap during blood moon
+    const bloodPool = [...HOSTILE_TEMPLATES, ...BLOOD_MOON_TEMPLATES];
+    const bloodWeight = bloodPool.reduce((sum, t) => sum + t.weight, 0);
+    return pickWeightedTemplate(bloodPool, bloodWeight);
+  }
+
   // During day: only spawn passive/neutral
   // At night: spawn all types (hostiles included)
   if (daytime) {
@@ -364,7 +423,10 @@ function pickTemplate(
   return pickWeightedTemplate(NIGHTTIME_TEMPLATES, NIGHTTIME_TOTAL_WEIGHT);
 }
 
-function pickWeightedTemplate(templates: CreatureTemplate[], totalWeight: number): CreatureTemplate {
+function pickWeightedTemplate(
+  templates: CreatureTemplate[],
+  totalWeight: number,
+): CreatureTemplate {
   let roll = Math.random() * totalWeight;
   for (const template of templates) {
     roll -= template.weight;
@@ -438,7 +500,10 @@ function despawnDistantHostiles(world: GameWorld, allNPCs: number[]): void {
 
     if (!nearPlayer) {
       world.ecs.destroyEntity(npcId);
-      logger.debug({ npc: npcId, creature: npcType.creatureType }, 'Despawned hostile NPC (daytime)');
+      logger.debug(
+        { npc: npcId, creature: npcType.creatureType },
+        'Despawned hostile NPC (daytime)',
+      );
     }
   }
 }

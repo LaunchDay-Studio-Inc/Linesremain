@@ -26,46 +26,103 @@ interface CreatureVisual {
 
 const CREATURE_VISUALS: Record<string, CreatureVisual> = {
   DustHopper: {
-    bodyColor: '#c9a96e', eyeColor: '#ffdd00',
-    width: 48, height: 48, legCount: 4,
-    hasHorns: false, hasTail: true, bodyShape: 'round',
+    bodyColor: '#c9a96e',
+    eyeColor: '#ffdd00',
+    width: 48,
+    height: 48,
+    legCount: 4,
+    hasHorns: false,
+    hasTail: true,
+    bodyShape: 'round',
     displayName: 'Dust Hopper',
   },
   RidgeGrazer: {
-    bodyColor: '#8b7d6b', eyeColor: '#553311',
-    width: 64, height: 56, legCount: 4,
-    hasHorns: true, hasTail: true, bodyShape: 'wide',
+    bodyColor: '#8b7d6b',
+    eyeColor: '#553311',
+    width: 64,
+    height: 56,
+    legCount: 4,
+    hasHorns: true,
+    hasTail: true,
+    bodyShape: 'wide',
     displayName: 'Ridge Grazer',
   },
   TuskWalker: {
-    bodyColor: '#6b5b4f', eyeColor: '#ff4400',
-    width: 72, height: 64, legCount: 4,
-    hasHorns: true, hasTail: false, bodyShape: 'wide',
+    bodyColor: '#6b5b4f',
+    eyeColor: '#ff4400',
+    width: 72,
+    height: 64,
+    legCount: 4,
+    hasHorns: true,
+    hasTail: false,
+    bodyShape: 'wide',
     displayName: 'Tusk Walker',
   },
   HuskWalker: {
-    bodyColor: '#4a5a3a', eyeColor: '#ccff00',
-    width: 56, height: 72, legCount: 2,
-    hasHorns: false, hasTail: false, bodyShape: 'tall',
+    bodyColor: '#4a5a3a',
+    eyeColor: '#ccff00',
+    width: 56,
+    height: 72,
+    legCount: 2,
+    hasHorns: false,
+    hasTail: false,
+    bodyShape: 'tall',
     displayName: 'Husk Walker',
   },
   SporeCrawler: {
-    bodyColor: '#5a4a6a', eyeColor: '#ff00ff',
-    width: 52, height: 44, legCount: 6,
-    hasHorns: false, hasTail: false, bodyShape: 'round',
+    bodyColor: '#5a4a6a',
+    eyeColor: '#ff00ff',
+    width: 52,
+    height: 44,
+    legCount: 6,
+    hasHorns: false,
+    hasTail: false,
+    bodyShape: 'round',
     displayName: 'Spore Crawler',
   },
   MireBrute: {
-    bodyColor: '#3a4a3a', eyeColor: '#ff3300',
-    width: 80, height: 80, legCount: 2,
-    hasHorns: true, hasTail: false, bodyShape: 'hunched',
+    bodyColor: '#3a4a3a',
+    eyeColor: '#ff3300',
+    width: 80,
+    height: 80,
+    legCount: 2,
+    hasHorns: true,
+    hasTail: false,
+    bodyShape: 'hunched',
     displayName: 'Mire Brute',
   },
   ShoreSnapper: {
-    bodyColor: '#4a6a7a', eyeColor: '#00ffcc',
-    width: 56, height: 40, legCount: 4,
-    hasHorns: false, hasTail: true, bodyShape: 'wide',
+    bodyColor: '#4a6a7a',
+    eyeColor: '#00ffcc',
+    width: 56,
+    height: 40,
+    legCount: 4,
+    hasHorns: false,
+    hasTail: true,
+    bodyShape: 'wide',
     displayName: 'Shore Snapper',
+  },
+  FrostStalker: {
+    bodyColor: '#8ecae6',
+    eyeColor: '#00bbff',
+    width: 52,
+    height: 52,
+    legCount: 4,
+    hasHorns: true,
+    hasTail: true,
+    bodyShape: 'round',
+    displayName: 'Frost Stalker',
+  },
+  CrimsonHusk: {
+    bodyColor: '#6b1a1a',
+    eyeColor: '#ff0000',
+    width: 60,
+    height: 76,
+    legCount: 2,
+    hasHorns: true,
+    hasTail: false,
+    bodyShape: 'tall',
+    displayName: 'Crimson Husk',
   },
 };
 
@@ -182,7 +239,12 @@ function generateCreatureSprite(creatureType: string, frame: number = 0): HTMLCa
     ctx.lineWidth = 3;
     ctx.beginPath();
     ctx.moveTo(cx + w / 2, cy + bob);
-    ctx.quadraticCurveTo(cx + w / 2 + 12, cy + bob - 8 + tailBob, cx + w / 2 + 18, cy + bob + tailBob);
+    ctx.quadraticCurveTo(
+      cx + w / 2 + 12,
+      cy + bob - 8 + tailBob,
+      cx + w / 2 + 18,
+      cy + bob + tailBob,
+    );
     ctx.stroke();
   }
 
@@ -398,10 +460,13 @@ export class NPCRenderer {
   update(
     dt: number,
     camera: THREE.Camera,
-    entityData: Map<number, {
-      position: { x: number; y: number; z: number };
-      health?: { current: number; max: number };
-    }>,
+    entityData: Map<
+      number,
+      {
+        position: { x: number; y: number; z: number };
+        health?: { current: number; max: number };
+      }
+    >,
   ): void {
     for (const [entityId, npc] of this.npcs) {
       const data = entityData.get(entityId);

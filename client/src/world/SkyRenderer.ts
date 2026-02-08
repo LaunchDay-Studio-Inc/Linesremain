@@ -194,6 +194,7 @@ export class SkyRenderer {
   // Sun/Moon orbit radius
   private readonly orbitRadius = 200;
   private readonly shadowFrustum = 100;
+  private bloodMoonActive = false;
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -248,6 +249,17 @@ export class SkyRenderer {
     const t = ((worldTime % 1) + 1) % 1;
     const kf = lerpKeyframes(t);
 
+    // Blood moon override
+    if (this.bloodMoonActive) {
+      kf.topColor.set('#3a0a0a');
+      kf.horizonColor.set('#8b0000');
+      kf.ambientColor.set('#661111');
+      kf.ambientIntensity = Math.max(kf.ambientIntensity, 0.2);
+      kf.moonIntensity = 0.4;
+      kf.fogNear = Math.min(kf.fogNear, 40);
+      kf.fogFar = Math.min(kf.fogFar, 160);
+    }
+
     // Sky colors
     (this.skyMaterial.uniforms['uTopColor']!.value as THREE.Color).copy(kf.topColor);
     (this.skyMaterial.uniforms['uHorizonColor']!.value as THREE.Color).copy(kf.horizonColor);
@@ -277,6 +289,10 @@ export class SkyRenderer {
   /** Center the sky dome on the camera so it always surrounds the player */
   followCamera(camera: THREE.Camera): void {
     this.skyMesh.position.copy(camera.position);
+  }
+
+  setBloodMoon(active: boolean): void {
+    this.bloodMoonActive = active;
   }
 
   getSunLight(): THREE.DirectionalLight {

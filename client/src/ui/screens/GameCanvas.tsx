@@ -2,7 +2,7 @@
 // Wires up the full game session: Engine, ChunkManager, Player Controller,
 // Particle System, Animation System, Camera, Sky, Water, and FPS Counter.
 
-import React, { useEffect, useRef, useCallback } from 'react';
+import React, { useEffect, useRef, useCallback, useState } from 'react';
 import * as THREE from 'three';
 import { Engine } from '../../engine/Engine';
 import { CameraController } from '../../engine/Camera';
@@ -27,7 +27,7 @@ import { useChatStore } from '../../stores/useChatStore';
 import { socketClient } from '../../network/SocketClient';
 import { SEA_LEVEL, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z, DAY_LENGTH_SECONDS } from '@shared/constants/game';
 import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
-import { ClientMessage, type InputPayload } from '@shared/types/network';
+import { ClientMessage, ServerMessage, type InputPayload, type WorldEventPayload, type JournalFoundPayload, type CinematicTextPayload } from '@shared/types/network';
 import { setOnBlockChanged, getEntities, getLocalPlayerEntityId, getLastServerTick } from '../../network/MessageHandler';
 import { HUD } from '../hud/HUD';
 import { FPSCounter } from '../hud/FPSCounter';
@@ -36,6 +36,12 @@ import { CraftingPanel } from '../panels/CraftingPanel';
 import { BuildingPanel } from '../panels/BuildingPanel';
 import { MapPanel } from '../panels/MapPanel';
 import { SettingsPanel } from '../panels/SettingsPanel';
+import { BiomeTracker } from '../../world/BiomeTracker';
+import { BiomeParticleSystem } from '../../world/BiomeParticleSystem';
+import { AmbientSynthesizer } from '../../engine/AmbientSynthesizer';
+import { SupplyDropRenderer } from '../../entities/SupplyDropRenderer';
+import { CinematicText } from '../hud/CinematicText';
+import { triggerJournalPopup } from '../panels/JournalPanel';
 
 // ─── Component ───
 
@@ -52,6 +58,9 @@ export const GameCanvas: React.FC = () => {
   const toggleBuildingMode = useUIStore((s) => s.toggleBuildingMode);
   const toggleSettings = useUIStore((s) => s.toggleSettings);
   const closeAll = useUIStore((s) => s.closeAll);
+
+  // Cinematic text overlay state
+  const [cinematicData, setCinematicData] = useState<{ text: string; subtitle?: string; duration: number; key: number }>({ text: '', subtitle: undefined, duration: 5000, key: 0 });
 
   // Building panel callbacks
   const handleSelectPiece = useCallback((pieceType: BuildingPieceType, tier: BuildingTier) => {
@@ -127,6 +136,18 @@ export const GameCanvas: React.FC = () => {
 
     // ── Entity Interpolation (smooth remote entity movement) ──
     const entityInterpolation = new EntityInterpolation();
+
+    // ── Biome Tracker (biome-specific atmosphere transitions) ──
+    const biomeTracker = new BiomeTracker(terrainGenerator);
+
+    // ── Biome Particle System (biome-specific ambient particles) ──
+    const biomeParticleSystem = new BiomeParticleSystem(scene);
+
+    // ── Ambient Synthesizer (procedural audio drones) ──
+    const ambientSynth = new AmbientSynthesizer();
+
+    // ── Supply Drop Renderer (falling crates with smoke trails) ──
+    const supplyDropRenderer = new SupplyDropRenderer(scene);
 
     // ── Remote Player Tracking ──
     const remotePlayerRenderers = new Map<number, PlayerRenderer>();
@@ -242,12 +263,43 @@ export const GameCanvas: React.FC = () => {
       }
       // Initialize audio on first user gesture
       audio.init();
+      ambientSynth.init();
     };
     canvas.addEventListener('click', handleClick);
 
     // Prevent context menu so right-click can place blocks
     const handleContextMenu = (e: Event) => e.preventDefault();
     canvas.addEventListener('contextmenu', handleContextMenu);
+
+    // ── World Event Socket Handlers ──
+    const handleWorldEvent = (data: unknown) => {
+      const payload = data as WorldEventPayload;
+      if (payload.eventType === 'blood_moon') {
+        skyRenderer.setBloodMoon(payload.active);
+      } else if (payload.eventType === 'supply_drop' && payload.active && payload.position) {
+        const dropId = `drop_${payload.position.x}_${payload.position.z}`;
+        supplyDropRenderer.addDrop(dropId, payload.position);
+      }
+    };
+
+    const handleJournalFound = (data: unknown) => {
+      const payload = data as JournalFoundPayload;
+      triggerJournalPopup(payload.title, payload.text);
+    };
+
+    const handleCinematicText = (data: unknown) => {
+      const payload = data as CinematicTextPayload;
+      setCinematicData(prev => ({
+        text: payload.text,
+        subtitle: payload.subtitle,
+        duration: payload.duration,
+        key: prev.key + 1,
+      }));
+    };
+
+    socketClient.on(ServerMessage.WorldEvent, handleWorldEvent);
+    socketClient.on(ServerMessage.JournalFound, handleJournalFound);
+    socketClient.on(ServerMessage.CinematicText, handleCinematicText);
 
     // ── Game Loop ──
     engine.onUpdate((dt) => {
@@ -393,6 +445,26 @@ export const GameCanvas: React.FC = () => {
       // Particles
       particleSystem.update(dt);
 
+      // Biome atmosphere tracking
+      biomeTracker.update(pos.x, pos.z, dt);
+      const atmosphere = biomeTracker.getCurrentAtmosphere();
+
+      // Biome-specific ambient particles
+      biomeParticleSystem.update(
+        dt,
+        new THREE.Vector3(pos.x, pos.y, pos.z),
+        atmosphere.particleType,
+        atmosphere.particleDensity,
+        worldTime,
+      );
+
+      // Ambient synthesizer mood
+      ambientSynth.update(dt);
+      ambientSynth.setMood(atmosphere.mood);
+
+      // Supply drop crates
+      supplyDropRenderer.update(dt);
+
       // Camera
       cameraController.update(dt);
 
@@ -449,6 +521,13 @@ export const GameCanvas: React.FC = () => {
       npcRenderer.dispose();
       combatEffects.dispose();
       particleSystem.dispose();
+      biomeParticleSystem.dispose();
+      biomeTracker.dispose();
+      ambientSynth.dispose();
+      supplyDropRenderer.dispose();
+      socketClient.off(ServerMessage.WorldEvent, handleWorldEvent);
+      socketClient.off(ServerMessage.JournalFound, handleJournalFound);
+      socketClient.off(ServerMessage.CinematicText, handleCinematicText);
       waterRenderer.dispose();
       skyRenderer.dispose();
       chunkManager.dispose();
@@ -464,6 +543,14 @@ export const GameCanvas: React.FC = () => {
 
       {/* Debug overlay */}
       <FPSCounter getRenderer={getRenderer} />
+
+      {/* Cinematic text overlay */}
+      <CinematicText
+        key={cinematicData.key}
+        text={cinematicData.text || null}
+        subtitle={cinematicData.subtitle}
+        duration={cinematicData.duration}
+      />
 
       {/* Full game HUD */}
       <HUD />

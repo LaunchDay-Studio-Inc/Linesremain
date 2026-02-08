@@ -43,6 +43,9 @@ export enum ServerMessage {
   PlayerStats = 's:player_stats',
   WorldTime = 's:world_time',
   Sound = 's:sound',
+  WorldEvent = 's:world_event',
+  JournalFound = 's:journal_found',
+  CinematicText = 's:cinematic_text',
 }
 
 // ─── Client Payload Interfaces ───
@@ -247,4 +250,22 @@ export interface SoundPayload {
   position: { x: number; y: number; z: number };
   volume: number; // 0-1
   pitch?: number;
+}
+
+export interface WorldEventPayload {
+  eventType: 'blood_moon' | 'supply_drop' | 'fog';
+  active: boolean;
+  position?: { x: number; y: number; z: number }; // for supply drops
+}
+
+export interface JournalFoundPayload {
+  fragmentId: number; // item ID 68-87
+  title: string;
+  text: string;
+}
+
+export interface CinematicTextPayload {
+  text: string;
+  subtitle?: string;
+  duration: number; // ms
 }
