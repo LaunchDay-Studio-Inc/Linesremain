@@ -225,6 +225,9 @@ export const GameCanvas: React.FC = () => {
     );
     playerControllerRef.current = playerController;
 
+    // Wire particle system into player controller for footstep dust
+    playerController.setParticleSystem(particleSystem);
+
     // ── Generate spawn chunk and find a dry-land spawn position ──
     const findSurfaceY = (chunkData: Uint8Array, lx: number, lz: number): number => {
       for (let y = CHUNK_SIZE_Y - 1; y >= 0; y--) {

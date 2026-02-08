@@ -1,6 +1,7 @@
 // ─── Particle System ───
-// Simple GPU particle system using THREE.Points.
-// Supports burst emissions for block breaking, footsteps, etc.
+// GPU particle system using THREE.Points with preset-based emission.
+// Supports burst emissions for block breaking, placement, footsteps,
+// campfire, combat, pickups, level-up, and environmental effects.
 
 import * as THREE from 'three';
 
@@ -10,6 +11,7 @@ export interface ParticleEmitOptions {
   position: THREE.Vector3;
   count: number;
   color?: THREE.Color;
+  colors?: THREE.Color[];
   speed?: number;
   spread?: number;
   lifetime?: number;
@@ -26,6 +28,143 @@ interface Particle {
   size: number;
   gravity: number;
 }
+
+export type ParticlePreset =
+  | 'blockBreakDirt'
+  | 'blockBreakStone'
+  | 'blockBreakWood'
+  | 'blockPlace'
+  | 'footstepDust'
+  | 'campfireEmbers'
+  | 'campfireSmoke'
+  | 'hitBlood'
+  | 'hitSpark'
+  | 'itemPickupSparkle'
+  | 'levelUpBurst'
+  | 'rainSplash';
+
+interface PresetConfig {
+  count: number;
+  colors: number[];
+  speed: number;
+  spread: number;
+  lifetime: number;
+  size: number;
+  gravity: number;
+}
+
+// ─── Preset Definitions ───
+
+const PRESET_CONFIGS: Record<ParticlePreset, PresetConfig> = {
+  blockBreakDirt: {
+    count: 12,
+    colors: [0x8b7355, 0xa0926b, 0x6b5b45],
+    speed: 4.0,
+    spread: 0.8,
+    lifetime: 0.5,
+    size: 0.18,
+    gravity: -9.8,
+  },
+  blockBreakStone: {
+    count: 15,
+    colors: [0x888888, 0xaaaaaa, 0x666666],
+    speed: 5.0,
+    spread: 0.9,
+    lifetime: 0.4,
+    size: 0.14,
+    gravity: -12.0,
+  },
+  blockBreakWood: {
+    count: 10,
+    colors: [0x8b6914, 0xa0822b, 0x6b4f14],
+    speed: 3.5,
+    spread: 0.7,
+    lifetime: 0.6,
+    size: 0.2,
+    gravity: -6.0,
+  },
+  blockPlace: {
+    count: 8,
+    colors: [0xddeeff, 0xffffff, 0xccccee],
+    speed: 1.5,
+    spread: 0.4,
+    lifetime: 0.3,
+    size: 0.1,
+    gravity: 0.5,
+  },
+  footstepDust: {
+    count: 4,
+    colors: [0xc8b99a],
+    speed: 1.0,
+    spread: 0.3,
+    lifetime: 0.3,
+    size: 0.12,
+    gravity: -2.0,
+  },
+  campfireEmbers: {
+    count: 3,
+    colors: [0xff6600, 0xff3300, 0xffaa00],
+    speed: 1.5,
+    spread: 0.3,
+    lifetime: 1.5,
+    size: 0.1,
+    gravity: 1.0,
+  },
+  campfireSmoke: {
+    count: 2,
+    colors: [0x555555, 0x777777],
+    speed: 0.8,
+    spread: 0.2,
+    lifetime: 3.0,
+    size: 0.4,
+    gravity: 0.5,
+  },
+  hitBlood: {
+    count: 8,
+    colors: [0xcc0000, 0x880000],
+    speed: 3.5,
+    spread: 0.6,
+    lifetime: 0.3,
+    size: 0.12,
+    gravity: -15.0,
+  },
+  hitSpark: {
+    count: 6,
+    colors: [0xffffee, 0xffaa00],
+    speed: 6.0,
+    spread: 0.5,
+    lifetime: 0.15,
+    size: 0.06,
+    gravity: 0.0,
+  },
+  itemPickupSparkle: {
+    count: 6,
+    colors: [0xffd700, 0xffa500],
+    speed: 2.0,
+    spread: 0.4,
+    lifetime: 0.5,
+    size: 0.08,
+    gravity: 1.5,
+  },
+  levelUpBurst: {
+    count: 30,
+    colors: [0xffd700, 0xffffff, 0xffaa00, 0xffffcc],
+    speed: 5.0,
+    spread: 1.0,
+    lifetime: 1.0,
+    size: 0.15,
+    gravity: -3.0,
+  },
+  rainSplash: {
+    count: 3,
+    colors: [0xccccee, 0xddeeff],
+    speed: 1.5,
+    spread: 0.2,
+    lifetime: 0.15,
+    size: 0.06,
+    gravity: -8.0,
+  },
+};
 
 // ─── Constants ───
 
@@ -82,7 +221,30 @@ export class ParticleSystem {
     scene.add(this.points);
   }
 
-  // ─── Emission ───
+  // ─── Preset Emission ───
+
+  /**
+   * Emit particles using a named preset at the given position.
+   * Optionally override the particle count.
+   */
+  emitPreset(preset: ParticlePreset, position: THREE.Vector3, count?: number): void {
+    const config = PRESET_CONFIGS[preset];
+    const c = count ?? config.count;
+    const colorObjs = config.colors.map((hex) => new THREE.Color(hex));
+
+    this.emit({
+      position,
+      count: c,
+      colors: colorObjs,
+      speed: config.speed,
+      spread: config.spread,
+      lifetime: config.lifetime,
+      size: config.size,
+      gravity: config.gravity,
+    });
+  }
+
+  // ─── Low-Level Emission ───
 
   /**
    * Emit a burst of particles at a position.
@@ -91,13 +253,16 @@ export class ParticleSystem {
     const {
       position,
       count,
-      color = new THREE.Color(0xffffff),
+      color,
+      colors,
       speed = DEFAULT_SPEED,
       spread = DEFAULT_SPREAD,
       lifetime = DEFAULT_LIFETIME,
       size = DEFAULT_SIZE,
       gravity = DEFAULT_GRAVITY,
     } = options;
+
+    const baseColor = color ?? new THREE.Color(0xffffff);
 
     for (let i = 0; i < count; i++) {
       if (this.particles.length >= MAX_PARTICLES) {
@@ -117,17 +282,33 @@ export class ParticleSystem {
         Math.cos(phi) * r * speed,
       );
 
+      // Pick color from palette or use single base color
+      let particleColor: THREE.Color;
+      if (colors && colors.length > 0) {
+        particleColor = colors[Math.floor(Math.random() * colors.length)]!.clone();
+      } else {
+        particleColor = baseColor.clone();
+      }
+
       // Slight color variation
-      const variedColor = color.clone();
-      const variation = 0.15;
-      variedColor.r = Math.max(0, Math.min(1, variedColor.r + (Math.random() - 0.5) * variation));
-      variedColor.g = Math.max(0, Math.min(1, variedColor.g + (Math.random() - 0.5) * variation));
-      variedColor.b = Math.max(0, Math.min(1, variedColor.b + (Math.random() - 0.5) * variation));
+      const variation = 0.1;
+      particleColor.r = Math.max(
+        0,
+        Math.min(1, particleColor.r + (Math.random() - 0.5) * variation),
+      );
+      particleColor.g = Math.max(
+        0,
+        Math.min(1, particleColor.g + (Math.random() - 0.5) * variation),
+      );
+      particleColor.b = Math.max(
+        0,
+        Math.min(1, particleColor.b + (Math.random() - 0.5) * variation),
+      );
 
       this.particles.push({
         position: position.clone(),
         velocity,
-        color: variedColor,
+        color: particleColor,
         lifetime,
         maxLifetime: lifetime,
         size: size * (0.5 + Math.random() * 0.5),
@@ -135,6 +316,8 @@ export class ParticleSystem {
       });
     }
   }
+
+  // ─── Convenience Emitters ───
 
   /**
    * Emit block-break particles with color matching the block.
@@ -156,16 +339,7 @@ export class ParticleSystem {
    * Emit footstep dust particles.
    */
   emitFootstep(position: THREE.Vector3): void {
-    this.emit({
-      position,
-      count: 3,
-      color: new THREE.Color(0x8b7355),
-      speed: 1.0,
-      spread: 0.3,
-      lifetime: 0.4,
-      size: 0.1,
-      gravity: -5.0,
-    });
+    this.emitPreset('footstepDust', position);
   }
 
   /**
@@ -174,19 +348,9 @@ export class ParticleSystem {
   emitBlood(position: THREE.Vector3, direction?: THREE.Vector3): void {
     const basePos = position.clone();
     if (direction) {
-      // Offset slightly in hit direction
       basePos.addScaledVector(direction, 0.2);
     }
-    this.emit({
-      position: basePos,
-      count: 8,
-      color: new THREE.Color(0x8b0000),
-      speed: 3.5,
-      spread: 0.6,
-      lifetime: 0.6,
-      size: 0.12,
-      gravity: -12.0,
-    });
+    this.emitPreset('hitBlood', basePos);
     // Secondary darker droplets
     this.emit({
       position: basePos,
@@ -201,10 +365,16 @@ export class ParticleSystem {
   }
 
   /**
+   * Emit hit spark particles (for non-blood hits).
+   */
+  emitHitSpark(position: THREE.Vector3): void {
+    this.emitPreset('hitSpark', position);
+  }
+
+  /**
    * Emit arrow/projectile impact particles.
    */
   emitArrowHit(position: THREE.Vector3, surfaceColor?: THREE.Color): void {
-    // Wood/stone chip particles
     this.emit({
       position,
       count: 6,
@@ -215,7 +385,6 @@ export class ParticleSystem {
       size: 0.1,
       gravity: -10.0,
     });
-    // Small dust cloud
     this.emit({
       position,
       count: 4,
@@ -233,7 +402,6 @@ export class ParticleSystem {
    */
   emitMuzzleFlash(position: THREE.Vector3, direction: THREE.Vector3): void {
     const flashPos = position.clone().addScaledVector(direction, 0.3);
-    // Bright flash core
     this.emit({
       position: flashPos,
       count: 3,
@@ -244,7 +412,6 @@ export class ParticleSystem {
       size: 0.25,
       gravity: 0,
     });
-    // Sparks
     this.emit({
       position: flashPos,
       count: 5,
@@ -255,7 +422,6 @@ export class ParticleSystem {
       size: 0.08,
       gravity: -5.0,
     });
-    // Smoke puff
     this.emit({
       position: flashPos,
       count: 2,
@@ -264,7 +430,7 @@ export class ParticleSystem {
       spread: 0.3,
       lifetime: 0.4,
       size: 0.2,
-      gravity: 2.0, // smoke rises
+      gravity: 2.0,
     });
   }
 
@@ -285,7 +451,6 @@ export class ParticleSystem {
       if (p.lifetime <= 0) {
         this.particles[i] = this.particles[this.particles.length - 1]!;
         this.particles.pop();
-        // Don't increment i — re-check the swapped element
       } else {
         i++;
       }
@@ -294,21 +459,21 @@ export class ParticleSystem {
     // Update GPU buffers
     const count = Math.min(this.particles.length, MAX_PARTICLES);
 
-    for (let i = 0; i < count; i++) {
-      const p = this.particles[i]!;
-      const i3 = i * 3;
+    for (let j = 0; j < count; j++) {
+      const p = this.particles[j]!;
+      const j3 = j * 3;
 
-      this.positions[i3] = p.position.x;
-      this.positions[i3 + 1] = p.position.y;
-      this.positions[i3 + 2] = p.position.z;
+      this.positions[j3] = p.position.x;
+      this.positions[j3 + 1] = p.position.y;
+      this.positions[j3 + 2] = p.position.z;
 
       // Fade out alpha via color brightness
       const alpha = Math.max(0, p.lifetime / p.maxLifetime);
-      this.colors[i3] = p.color.r * alpha;
-      this.colors[i3 + 1] = p.color.g * alpha;
-      this.colors[i3 + 2] = p.color.b * alpha;
+      this.colors[j3] = p.color.r * alpha;
+      this.colors[j3 + 1] = p.color.g * alpha;
+      this.colors[j3 + 2] = p.color.b * alpha;
 
-      this.sizes[i] = p.size * (0.5 + alpha * 0.5);
+      this.sizes[j] = p.size * (0.5 + alpha * 0.5);
     }
 
     // Mark buffers for upload

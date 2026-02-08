@@ -179,8 +179,9 @@ export class CombatEffects {
   private onEntityDamaged(entity: EntityHealthState, damage: number): void {
     const pos = new THREE.Vector3(entity.position.x, entity.position.y, entity.position.z);
 
-    // Blood particles
+    // Blood particles + hit sparks
     this.particles.emitBlood(pos);
+    this.particles.emitHitSpark(pos);
 
     // Floating damage number
     const isCrit = damage >= 50;
@@ -212,11 +213,7 @@ export class CombatEffects {
   /**
    * Call when a projectile hits something.
    */
-  onProjectileHit(
-    position: THREE.Vector3,
-    hitEntity: boolean,
-    surfaceColor?: THREE.Color,
-  ): void {
+  onProjectileHit(position: THREE.Vector3, hitEntity: boolean, surfaceColor?: THREE.Color): void {
     if (hitEntity) {
       this.particles.emitBlood(position);
     } else {
@@ -309,11 +306,9 @@ export class CombatEffects {
     });
     const sprite = new THREE.Sprite(material);
 
-    sprite.position.copy(worldPos).add(new THREE.Vector3(
-      (Math.random() - 0.5) * 0.3,
-      1.8,
-      (Math.random() - 0.5) * 0.3,
-    ));
+    sprite.position
+      .copy(worldPos)
+      .add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 1.8, (Math.random() - 0.5) * 0.3));
     sprite.scale.set(1.4, 0.7, 1);
 
     this.scene.add(sprite);

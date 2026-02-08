@@ -22,6 +22,7 @@ import * as THREE from 'three';
 import type { AnimationName } from '../assets/SpriteGenerator';
 import { CameraController } from '../engine/Camera';
 import { InputManager } from '../engine/InputManager';
+import type { ParticleSystem } from '../engine/ParticleSystem';
 import { usePlayerStore } from '../stores/usePlayerStore';
 import { ChunkManager } from '../world/ChunkManager';
 import { PlayerRenderer } from './PlayerRenderer';
@@ -32,6 +33,8 @@ const MOUSE_SENSITIVITY = 0.15; // degrees per pixel
 const ARROW_KEY_SENSITIVITY = 0.5; // degrees per frame
 const HALF_WIDTH = PLAYER_WIDTH / 2;
 const COLLISION_EPSILON = 0.001;
+const FOOTSTEP_INTERVAL_WALK = 0.45; // seconds between footstep dust when walking
+const FOOTSTEP_INTERVAL_RUN = 0.3; // seconds between footstep dust when sprinting
 
 // ─── Helper: Get block at world position ───
 
@@ -87,6 +90,7 @@ export class LocalPlayerController {
   private playerRenderer: PlayerRenderer;
   private chunkManager: ChunkManager;
   private camera: THREE.PerspectiveCamera;
+  private particleSystem: ParticleSystem | null = null;
 
   // Reusable vectors
   private readonly forward = new THREE.Vector3();
@@ -95,6 +99,9 @@ export class LocalPlayerController {
 
   // Debug: throttle movement logging to avoid spam
   private lastMovementLog = 0;
+
+  // Footstep dust timer
+  private footstepTimer = 0;
 
   // Store sync: only push to React when position changes meaningfully
   private lastSyncX = NaN;
@@ -129,6 +136,10 @@ export class LocalPlayerController {
     return this.yaw;
   }
 
+  setParticleSystem(ps: ParticleSystem): void {
+    this.particleSystem = ps;
+  }
+
   // ─── Update (call each fixed timestep) ───
 
   update(dt: number): void {
@@ -136,6 +147,7 @@ export class LocalPlayerController {
     this.handleCameraInput();
     this.handleMovement(dt);
     this.handleCollision(dt);
+    this.updateFootstepDust(dt);
     this.updateAnimation();
     this.updateCamera();
     this.syncStore();
@@ -243,6 +255,29 @@ export class LocalPlayerController {
       if (this.input.isKeyDown(keybinds.jump)) {
         this.velocity.y = PLAYER_JUMP_VELOCITY * 0.4;
       }
+    }
+  }
+
+  // ─── Footstep Dust ───
+
+  private updateFootstepDust(dt: number): void {
+    if (!this.particleSystem) return;
+
+    const isMoving = Math.abs(this.velocity.x) > 0.1 || Math.abs(this.velocity.z) > 0.1;
+
+    if (!isMoving || !this.isGrounded || this.isInWater) {
+      this.footstepTimer = 0;
+      return;
+    }
+
+    const interval = this.isSprinting ? FOOTSTEP_INTERVAL_RUN : FOOTSTEP_INTERVAL_WALK;
+    this.footstepTimer += dt;
+
+    if (this.footstepTimer >= interval) {
+      this.footstepTimer -= interval;
+      this.particleSystem.emitFootstep(
+        new THREE.Vector3(this.position.x, this.position.y, this.position.z),
+      );
     }
   }
 

@@ -11,7 +11,7 @@ import { ClientMessage } from '@shared/types/network';
 import * as THREE from 'three';
 import { AudioManager } from '../engine/AudioManager';
 import { InputManager } from '../engine/InputManager';
-import type { ParticleSystem } from '../engine/ParticleSystem';
+import type { ParticlePreset, ParticleSystem } from '../engine/ParticleSystem';
 import { socketClient } from '../network/SocketClient';
 import { useGameStore } from '../stores/useGameStore';
 import { usePlayerStore } from '../stores/usePlayerStore';
@@ -58,6 +58,27 @@ const BLOCK_COLORS: Partial<Record<BlockType, number>> = {
   [BlockType.Cactus]: 0x2d7a3a,
   [BlockType.Ice]: 0xaaddff,
   [BlockType.MossyStone]: 0x6a8a6a,
+};
+
+// Map block types to break particle presets
+const BLOCK_BREAK_PRESET: Partial<Record<BlockType, ParticlePreset>> = {
+  [BlockType.Dirt]: 'blockBreakDirt',
+  [BlockType.Grass]: 'blockBreakDirt',
+  [BlockType.Sand]: 'blockBreakDirt',
+  [BlockType.Gravel]: 'blockBreakDirt',
+  [BlockType.Clay]: 'blockBreakDirt',
+  [BlockType.Snow]: 'blockBreakDirt',
+  [BlockType.Stone]: 'blockBreakStone',
+  [BlockType.Cobblestone]: 'blockBreakStone',
+  [BlockType.MetalOre]: 'blockBreakStone',
+  [BlockType.SulfurOre]: 'blockBreakStone',
+  [BlockType.HQMOre]: 'blockBreakStone',
+  [BlockType.Ice]: 'blockBreakStone',
+  [BlockType.MossyStone]: 'blockBreakStone',
+  [BlockType.Log]: 'blockBreakWood',
+  [BlockType.Leaves]: 'blockBreakWood',
+  [BlockType.Planks]: 'blockBreakWood',
+  [BlockType.Cactus]: 'blockBreakWood',
 };
 
 // ─── Helpers ───
@@ -315,12 +336,15 @@ export class BlockInteraction {
       }
     }
 
-    // Spawn break particles
-    const color = BLOCK_COLORS[blockType as BlockType] ?? 0x888888;
-    this.particleSystem.emitBlockBreak(
-      new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5),
-      new THREE.Color(color),
-    );
+    // Spawn break particles using block-specific preset
+    const breakPos = new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5);
+    const preset = BLOCK_BREAK_PRESET[blockType as BlockType];
+    if (preset) {
+      this.particleSystem.emitPreset(preset, breakPos);
+    } else {
+      const color = BLOCK_COLORS[blockType as BlockType] ?? 0x888888;
+      this.particleSystem.emitBlockBreak(breakPos, new THREE.Color(color));
+    }
 
     // Play break sound
     AudioManager.getInstance().play('blockBreak');
@@ -381,8 +405,9 @@ export class BlockInteraction {
       store.setInventory(updatedInventory);
     }
 
-    // Play place sound
+    // Play place sound and spawn placement particles
     AudioManager.getInstance().play('blockPlace');
+    this.particleSystem.emitPreset('blockPlace', new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5));
   }
 
   // ─── DDA Voxel Raycast ───
