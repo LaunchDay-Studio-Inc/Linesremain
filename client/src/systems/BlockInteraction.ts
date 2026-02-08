@@ -115,6 +115,18 @@ export class BlockInteraction {
   // Right-click debounce (prevent placing every frame)
   private rightClickConsumed = false;
 
+  // Reusable vectors for raycast (avoids per-frame allocation)
+  private _rayOrigin = new THREE.Vector3();
+  private _rayDir = new THREE.Vector3();
+
+  // Reusable breaking block cache (avoids per-frame spread)
+  private _breakingBlockCache = { x: 0, y: 0, z: 0 };
+
+  // Reusable objects for break particles
+  private _breakPos = new THREE.Vector3();
+  private _breakColor = new THREE.Color();
+  private _placePos = new THREE.Vector3();
+
   constructor(
     scene: THREE.Scene,
     camera: THREE.PerspectiveCamera,
@@ -244,7 +256,10 @@ export class BlockInteraction {
       this.breakProgress = 0;
     }
 
-    this.breakingBlock = { ...this.targetBlock };
+    this._breakingBlockCache.x = this.targetBlock.x;
+    this._breakingBlockCache.y = this.targetBlock.y;
+    this._breakingBlockCache.z = this.targetBlock.z;
+    this.breakingBlock = this._breakingBlockCache;
 
     // Get the block type at the target position
     const blockType = this.getBlockType(this.targetBlock.x, this.targetBlock.y, this.targetBlock.z);
@@ -337,13 +352,14 @@ export class BlockInteraction {
     }
 
     // Spawn break particles using block-specific preset
-    const breakPos = new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5);
+    this._breakPos.set(x + 0.5, y + 0.5, z + 0.5);
     const preset = BLOCK_BREAK_PRESET[blockType as BlockType];
     if (preset) {
-      this.particleSystem.emitPreset(preset, breakPos);
+      this.particleSystem.emitPreset(preset, this._breakPos);
     } else {
       const color = BLOCK_COLORS[blockType as BlockType] ?? 0x888888;
-      this.particleSystem.emitBlockBreak(breakPos, new THREE.Color(color));
+      this._breakColor.set(color);
+      this.particleSystem.emitBlockBreak(this._breakPos, this._breakColor);
     }
 
     // Play break sound
@@ -407,17 +423,19 @@ export class BlockInteraction {
 
     // Play place sound and spawn placement particles
     AudioManager.getInstance().play('blockPlace');
-    this.particleSystem.emitPreset('blockPlace', new THREE.Vector3(x + 0.5, y + 0.5, z + 0.5));
+    this._placePos.set(x + 0.5, y + 0.5, z + 0.5);
+    this.particleSystem.emitPreset('blockPlace', this._placePos);
   }
 
   // ─── DDA Voxel Raycast ───
 
   private raycast(): RaycastHit | null {
-    // Get camera world position and forward direction
-    const origin = new THREE.Vector3();
+    // Get camera world position and forward direction (reuse class-level vectors)
+    const origin = this._rayOrigin;
     this.camera.getWorldPosition(origin);
 
-    const direction = new THREE.Vector3(0, 0, -1);
+    const direction = this._rayDir;
+    direction.set(0, 0, -1);
     direction.applyQuaternion(this.camera.quaternion);
     direction.normalize();
 

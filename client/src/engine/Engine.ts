@@ -25,15 +25,13 @@ export class Engine {
     // ── Renderer ──
     this.renderer = new THREE.WebGLRenderer({
       canvas,
-      antialias: true,
+      antialias: false,
       powerPreference: 'high-performance',
     });
     this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 1.5));
     this.renderer.setSize(window.innerWidth, window.innerHeight);
-    this.renderer.shadowMap.enabled = false;
     this.renderer.outputColorSpace = THREE.SRGBColorSpace;
-    this.renderer.toneMapping = THREE.ACESFilmicToneMapping;
-    this.renderer.toneMappingExposure = 1.0;
+    this.renderer.toneMapping = THREE.NoToneMapping;
 
     // ── Scene ──
     this.scene = new THREE.Scene();
@@ -41,7 +39,7 @@ export class Engine {
 
     // ── Camera ──
     const aspect = window.innerWidth / window.innerHeight;
-    this.camera = new THREE.PerspectiveCamera(60, aspect, 0.1, 1000);
+    this.camera = new THREE.PerspectiveCamera(60, aspect, 0.5, 400);
     this.camera.position.set(0, 20, 30);
     this.camera.lookAt(0, 0, 0);
 

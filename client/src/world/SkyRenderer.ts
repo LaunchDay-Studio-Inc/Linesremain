@@ -215,7 +215,6 @@ export class SkyRenderer {
 
   // Sun/Moon orbit radius
   private readonly orbitRadius = 200;
-  private readonly shadowFrustum = 100;
   private bloodMoonActive = false;
 
   constructor(scene: THREE.Scene) {
@@ -240,15 +239,7 @@ export class SkyRenderer {
 
     // ── Sun ──
     this.sunLight = new THREE.DirectionalLight(0xfff4e0, 1.5);
-    this.sunLight.castShadow = true;
-    this.sunLight.shadow.mapSize.set(2048, 2048);
-    this.sunLight.shadow.camera.left = -this.shadowFrustum;
-    this.sunLight.shadow.camera.right = this.shadowFrustum;
-    this.sunLight.shadow.camera.top = this.shadowFrustum;
-    this.sunLight.shadow.camera.bottom = -this.shadowFrustum;
-    this.sunLight.shadow.camera.near = 0.5;
-    this.sunLight.shadow.camera.far = 500;
-    this.sunLight.shadow.bias = -0.001;
+    this.sunLight.castShadow = false;
     scene.add(this.sunLight);
     scene.add(this.sunLight.target);
 
@@ -329,6 +320,10 @@ export class SkyRenderer {
     return this.ambientLight;
   }
 
+  // Reusable Color objects for applyBiomeAtmosphere (avoids per-call allocations)
+  private _biomeFogColor = new THREE.Color();
+  private _biomeTintColor = new THREE.Color();
+
   /** Blend biome atmosphere into the current time-of-day fog/lighting */
   applyBiomeAtmosphere(
     fogColor: string,
@@ -337,22 +332,22 @@ export class SkyRenderer {
     ambientTint: string,
   ): void {
     // Parse biome fog color
-    const biomeFog = new THREE.Color(fogColor);
+    this._biomeFogColor.set(fogColor);
 
     // Blend fog color: 50% time-of-day + 50% biome
-    this.fog.color.lerp(biomeFog, 0.5);
+    this.fog.color.lerp(this._biomeFogColor, 0.5);
 
     // Use whichever fog distance is shorter (more atmospheric)
     this.fog.near = Math.min(this.fog.near, fogNear);
     this.fog.far = Math.min(this.fog.far, fogFar);
 
     // Tint ambient light: blend 30% toward biome tint
-    const biomeTint = new THREE.Color(ambientTint);
-    this.ambientLight.color.lerp(biomeTint, 0.3);
+    this._biomeTintColor.set(ambientTint);
+    this.ambientLight.color.lerp(this._biomeTintColor, 0.3);
 
     // Also tint sky horizon slightly
     const horizonUniform = this.skyMaterial.uniforms['uHorizonColor']!.value as THREE.Color;
-    horizonUniform.lerp(biomeFog, 0.2);
+    horizonUniform.lerp(this._biomeFogColor, 0.2);
   }
 
   dispose(): void {

@@ -52,17 +52,13 @@ export class WeatherSystem {
   // Clouds
   private clouds: Cloud[] = [];
   private cloudGroup: THREE.Group;
-  private cloudMaterial: THREE.SpriteMaterial;
+  private cloudMaterials: THREE.SpriteMaterial[] = [];
   private cloudTexture: THREE.CanvasTexture;
 
-  // Lighting overrides
-  private ambientLight: THREE.AmbientLight | null = null;
-  private originalAmbientIntensity = 0.4;
-
-  // Fog overrides
-  private fog: THREE.Fog | null = null;
-  private originalFogNear = 80;
-  private originalFogFar = 300;
+  // Fog/lighting multipliers (applied by caller, not directly to fog)
+  private fogNearMultiplier = 1;
+  private fogFarMultiplier = 1;
+  private ambientMultiplier = 1;
 
   // Player tracking
   private playerPos = new THREE.Vector3();
@@ -100,16 +96,22 @@ export class WeatherSystem {
     scene.add(this.cloudGroup);
 
     this.cloudTexture = this.generateCloudTexture();
-    this.cloudMaterial = new THREE.SpriteMaterial({
-      map: this.cloudTexture,
-      transparent: true,
-      opacity: 0.6,
-      depthWrite: false,
-      fog: true,
-    });
+
+    // Pre-create one material per cloud to avoid per-cloud cloning
+    for (let i = 0; i < CLOUD_COUNT; i++) {
+      this.cloudMaterials.push(
+        new THREE.SpriteMaterial({
+          map: this.cloudTexture,
+          transparent: true,
+          opacity: 0.3 + Math.random() * 0.4,
+          depthWrite: false,
+          fog: true,
+        }),
+      );
+    }
 
     for (let i = 0; i < CLOUD_COUNT; i++) {
-      this.clouds.push(this.createCloud());
+      this.clouds.push(this.createCloud(i));
     }
   }
 
@@ -171,8 +173,8 @@ export class WeatherSystem {
 
   // ─── Cloud Creation ───
 
-  private createCloud(): Cloud {
-    const sprite = new THREE.Sprite(this.cloudMaterial.clone());
+  private createCloud(index: number): Cloud {
+    const sprite = new THREE.Sprite(this.cloudMaterials[index]!);
     const scale = 15 + Math.random() * 20;
     sprite.scale.set(scale, scale * 0.4, 1);
 
@@ -180,9 +182,6 @@ export class WeatherSystem {
     const y = CLOUD_Y_MIN + Math.random() * (CLOUD_Y_MAX - CLOUD_Y_MIN);
     const z = this.playerPos.z + (Math.random() - 0.5) * CLOUD_SPREAD * 2;
     sprite.position.set(x, y, z);
-
-    // Vary opacity per cloud
-    (sprite.material as THREE.SpriteMaterial).opacity = 0.3 + Math.random() * 0.4;
 
     this.cloudGroup.add(sprite);
 
@@ -209,26 +208,15 @@ export class WeatherSystem {
     this.rainMesh.visible = showRain;
     this.cloudGroup.visible = showClouds;
 
-    // Adjust lighting
-    if (this.ambientLight) {
-      if (weather === 'rain') {
-        this.ambientLight.intensity = this.originalAmbientIntensity * 0.7;
-      } else {
-        this.ambientLight.intensity = this.originalAmbientIntensity;
-      }
-    }
-
-    // Adjust fog
-    if (this.fog) {
-      if (weather === 'rain') {
-        this.fog.near = 30;
-        this.fog.far = 100;
-        this.fog.color.set(0x6688aa);
-      } else {
-        this.fog.near = this.originalFogNear;
-        this.fog.far = this.originalFogFar;
-        this.fog.color.set(0x87ceeb);
-      }
+    // Set fog/lighting multipliers for caller to consume
+    if (weather === 'rain') {
+      this.fogNearMultiplier = 0.4;
+      this.fogFarMultiplier = 0.35;
+      this.ambientMultiplier = 0.7;
+    } else {
+      this.fogNearMultiplier = 1;
+      this.fogFarMultiplier = 1;
+      this.ambientMultiplier = 1;
     }
   }
 
@@ -236,17 +224,19 @@ export class WeatherSystem {
     return this.weather;
   }
 
-  /** Register the scene's ambient light so weather can adjust it */
-  setAmbientLight(light: THREE.AmbientLight): void {
-    this.ambientLight = light;
-    this.originalAmbientIntensity = light.intensity;
+  /** Get fog near multiplier for SkyRenderer to apply */
+  getFogNearMultiplier(): number {
+    return this.fogNearMultiplier;
   }
 
-  /** Register the scene's fog so weather can adjust it */
-  setFog(fog: THREE.Fog): void {
-    this.fog = fog;
-    this.originalFogNear = fog.near;
-    this.originalFogFar = fog.far;
+  /** Get fog far multiplier for SkyRenderer to apply */
+  getFogFarMultiplier(): number {
+    return this.fogFarMultiplier;
+  }
+
+  /** Get ambient light multiplier for SkyRenderer to apply */
+  getAmbientMultiplier(): number {
+    return this.ambientMultiplier;
   }
 
   // ─── Update ───
@@ -324,11 +314,13 @@ export class WeatherSystem {
 
     // Cloud cleanup
     for (const cloud of this.clouds) {
-      (cloud.mesh.material as THREE.SpriteMaterial).dispose();
       this.cloudGroup.remove(cloud.mesh);
     }
     this.clouds.length = 0;
-    this.cloudMaterial.dispose();
+    for (const mat of this.cloudMaterials) {
+      mat.dispose();
+    }
+    this.cloudMaterials.length = 0;
     this.cloudTexture.dispose();
     this.scene.remove(this.cloudGroup);
   }

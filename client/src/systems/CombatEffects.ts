@@ -27,7 +27,9 @@ export interface KillNotification {
 
 interface FloatingNumber {
   sprite: THREE.Sprite;
-  velocity: THREE.Vector3;
+  vx: number;
+  vy: number;
+  vz: number;
   lifetime: number;
   maxLifetime: number;
 }
@@ -41,13 +43,25 @@ const KILL_FEED_MAX = 6;
 const KILL_FEED_DURATION = 8000; // ms
 const MAX_FLOATING_NUMBERS = 30;
 
+// ─── Shared Canvas for Damage Numbers (avoids per-number DOM allocation) ───
+
+let _sharedCanvas: HTMLCanvasElement | null = null;
+let _sharedCtx: CanvasRenderingContext2D | null = null;
+
+function getSharedCanvas(): { canvas: HTMLCanvasElement; ctx: CanvasRenderingContext2D } {
+  if (!_sharedCanvas) {
+    _sharedCanvas = document.createElement('canvas');
+    _sharedCanvas.width = 128;
+    _sharedCanvas.height = 64;
+    _sharedCtx = _sharedCanvas.getContext('2d')!;
+  }
+  return { canvas: _sharedCanvas, ctx: _sharedCtx! };
+}
+
 // ─── Canvas Texture Helpers ───
 
 function createDamageNumberTexture(damage: number, isCrit: boolean): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d')!;
+  const { canvas, ctx } = getSharedCanvas();
 
   ctx.clearRect(0, 0, 128, 64);
 
@@ -78,17 +92,20 @@ function createDamageNumberTexture(damage: number, isCrit: boolean): THREE.Canva
   ctx.lineWidth = 2;
   ctx.strokeText(text, 64, 32);
 
-  const texture = new THREE.CanvasTexture(canvas);
+  // Copy to a new canvas for the texture (shared canvas gets reused)
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width = 128;
+  texCanvas.height = 64;
+  texCanvas.getContext('2d')!.drawImage(canvas, 0, 0);
+
+  const texture = new THREE.CanvasTexture(texCanvas);
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
   return texture;
 }
 
 function createHealNumberTexture(amount: number): THREE.CanvasTexture {
-  const canvas = document.createElement('canvas');
-  canvas.width = 128;
-  canvas.height = 64;
-  const ctx = canvas.getContext('2d')!;
+  const { canvas, ctx } = getSharedCanvas();
 
   ctx.clearRect(0, 0, 128, 64);
 
@@ -106,7 +123,13 @@ function createHealNumberTexture(amount: number): THREE.CanvasTexture {
   ctx.fillStyle = '#44ff44';
   ctx.fillText(text, 64, 32);
 
-  const texture = new THREE.CanvasTexture(canvas);
+  // Copy to a new canvas for the texture
+  const texCanvas = document.createElement('canvas');
+  texCanvas.width = 128;
+  texCanvas.height = 64;
+  texCanvas.getContext('2d')!.drawImage(canvas, 0, 0);
+
+  const texture = new THREE.CanvasTexture(texCanvas);
   texture.minFilter = THREE.LinearFilter;
   texture.magFilter = THREE.LinearFilter;
   return texture;
@@ -275,7 +298,13 @@ export class CombatEffects {
    */
   getKillFeed(): KillNotification[] {
     const now = Date.now();
-    this.killFeed = this.killFeed.filter((n) => now - n.timestamp < KILL_FEED_DURATION);
+    let writeIdx = 0;
+    for (let i = 0; i < this.killFeed.length; i++) {
+      if (now - this.killFeed[i]!.timestamp < KILL_FEED_DURATION) {
+        this.killFeed[writeIdx++] = this.killFeed[i]!;
+      }
+    }
+    this.killFeed.length = writeIdx;
     return this.killFeed;
   }
 
@@ -321,11 +350,9 @@ export class CombatEffects {
 
     this.floatingNumbers.push({
       sprite,
-      velocity: new THREE.Vector3(
-        (Math.random() - 0.5) * 0.5,
-        DAMAGE_NUMBER_RISE_SPEED,
-        (Math.random() - 0.5) * 0.5,
-      ),
+      vx: (Math.random() - 0.5) * 0.5,
+      vy: DAMAGE_NUMBER_RISE_SPEED,
+      vz: (Math.random() - 0.5) * 0.5,
       lifetime: DAMAGE_NUMBER_LIFETIME,
       maxLifetime: DAMAGE_NUMBER_LIFETIME,
     });
@@ -353,7 +380,9 @@ export class CombatEffects {
 
     this.floatingNumbers.push({
       sprite,
-      velocity: new THREE.Vector3(0, DAMAGE_NUMBER_RISE_SPEED * 0.7, 0),
+      vx: 0,
+      vy: DAMAGE_NUMBER_RISE_SPEED * 0.7,
+      vz: 0,
       lifetime: DAMAGE_NUMBER_LIFETIME * 0.8,
       maxLifetime: DAMAGE_NUMBER_LIFETIME * 0.8,
     });
@@ -382,14 +411,16 @@ export class CombatEffects {
       }
 
       // Move upward + drift
-      fn.sprite.position.addScaledVector(fn.velocity, dt);
+      fn.sprite.position.x += fn.vx * dt;
+      fn.sprite.position.y += fn.vy * dt;
+      fn.sprite.position.z += fn.vz * dt;
 
       // Slow down horizontal drift
-      fn.velocity.x *= 0.98;
-      fn.velocity.z *= 0.98;
+      fn.vx *= 0.98;
+      fn.vz *= 0.98;
 
       // Decelerate vertical rise
-      fn.velocity.y *= 0.97;
+      fn.vy *= 0.97;
 
       // Fade out
       const alpha = Math.max(0, fn.lifetime / fn.maxLifetime);

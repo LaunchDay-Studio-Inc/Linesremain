@@ -175,10 +175,6 @@ export const GameCanvas: React.FC = () => {
 
     // ── Weather System (rain, clouds, fog adjustments) ──
     const weatherSystem = new WeatherSystem(scene);
-    weatherSystem.setAmbientLight(skyRenderer.getAmbientLight());
-    if (scene.fog instanceof THREE.Fog) {
-      weatherSystem.setFog(scene.fog);
-    }
 
     // ── Particle System ──
     const particleSystem = new ParticleSystem(scene);

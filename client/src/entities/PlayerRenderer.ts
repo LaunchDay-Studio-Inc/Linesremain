@@ -91,12 +91,11 @@ export class PlayerRenderer {
   play(animation: AnimationName, speed = 8, loop = true): void {
     if (this.state.animation === animation && !this.state.finished) return;
 
-    const animConfig = this.config.animations[animation];
     this.state = {
       animation,
       frame: 0,
       elapsed: 0,
-      speed: speed * (animConfig.frameCount / 8), // normalize speed
+      speed,
       loop,
       finished: false,
     };
@@ -223,7 +222,7 @@ export class PlayerRenderer {
   }
 
   getPosition(): THREE.Vector3 {
-    return this.sprite.position.clone();
+    return this.sprite.position;
   }
 
   // ─── Scene Management ───

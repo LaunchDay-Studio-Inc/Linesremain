@@ -1,14 +1,14 @@
 // ─── Chunk Manager ───
 
-import * as THREE from 'three';
 import {
   CHUNK_SIZE_X,
   CHUNK_SIZE_Y,
   CHUNK_SIZE_Z,
   VIEW_DISTANCE_CHUNKS,
 } from '@shared/constants/game';
+import * as THREE from 'three';
+import type { ChunkMeshData, NeighborChunks } from './ChunkMesher';
 import { meshChunk } from './ChunkMesher';
-import type { NeighborChunks, ChunkMeshData } from './ChunkMesher';
 import { createTextureAtlas, disposeTextureAtlas } from './TextureAtlas';
 
 // ─── Types ───
@@ -17,6 +17,8 @@ interface LoadedChunk {
   data: Uint8Array;
   mesh: THREE.Mesh | null;
   waterMesh: THREE.Mesh | null;
+  cx: number;
+  cz: number;
 }
 
 export type ChunkRequestCallback = (chunkX: number, chunkZ: number) => void;
@@ -40,6 +42,16 @@ export class ChunkManager {
 
   // Rate-limit chunk rebuilds per frame to avoid frame spikes
   private static readonly MAX_REBUILDS_PER_FRAME = 2;
+
+  // Reusable set for needed chunks (avoids per-frame allocation)
+  private neededChunks = new Set<string>();
+
+  // Cached chunk meshes array (invalidated when meshes change)
+  private chunkMeshesCache: THREE.Mesh[] = [];
+  private chunkMeshesDirty = true;
+
+  // Pooled AO color buffer
+  private aoColorBuffer: Float32Array = new Float32Array(0);
 
   private scene: THREE.Scene;
   private opaqueMaterial: THREE.MeshLambertMaterial;
@@ -82,8 +94,8 @@ export class ChunkManager {
     const playerCX = Math.floor(playerX / CHUNK_SIZE_X);
     const playerCZ = Math.floor(playerZ / CHUNK_SIZE_Z);
 
-    // Determine which chunks should be loaded
-    const neededChunks = new Set<string>();
+    // Determine which chunks should be loaded (reuse set)
+    this.neededChunks.clear();
 
     for (let dx = -this.viewDistance; dx <= this.viewDistance; dx++) {
       for (let dz = -this.viewDistance; dz <= this.viewDistance; dz++) {
@@ -93,7 +105,7 @@ export class ChunkManager {
         const cx = playerCX + dx;
         const cz = playerCZ + dz;
         const key = chunkKey(cx, cz);
-        neededChunks.add(key);
+        this.neededChunks.add(key);
 
         // Request if not loaded and not pending
         if (!this.loadedChunks.has(key) && !this.pendingChunks.has(key)) {
@@ -105,10 +117,11 @@ export class ChunkManager {
 
     // Unload chunks too far away
     for (const [key, chunk] of this.loadedChunks) {
-      if (!neededChunks.has(key)) {
+      if (!this.neededChunks.has(key)) {
         this.removeChunkMeshes(chunk);
         this.loadedChunks.delete(key);
         this.dirtyChunks.delete(key);
+        this.loadedKeySetDirty = true;
       }
     }
 
@@ -118,8 +131,7 @@ export class ChunkManager {
       if (rebuilds >= ChunkManager.MAX_REBUILDS_PER_FRAME) break;
       const chunk = this.loadedChunks.get(key);
       if (chunk) {
-        const [cx, cz] = key.split(',').map(Number) as [number, number];
-        this.buildChunkMesh(cx, cz, chunk);
+        this.buildChunkMesh(chunk.cx, chunk.cz, chunk);
         rebuilds++;
       }
       this.dirtyChunks.delete(key);
@@ -138,8 +150,9 @@ export class ChunkManager {
       this.removeChunkMeshes(existing);
     }
 
-    const chunk: LoadedChunk = { data, mesh: null, waterMesh: null };
+    const chunk: LoadedChunk = { data, mesh: null, waterMesh: null, cx: chunkX, cz: chunkZ };
     this.loadedChunks.set(key, chunk);
+    this.loadedKeySetDirty = true;
 
     this.buildChunkMesh(chunkX, chunkZ, chunk);
 
@@ -191,6 +204,7 @@ export class ChunkManager {
     if (result.opaque.positions.length > 0) {
       chunk.mesh = this.createMesh(result.opaque, this.opaqueMaterial);
       this.scene.add(chunk.mesh);
+      this.chunkMeshesDirty = true;
     }
 
     // Build transparent mesh
@@ -209,22 +223,27 @@ export class ChunkManager {
     geometry.setAttribute('uv', new THREE.BufferAttribute(meshData.uvs, 2));
     geometry.setIndex(new THREE.BufferAttribute(meshData.indices, 1));
 
-    // Use AO values as vertex colors (grayscale)
-    const colors = new Float32Array(meshData.aoValues.length * 3);
+    // Use AO values as vertex colors (grayscale) — reuse pooled buffer
+    const needed = meshData.aoValues.length * 3;
+    if (this.aoColorBuffer.length < needed) {
+      this.aoColorBuffer = new Float32Array(needed);
+    }
     for (let i = 0; i < meshData.aoValues.length; i++) {
       const ao = meshData.aoValues[i]!;
-      colors[i * 3] = ao;
-      colors[i * 3 + 1] = ao;
-      colors[i * 3 + 2] = ao;
+      this.aoColorBuffer[i * 3] = ao;
+      this.aoColorBuffer[i * 3 + 1] = ao;
+      this.aoColorBuffer[i * 3 + 2] = ao;
     }
-    geometry.setAttribute('color', new THREE.BufferAttribute(colors, 3));
+    // Slice to exact size for the buffer attribute
+    const colors = this.aoColorBuffer.subarray(0, needed);
+    geometry.setAttribute('color', new THREE.BufferAttribute(new Float32Array(colors), 3));
 
     geometry.computeBoundingSphere();
 
     const mesh = new THREE.Mesh(geometry, material);
     mesh.frustumCulled = true;
     mesh.castShadow = false;
-    mesh.receiveShadow = true;
+    mesh.receiveShadow = false;
 
     return mesh;
   }
@@ -236,6 +255,7 @@ export class ChunkManager {
       this.scene.remove(chunk.mesh);
       chunk.mesh.geometry.dispose();
       chunk.mesh = null;
+      this.chunkMeshesDirty = true;
     }
     if (chunk.waterMesh) {
       this.scene.remove(chunk.waterMesh);
@@ -245,7 +265,12 @@ export class ChunkManager {
   }
 
   private markNeighborsDirty(cx: number, cz: number): void {
-    const dirs = [[1, 0], [-1, 0], [0, 1], [0, -1]] as const;
+    const dirs = [
+      [1, 0],
+      [-1, 0],
+      [0, 1],
+      [0, -1],
+    ] as const;
     for (const [dx, dz] of dirs) {
       const key = chunkKey(cx + dx, cz + dz);
       if (this.loadedChunks.has(key)) {
@@ -276,8 +301,18 @@ export class ChunkManager {
     return this.loadedChunks.size;
   }
 
+  // Cached key set for getLoadedChunkKeys (avoids per-call allocation)
+  private loadedKeySetCache = new Set<string>();
+  private loadedKeySetDirty = true;
+
   getLoadedChunkKeys(): Set<string> {
-    return new Set(this.loadedChunks.keys());
+    if (!this.loadedKeySetDirty) return this.loadedKeySetCache;
+    this.loadedKeySetCache.clear();
+    for (const key of this.loadedChunks.keys()) {
+      this.loadedKeySetCache.add(key);
+    }
+    this.loadedKeySetDirty = false;
+    return this.loadedKeySetCache;
   }
 
   // ─── Local Test Terrain Generation ───
@@ -318,9 +353,9 @@ export class ChunkManager {
         // Simple height generation using sine waves
         const height = Math.floor(
           seaLevel +
-          Math.sin(worldX * 0.05) * 4 +
-          Math.cos(worldZ * 0.07) * 3 +
-          Math.sin((worldX + worldZ) * 0.03) * 2
+            Math.sin(worldX * 0.05) * 4 +
+            Math.cos(worldZ * 0.07) * 3 +
+            Math.sin((worldX + worldZ) * 0.03) * 2,
         );
 
         for (let y = 0; y < CHUNK_SIZE_Y; y++) {
@@ -347,11 +382,13 @@ export class ChunkManager {
 
   /** Returns all opaque chunk meshes (for raycasting against terrain) */
   getChunkMeshes(): THREE.Mesh[] {
-    const meshes: THREE.Mesh[] = [];
+    if (!this.chunkMeshesDirty) return this.chunkMeshesCache;
+    this.chunkMeshesCache.length = 0;
     for (const [, chunk] of this.loadedChunks) {
-      if (chunk.mesh) meshes.push(chunk.mesh);
+      if (chunk.mesh) this.chunkMeshesCache.push(chunk.mesh);
     }
-    return meshes;
+    this.chunkMeshesDirty = false;
+    return this.chunkMeshesCache;
   }
 
   // ─── Cleanup ───
