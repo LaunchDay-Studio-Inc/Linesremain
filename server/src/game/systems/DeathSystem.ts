@@ -13,13 +13,14 @@ import {
 import { logger } from '../../utils/logger.js';
 import type { GameWorld } from '../World.js';
 import { trackDeath } from './AchievementSystem.js';
-import { checkPlayerDeath, processPlayerDeaths } from './RespawnSystem.js';
+import { checkPlayerDeath, playerHasSleepingBag, processPlayerDeaths } from './RespawnSystem.js';
 
 // ─── Death Notification Queue ───
 
 export interface DeathNotification {
   playerId: string;
   cause: string;
+  hasSleepingBag: boolean;
 }
 
 const deathNotificationQueue: DeathNotification[] = [];
@@ -45,7 +46,8 @@ export function deathSystem(world: GameWorld, _dt: number): void {
     if (!wasDead) continue;
 
     const cause = determineCauseOfDeath(world, entityId);
-    deathNotificationQueue.push({ playerId, cause });
+    const hasBag = playerHasSleepingBag(world, playerId);
+    deathNotificationQueue.push({ playerId, cause, hasSleepingBag: hasBag });
     trackDeath(playerId);
     logger.info({ playerId, cause }, 'Player death detected');
   }

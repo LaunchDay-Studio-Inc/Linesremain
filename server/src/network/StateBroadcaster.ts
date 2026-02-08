@@ -19,9 +19,9 @@ import {
   type DoorStatePayload,
   type EntitySnapshot,
   type ExplosionPayload,
-  type JournalFoundPayload,
   type HealthComponent,
   type HungerComponent,
+  type JournalFoundPayload,
   type LevelUpPayload,
   type PlayerStatsPayload,
   type PositionComponent,
@@ -34,20 +34,26 @@ import {
   type XpGainPayload,
 } from '@lineremain/shared';
 import { gameLoop } from '../game/GameLoop.js';
-import { drainDeathNotifications } from '../game/systems/DeathSystem.js';
-import { drainJournalFinds } from '../game/systems/JournalSystem.js';
-import { drainWorldEvents } from '../game/systems/WorldEventSystem.js';
 import {
   drainAchievementNotifications,
   drainLevelUpNotifications,
   drainXpGainNotifications,
 } from '../game/systems/AchievementSystem.js';
-import { drainExplosionNotifications, drainBaseAttackNotifications } from '../game/systems/RaidingSystem.js';
-import { drainDoorStateNotifications, drainCodeLockPrompts } from '../game/systems/DoorSystem.js';
+import {
+  drainBlueprintLearnedNotifications,
+  drainResearchProgressUpdates,
+} from '../game/systems/BlueprintSystem.js';
 import { drainContainerContentUpdates } from '../game/systems/ContainerSystem.js';
+import { drainDeathNotifications } from '../game/systems/DeathSystem.js';
 import { drainDefenseExplosionNotifications } from '../game/systems/DefenseSystem.js';
+import { drainCodeLockPrompts, drainDoorStateNotifications } from '../game/systems/DoorSystem.js';
+import { drainJournalFinds } from '../game/systems/JournalSystem.js';
+import {
+  drainBaseAttackNotifications,
+  drainExplosionNotifications,
+} from '../game/systems/RaidingSystem.js';
 import { drainWipeWarnings } from '../game/systems/WipeSystem.js';
-import { drainBlueprintLearnedNotifications, drainResearchProgressUpdates } from '../game/systems/BlueprintSystem.js';
+import { drainWorldEvents } from '../game/systems/WorldEventSystem.js';
 import type { GameWorld } from '../game/World.js';
 import type { SocketServer } from './SocketServer.js';
 
@@ -360,6 +366,7 @@ export class StateBroadcaster {
         killerId: null,
         killerName: null,
         cause: death.cause,
+        hasSleepingBag: death.hasSleepingBag,
       };
 
       this.socketServer.emitToPlayer(death.playerId, ServerMessage.Death, payload);

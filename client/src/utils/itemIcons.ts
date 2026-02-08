@@ -166,6 +166,7 @@ export const BUILDING_ICON_MAP: Record<BuildingPieceType, IconName> = {
   [BuildingPieceType.Pillar]: 'pillar',
   [BuildingPieceType.FloorGrill]: 'floor',
   [BuildingPieceType.Campfire]: 'campfire',
+  [BuildingPieceType.SleepingBag]: 'campfire',
 };
 
 // ─── Public API ───

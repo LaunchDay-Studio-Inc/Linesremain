@@ -348,7 +348,8 @@ function handlePlayerStats(stats: PlayerStatsPayload): void {
 
 // ─── Death Handler ───
 
-function handleDeath(_death: DeathPayload): void {
+function handleDeath(death: DeathPayload): void {
+  useGameStore.getState().setHasSleepingBag(death.hasSleepingBag ?? false);
   useGameStore.getState().setScreen('dead');
 }
 

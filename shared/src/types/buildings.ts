@@ -17,6 +17,7 @@ export enum BuildingPieceType {
   Fence = 'Fence',
   Pillar = 'Pillar',
   Campfire = 'Campfire',
+  SleepingBag = 'SleepingBag',
 }
 
 export enum BuildingTier {
@@ -37,4 +38,3 @@ export interface UpgradeCost {
   itemId: number;
   quantity: number;
 }
-

@@ -29,7 +29,11 @@ import {
   handleContainerMoveItem,
   handleContainerOpen,
 } from '../../game/systems/ContainerSystem.js';
-import { createBarricadeEntity, createLandmineEntity } from '../../game/systems/DefenseSystem.js';
+import {
+  createBarricadeEntity,
+  createLandmineEntity,
+  createSleepingBagEntity,
+} from '../../game/systems/DefenseSystem.js';
 import {
   handleAttachCodeLock,
   handleDoorInteract,
@@ -56,6 +60,7 @@ const RESEARCH_TABLE_ITEM_ID = 95;
 const WOODEN_DOOR_ITEM_ID = 61;
 const METAL_DOOR_ITEM_ID = 62;
 const CODE_LOCK_ITEM_ID = 63;
+const SLEEPING_BAG_ITEM_ID = 64;
 
 // ─── Helper: deduct item from inventory ───
 
@@ -323,6 +328,11 @@ export function registerEndgameHandlers(
         // Code lock is attached to an existing door entity
         const doorEntityId = Math.floor(payload.rotation);
         handleAttachCodeLock(world, playerId, doorEntityId);
+        break;
+      }
+      case SLEEPING_BAG_ITEM_ID: {
+        if (!deductItem(inventory, SLEEPING_BAG_ITEM_ID, 1)) return;
+        createSleepingBagEntity(world, pos, playerId);
         break;
       }
       default: {

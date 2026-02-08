@@ -14,6 +14,7 @@ import {
   type HungerComponent,
   type InventoryComponent,
   type PositionComponent,
+  type RespawnPayload,
   type SnapshotPayload,
   type ThirstComponent,
 } from '@lineremain/shared';
@@ -25,13 +26,17 @@ import { logger } from '../utils/logger.js';
 
 // ─── Handler Imports ───
 import { loadPlayerStats, unloadPlayerStats } from '../game/systems/AchievementSystem.js';
+import { loadPlayerBlueprints, unloadPlayerBlueprints } from '../game/systems/BlueprintSystem.js';
+import { closePlayerContainer } from '../game/systems/ContainerSystem.js';
 import { processRespawn } from '../game/systems/RespawnSystem.js';
+import { getSeasonInfo } from '../game/systems/WipeSystem.js';
 import { registerBlockHandlers } from './handlers/BlockHandler.js';
 import { registerBuildingHandlers } from './handlers/BuildingHandler.js';
 import { registerChatHandlers } from './handlers/ChatHandler.js';
 import { registerChunkRequestHandlers } from './handlers/ChunkRequestHandler.js';
 import { registerCraftingHandlers } from './handlers/CraftingHandler.js';
 import { registerCustomizationHandlers } from './handlers/CustomizationHandler.js';
+import { registerEndgameHandlers } from './handlers/EndgameHandler.js';
 import { registerInventoryHandlers } from './handlers/InventoryHandler.js';
 import { registerPlayerInputHandlers } from './handlers/PlayerInputHandler.js';
 import {
@@ -39,10 +44,6 @@ import {
   handlePlayerDisconnect,
   registerTeamHandlers,
 } from './handlers/TeamHandler.js';
-import { registerEndgameHandlers } from './handlers/EndgameHandler.js';
-import { loadPlayerBlueprints, unloadPlayerBlueprints } from '../game/systems/BlueprintSystem.js';
-import { closePlayerContainer } from '../game/systems/ContainerSystem.js';
-import { getSeasonInfo } from '../game/systems/WipeSystem.js';
 
 // ─── Types ───
 
@@ -274,6 +275,7 @@ export class SocketServer {
       ComponentType.Explosive,
       ComponentType.Landmine,
       ComponentType.Barricade,
+      ComponentType.SleepingBag,
     ];
 
     let hasAny = false;
@@ -319,7 +321,7 @@ export class SocketServer {
     registerEndgameHandlers(this.io, socket, world, getPlayerId);
 
     // Respawn handler — creates fresh entity via RespawnSystem
-    socket.on(ClientMessage.Respawn, () => {
+    socket.on(ClientMessage.Respawn, (data?: unknown) => {
       // Only respawn if player entity was removed by DeathSystem
       const existingEntity = world.getPlayerEntity(player.playerId);
       if (existingEntity !== undefined) {
@@ -331,8 +333,12 @@ export class SocketServer {
         if (!health || health.current > 0) return; // not dead
       }
 
+      // Parse respawn payload
+      const payload = data as RespawnPayload | undefined;
+      const respawnType = payload?.spawnOption === 'bag' ? 'bag' : 'random';
+
       // Create fresh player entity with starting gear
-      const newEntityId = processRespawn(world, player.playerId);
+      const newEntityId = processRespawn(world, player.playerId, respawnType);
       player.entityId = newEntityId;
 
       // Send fresh snapshot to the respawned player

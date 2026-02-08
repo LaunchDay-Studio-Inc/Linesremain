@@ -269,6 +269,7 @@ export interface DeathPayload {
   killerId: string | null;
   killerName: string | null;
   cause: string; // 'player', 'animal', 'hunger', 'thirst', 'cold', 'heat', 'fall', 'bleeding'
+  hasSleepingBag: boolean;
 }
 
 export interface NotificationPayload {

@@ -2,20 +2,21 @@
 // Handles player death (creates LootBag with all items) and respawn
 // (random/bag/bed spawn types, stat reset, starting Rock item).
 
-import type { GameWorld } from '../World.js';
 import {
   ComponentType,
   CORPSE_DESPAWN_SECONDS,
-  WORLD_SIZE,
   SEA_LEVEL,
+  WORLD_SIZE,
   type EntityId,
-  type PositionComponent,
+  type EquipmentComponent,
   type HealthComponent,
   type InventoryComponent,
-  type EquipmentComponent,
   type ItemStack,
+  type PositionComponent,
+  type SleepingBagComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
+import type { GameWorld } from '../World.js';
 
 // ─── Death Tracking ───
 
@@ -57,7 +58,10 @@ export function processPlayerDeaths(world: GameWorld): DeathRecord[] {
     // Gather all items from inventory + equipment
     const allItems: ItemStack[] = [];
 
-    const inventory = world.ecs.getComponent<InventoryComponent>(death.entityId, ComponentType.Inventory);
+    const inventory = world.ecs.getComponent<InventoryComponent>(
+      death.entityId,
+      ComponentType.Inventory,
+    );
     if (inventory) {
       for (const slot of inventory.slots) {
         if (slot !== null) {
@@ -66,9 +70,18 @@ export function processPlayerDeaths(world: GameWorld): DeathRecord[] {
       }
     }
 
-    const equipment = world.ecs.getComponent<EquipmentComponent>(death.entityId, ComponentType.Equipment);
+    const equipment = world.ecs.getComponent<EquipmentComponent>(
+      death.entityId,
+      ComponentType.Equipment,
+    );
     if (equipment) {
-      const equipSlots = [equipment.head, equipment.chest, equipment.legs, equipment.feet, equipment.held];
+      const equipSlots = [
+        equipment.head,
+        equipment.chest,
+        equipment.legs,
+        equipment.feet,
+        equipment.held,
+      ];
       for (const slot of equipSlots) {
         if (slot !== null) {
           allItems.push({ ...slot });
@@ -95,6 +108,35 @@ export function processPlayerDeaths(world: GameWorld): DeathRecord[] {
 
 export type RespawnType = 'random' | 'bag' | 'bed';
 
+/** 5-minute cooldown between sleeping bag respawns */
+const SLEEPING_BAG_COOLDOWN_MS = 5 * 60 * 1000;
+
+/** Find the sleeping bag entity placed by a specific player */
+function findPlayerSleepingBag(
+  world: GameWorld,
+  playerId: string,
+): { entityId: EntityId; bag: SleepingBagComponent; pos: PositionComponent } | null {
+  const bags = world.ecs.query(ComponentType.SleepingBag, ComponentType.Position);
+  for (const bagEntityId of bags) {
+    const bag = world.ecs.getComponent<SleepingBagComponent>(
+      bagEntityId,
+      ComponentType.SleepingBag,
+    );
+    if (!bag || bag.placerId !== playerId) continue;
+
+    const pos = world.ecs.getComponent<PositionComponent>(bagEntityId, ComponentType.Position);
+    if (!pos) continue;
+
+    return { entityId: bagEntityId, bag, pos };
+  }
+  return null;
+}
+
+/** Check if a player has a sleeping bag placed */
+export function playerHasSleepingBag(world: GameWorld, playerId: string): boolean {
+  return findPlayerSleepingBag(world, playerId) !== null;
+}
+
 /** Find a random spawn position on the map */
 function findRandomSpawnPosition(world: GameWorld): { x: number; y: number; z: number } {
   // Try to find a valid position near the coast/beach
@@ -119,9 +161,25 @@ function findRandomSpawnPosition(world: GameWorld): { x: number; y: number; z: n
 export function processRespawn(
   world: GameWorld,
   playerId: string,
-  _respawnType: RespawnType = 'random',
+  respawnType: RespawnType = 'random',
 ): EntityId {
-  const spawnPos = findRandomSpawnPosition(world);
+  let spawnPos: { x: number; y: number; z: number };
+
+  if (respawnType === 'bag') {
+    const bagResult = findPlayerSleepingBag(world, playerId);
+    const now = Date.now();
+
+    if (bagResult && now - bagResult.bag.lastUsedTime >= SLEEPING_BAG_COOLDOWN_MS) {
+      spawnPos = { x: bagResult.pos.x, y: bagResult.pos.y + 1, z: bagResult.pos.z };
+      bagResult.bag.lastUsedTime = now;
+      logger.info({ playerId, bagEntityId: bagResult.entityId }, 'Player respawning at sleeping bag');
+    } else {
+      spawnPos = findRandomSpawnPosition(world);
+      logger.info({ playerId }, 'Sleeping bag unavailable or on cooldown, random respawn');
+    }
+  } else {
+    spawnPos = findRandomSpawnPosition(world);
+  }
 
   // Create fresh player entity
   const entityId = world.createPlayerEntity(playerId, spawnPos);

@@ -29,6 +29,7 @@ export enum ComponentType {
   Landmine = 'Landmine',
   Research = 'Research',
   Barricade = 'Barricade',
+  SleepingBag = 'SleepingBag',
 }
 
 // ─── Component Interfaces ───
@@ -251,4 +252,9 @@ export interface ResearchComponent {
 
 export interface BarricadeComponent {
   placerId: string;
+}
+
+export interface SleepingBagComponent {
+  placerId: string;
+  lastUsedTime: number; // timestamp of last respawn use (for cooldown)
 }

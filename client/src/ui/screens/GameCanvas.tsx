@@ -29,6 +29,7 @@ import { InputManager } from '../../engine/InputManager';
 import { musicSystem } from '../../engine/MusicSystem';
 import { ParticleSystem } from '../../engine/ParticleSystem';
 import { BuildingPreview } from '../../entities/BuildingPreview';
+import { BuildingRenderer } from '../../entities/BuildingRenderer';
 import { LocalPlayerController } from '../../entities/LocalPlayerController';
 import { NPCRenderer } from '../../entities/NPCRenderer';
 import { PlayerRenderer } from '../../entities/PlayerRenderer';
@@ -177,6 +178,9 @@ export const GameCanvas: React.FC = () => {
     buildingPreviewRef.current = buildingPreview;
     chunkManagerRef.current = chunkManager;
 
+    // ── Building Renderer (placed buildings: foundations, walls, campfires, sleeping bags, etc.) ──
+    const buildingRenderer = new BuildingRenderer(scene);
+
     // ── NPC Renderer (creatures: passive animals, hostiles, neutrals) ──
     const npcRenderer = new NPCRenderer(scene);
 
@@ -197,6 +201,9 @@ export const GameCanvas: React.FC = () => {
 
     // ── Dynamic Lighting System (flickering campfire/torch point lights) ──
     const lightingSystem = new LightingSystem(scene);
+
+    // Wire lighting system to building renderer for campfire point lights
+    buildingRenderer.setLightingSystem(lightingSystem);
 
     // ── Supply Drop Renderer (falling crates with smoke trails) ──
     const supplyDropRenderer = new SupplyDropRenderer(scene);
@@ -567,6 +574,40 @@ export const GameCanvas: React.FC = () => {
 
       npcRenderer.update(dt, camera, npcEntityData);
 
+      // Building rendering — sync building entities from server with renderer
+      const activeBuildingIds = new Set<number>();
+      for (const [entityId, entity] of entities) {
+        const building = entity.components['Building'] as
+          | { pieceType: string; tier: string }
+          | undefined;
+        if (!building) continue;
+
+        const entPos = entity.components['Position'] as
+          | { x: number; y: number; z: number }
+          | undefined;
+        if (!entPos) continue;
+
+        activeBuildingIds.add(entityId);
+
+        if (!buildingRenderer.getMesh(entityId)) {
+          const rotation = (entPos as { rotation?: number }).rotation ?? 0;
+          buildingRenderer.addBuilding(
+            entityId,
+            building.pieceType as BuildingPieceType,
+            building.tier as unknown as BuildingTier,
+            entPos,
+            rotation,
+          );
+        }
+      }
+
+      // Remove buildings that are no longer in the entity list
+      for (const [eid] of entities) {
+        if (!activeBuildingIds.has(eid) && buildingRenderer.getMesh(eid)) {
+          buildingRenderer.removeBuilding(eid);
+        }
+      }
+
       // Remote player rendering — sync remote player entities with renderers
       const activeRemotePlayerIds = new Set<number>();
       for (const [entityId, entity] of entities) {
@@ -734,6 +775,7 @@ export const GameCanvas: React.FC = () => {
       remotePlayerRenderers.clear();
       entityInterpolation.clear();
       buildingPreview.dispose();
+      buildingRenderer.dispose();
       blockInteraction.dispose();
       animationSystem.dispose();
       npcRenderer.dispose();

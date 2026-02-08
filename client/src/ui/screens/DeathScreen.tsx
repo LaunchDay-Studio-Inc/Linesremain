@@ -10,6 +10,7 @@ export const DeathScreen: React.FC = () => {
   const [respawning, setRespawning] = useState(false);
   const [fadeIn, setFadeIn] = useState(false);
   const isConnected = useGameStore((s) => s.isConnected);
+  const hasSleepingBag = useGameStore((s) => s.hasSleepingBag);
 
   useEffect(() => {
     const timer = setTimeout(() => setFadeIn(true), 200);
@@ -151,27 +152,29 @@ export const DeathScreen: React.FC = () => {
             {respawning ? 'RESPAWNING...' : 'RESPAWN'}
           </button>
 
-          <button
-            style={{
-              padding: '14px 24px',
-              background: 'rgba(255,255,255,0.06)',
-              border: '1px solid rgba(255,255,255,0.12)',
-              borderRadius: '8px',
-              color: 'rgba(255,200,200,0.8)',
-              fontSize: '13px',
-              fontWeight: 600,
-              cursor: respawning ? 'not-allowed' : 'pointer',
-              transition: 'all 0.2s',
-              letterSpacing: '1px',
-              textTransform: 'uppercase',
-              fontFamily: 'var(--font-ui)',
-              opacity: respawning ? 0.5 : 1,
-            }}
-            onClick={() => handleRespawn('bag')}
-            disabled={respawning}
-          >
-            Respawn at Sleeping Bag
-          </button>
+          {hasSleepingBag && (
+            <button
+              style={{
+                padding: '14px 24px',
+                background: 'rgba(255,255,255,0.06)',
+                border: '1px solid rgba(255,255,255,0.12)',
+                borderRadius: '8px',
+                color: 'rgba(255,200,200,0.8)',
+                fontSize: '13px',
+                fontWeight: 600,
+                cursor: respawning ? 'not-allowed' : 'pointer',
+                transition: 'all 0.2s',
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+                fontFamily: 'var(--font-ui)',
+                opacity: respawning ? 0.5 : 1,
+              }}
+              onClick={() => handleRespawn('bag')}
+              disabled={respawning}
+            >
+              Respawn at Sleeping Bag
+            </button>
+          )}
 
           <button
             style={{

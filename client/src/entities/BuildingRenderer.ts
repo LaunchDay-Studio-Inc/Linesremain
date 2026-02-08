@@ -3,8 +3,8 @@
 // Creates tier-based materials, reuses geometries via pooling, and manages
 // building meshes keyed by entity ID.
 
-import * as THREE from 'three';
 import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
+import * as THREE from 'three';
 import type { LightingSystem } from '../systems/LightingSystem';
 
 // ─── Constants ───
@@ -15,10 +15,10 @@ const WALL_HEIGHT = 3;
 // ─── Tier Colors ───
 
 const TIER_COLORS: Record<BuildingTier, number> = {
-  [BuildingTier.Twig]: 0x8b7355,    // brown twigs
-  [BuildingTier.Wood]: 0xa0522d,    // sienna wood
-  [BuildingTier.Stone]: 0x808080,   // gray stone
-  [BuildingTier.Metal]: 0x708090,   // slate gray metal
+  [BuildingTier.Twig]: 0x8b7355, // brown twigs
+  [BuildingTier.Wood]: 0xa0522d, // sienna wood
+  [BuildingTier.Stone]: 0x808080, // gray stone
+  [BuildingTier.Metal]: 0x708090, // slate gray metal
   [BuildingTier.Armored]: 0x2f4f4f, // dark slate armored
 };
 
@@ -42,7 +42,10 @@ const TIER_METALNESS: Record<BuildingTier, number> = {
 
 const geometryCache = new Map<string, THREE.BufferGeometry>();
 
-function getOrCreateGeometry(key: string, factory: () => THREE.BufferGeometry): THREE.BufferGeometry {
+function getOrCreateGeometry(
+  key: string,
+  factory: () => THREE.BufferGeometry,
+): THREE.BufferGeometry {
   let geo = geometryCache.get(key);
   if (!geo) {
     geo = factory();
@@ -74,8 +77,9 @@ function getTierMaterial(tier: BuildingTier, opacity = 1): THREE.MeshStandardMat
 // ─── Geometry Factories ───
 
 function createFoundationGeometry(): THREE.BufferGeometry {
-  return getOrCreateGeometry('foundation', () =>
-    new THREE.BoxGeometry(FOUNDATION_SIZE, 0.3, FOUNDATION_SIZE),
+  return getOrCreateGeometry(
+    'foundation',
+    () => new THREE.BoxGeometry(FOUNDATION_SIZE, 0.3, FOUNDATION_SIZE),
   );
 }
 
@@ -93,14 +97,16 @@ function createFoundationTriangleGeometry(): THREE.BufferGeometry {
 }
 
 function createWallGeometry(): THREE.BufferGeometry {
-  return getOrCreateGeometry('wall', () =>
-    new THREE.BoxGeometry(FOUNDATION_SIZE, WALL_HEIGHT, 0.2),
+  return getOrCreateGeometry(
+    'wall',
+    () => new THREE.BoxGeometry(FOUNDATION_SIZE, WALL_HEIGHT, 0.2),
   );
 }
 
 function createHalfWallGeometry(): THREE.BufferGeometry {
-  return getOrCreateGeometry('half-wall', () =>
-    new THREE.BoxGeometry(FOUNDATION_SIZE, WALL_HEIGHT / 2, 0.2),
+  return getOrCreateGeometry(
+    'half-wall',
+    () => new THREE.BoxGeometry(FOUNDATION_SIZE, WALL_HEIGHT / 2, 0.2),
   );
 }
 
@@ -162,8 +168,9 @@ function createWindowFrameGeometry(): THREE.BufferGeometry {
 }
 
 function createFloorGeometry(): THREE.BufferGeometry {
-  return getOrCreateGeometry('floor', () =>
-    new THREE.BoxGeometry(FOUNDATION_SIZE, 0.2, FOUNDATION_SIZE),
+  return getOrCreateGeometry(
+    'floor',
+    () => new THREE.BoxGeometry(FOUNDATION_SIZE, 0.2, FOUNDATION_SIZE),
   );
 }
 
@@ -207,27 +214,27 @@ function createRoofGeometry(): THREE.BufferGeometry {
 }
 
 function createDoorGeometry(): THREE.BufferGeometry {
-  return getOrCreateGeometry('door', () =>
-    new THREE.BoxGeometry(1, 2, 0.1),
-  );
+  return getOrCreateGeometry('door', () => new THREE.BoxGeometry(1, 2, 0.1));
 }
 
 function createFenceGeometry(): THREE.BufferGeometry {
-  return getOrCreateGeometry('fence', () =>
-    new THREE.BoxGeometry(FOUNDATION_SIZE, 1, 0.1),
-  );
+  return getOrCreateGeometry('fence', () => new THREE.BoxGeometry(FOUNDATION_SIZE, 1, 0.1));
 }
 
 function createPillarGeometry(): THREE.BufferGeometry {
-  return getOrCreateGeometry('pillar', () =>
-    new THREE.BoxGeometry(0.3, WALL_HEIGHT, 0.3),
-  );
+  return getOrCreateGeometry('pillar', () => new THREE.BoxGeometry(0.3, WALL_HEIGHT, 0.3));
 }
 
 function createCampfireGeometry(): THREE.BufferGeometry {
   return getOrCreateGeometry('campfire', () => {
     // Low cylinder for the stone ring base
     return new THREE.CylinderGeometry(0.45, 0.5, 0.2, 8);
+  });
+}
+
+function createSleepingBagGeometry(): THREE.BufferGeometry {
+  return getOrCreateGeometry('sleeping_bag', () => {
+    return new THREE.BoxGeometry(1.8, 0.2, 0.8);
   });
 }
 
@@ -282,23 +289,42 @@ function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeomet
 
 function getGeometryForPiece(pieceType: BuildingPieceType): THREE.BufferGeometry {
   switch (pieceType) {
-    case BuildingPieceType.Foundation: return createFoundationGeometry();
-    case BuildingPieceType.FoundationTriangle: return createFoundationTriangleGeometry();
-    case BuildingPieceType.Wall: return createWallGeometry();
-    case BuildingPieceType.HalfWall: return createHalfWallGeometry();
-    case BuildingPieceType.Doorway: return createDoorwayGeometry();
-    case BuildingPieceType.WindowFrame: return createWindowFrameGeometry();
-    case BuildingPieceType.WallFrame: return createDoorwayGeometry(); // reuse doorway shape
-    case BuildingPieceType.Floor: return createFloorGeometry();
-    case BuildingPieceType.FloorTriangle: return createFoundationTriangleGeometry();
-    case BuildingPieceType.FloorGrill: return createFloorGeometry();
-    case BuildingPieceType.Stairs: return createStairsGeometry();
-    case BuildingPieceType.Roof: return createRoofGeometry();
-    case BuildingPieceType.Door: return createDoorGeometry();
-    case BuildingPieceType.Fence: return createFenceGeometry();
-    case BuildingPieceType.Pillar: return createPillarGeometry();
-    case BuildingPieceType.Campfire: return createCampfireGeometry();
-    default: return createFoundationGeometry();
+    case BuildingPieceType.Foundation:
+      return createFoundationGeometry();
+    case BuildingPieceType.FoundationTriangle:
+      return createFoundationTriangleGeometry();
+    case BuildingPieceType.Wall:
+      return createWallGeometry();
+    case BuildingPieceType.HalfWall:
+      return createHalfWallGeometry();
+    case BuildingPieceType.Doorway:
+      return createDoorwayGeometry();
+    case BuildingPieceType.WindowFrame:
+      return createWindowFrameGeometry();
+    case BuildingPieceType.WallFrame:
+      return createDoorwayGeometry(); // reuse doorway shape
+    case BuildingPieceType.Floor:
+      return createFloorGeometry();
+    case BuildingPieceType.FloorTriangle:
+      return createFoundationTriangleGeometry();
+    case BuildingPieceType.FloorGrill:
+      return createFloorGeometry();
+    case BuildingPieceType.Stairs:
+      return createStairsGeometry();
+    case BuildingPieceType.Roof:
+      return createRoofGeometry();
+    case BuildingPieceType.Door:
+      return createDoorGeometry();
+    case BuildingPieceType.Fence:
+      return createFenceGeometry();
+    case BuildingPieceType.Pillar:
+      return createPillarGeometry();
+    case BuildingPieceType.Campfire:
+      return createCampfireGeometry();
+    case BuildingPieceType.SleepingBag:
+      return createSleepingBagGeometry();
+    default:
+      return createFoundationGeometry();
   }
 }
 
@@ -356,6 +382,11 @@ export class BuildingRenderer {
         fireLight.castShadow = false;
         mesh.add(fireLight);
       }
+    }
+
+    // Sleeping bag: dark red-brown material
+    if (pieceType === BuildingPieceType.SleepingBag) {
+      mesh.material = new THREE.MeshStandardMaterial({ color: 0x8b2500, roughness: 0.8 });
     }
 
     this.scene.add(mesh);

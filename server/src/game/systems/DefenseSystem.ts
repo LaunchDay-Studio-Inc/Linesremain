@@ -4,14 +4,18 @@
 // via the physics system and can be destroyed, requiring no per-tick logic.
 
 import {
+  BuildingPieceType,
+  BuildingTier,
   ComponentType,
   type BarricadeComponent,
+  type BuildingComponent,
   type ColliderComponent,
   type EntityId,
   type HealthComponent,
   type LandmineComponent,
   type OwnershipComponent,
   type PositionComponent,
+  type SleepingBagComponent,
 } from '@lineremain/shared';
 import { logger } from '../../utils/logger.js';
 import type { GameWorld, SystemFn } from '../World.js';
@@ -144,6 +148,68 @@ export function createBarricadeEntity(
   });
 
   logger.debug({ entityId, position, placerId }, 'Barricade entity created');
+  return entityId;
+}
+
+/**
+ * Create a sleeping bag entity at the given position.
+ * Enforces one sleeping bag per player — destroys any existing bag first.
+ */
+export function createSleepingBagEntity(
+  world: GameWorld,
+  position: { x: number; y: number; z: number },
+  placerId: string,
+): EntityId {
+  // One-per-player: destroy existing sleeping bag for this player
+  const existingBags = world.ecs.query(ComponentType.SleepingBag);
+  for (const bagId of existingBags) {
+    const bag = world.ecs.getComponent<SleepingBagComponent>(bagId, ComponentType.SleepingBag);
+    if (bag && bag.placerId === placerId) {
+      world.ecs.destroyEntity(bagId);
+      logger.debug({ entityId: bagId, placerId }, 'Destroyed old sleeping bag');
+    }
+  }
+
+  const entityId = world.ecs.createEntity();
+
+  world.ecs.addComponent<PositionComponent>(entityId, ComponentType.Position, {
+    x: position.x,
+    y: position.y,
+    z: position.z,
+    rotation: 0,
+  });
+
+  world.ecs.addComponent<HealthComponent>(entityId, ComponentType.Health, {
+    current: 100,
+    max: 100,
+  });
+
+  world.ecs.addComponent<SleepingBagComponent>(entityId, ComponentType.SleepingBag, {
+    placerId,
+    lastUsedTime: 0,
+  });
+
+  world.ecs.addComponent<BuildingComponent>(entityId, ComponentType.Building, {
+    pieceType: BuildingPieceType.SleepingBag,
+    tier: BuildingTier.Twig,
+    stability: 1,
+  });
+
+  world.ecs.addComponent<ColliderComponent>(entityId, ComponentType.Collider, {
+    width: 1.8,
+    height: 0.2,
+    depth: 0.8,
+    isStatic: true,
+  });
+
+  world.ecs.addComponent<OwnershipComponent>(entityId, ComponentType.Ownership, {
+    ownerId: placerId,
+    teamId: null,
+    isLocked: false,
+    authPlayerIds: [placerId],
+  });
+
+  logger.debug({ entityId, position, placerId }, 'Sleeping bag entity created');
   return entityId;
 }
 
