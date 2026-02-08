@@ -7,6 +7,7 @@ import {
   ComponentType,
   ITEM_REGISTRY,
   PICKUP_RANGE,
+  type HealthComponent,
   type InventoryComponent,
   type PositionComponent,
 } from '@lineremain/shared';
@@ -23,6 +24,7 @@ let tickCounter = 0;
 
 const playerEntityIds = new Set<number>();
 const playerEntries: { entityId: number; pos: PositionComponent; inv: InventoryComponent }[] = [];
+const toDestroy: number[] = [];
 
 // ─── System ───
 
@@ -33,25 +35,26 @@ export const itemPickupSystem: SystemFn = (world: GameWorld, _dt: number): void 
   const playerMap = world.getPlayerEntityMap();
   if (playerMap.size === 0) return;
 
-  // Query all entities that have Position + Inventory (potential drops)
+  // Query all entities that have Position + Inventory (includes players, NPCs,
+  // containers — filtered below via hasComponent checks to find item drops only)
   const candidates = world.ecs.query(ComponentType.Position, ComponentType.Inventory);
   if (candidates.length === 0) return;
 
   // Clear and reuse module-level containers
   playerEntityIds.clear();
   playerEntries.length = 0;
+  toDestroy.length = 0;
 
   for (const [, entityId] of playerMap) {
     playerEntityIds.add(entityId);
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position);
     const inv = world.ecs.getComponent<InventoryComponent>(entityId, ComponentType.Inventory);
-    if (pos && inv) {
+    // Skip dead players — they shouldn't pick up items (Issue 139)
+    const health = world.ecs.getComponent<HealthComponent>(entityId, ComponentType.Health);
+    if (pos && inv && health && health.current > 0) {
       playerEntries.push({ entityId, pos, inv });
     }
   }
-
-  // Collect entities to destroy after iteration (avoid mutating during loop)
-  const toDestroy: number[] = [];
 
   for (const dropId of candidates) {
     // Skip player entities
@@ -129,6 +132,7 @@ export const itemPickupSystem: SystemFn = (world: GameWorld, _dt: number): void 
 
     if (allPickedUp) {
       toDestroy.push(dropId);
+      // TODO: emit pickup sound/event to client via world.emitToPlayer()
       logger.debug({ dropId, playerEntityId: closestPlayer.entityId }, 'Item drop auto-collected');
     }
   }

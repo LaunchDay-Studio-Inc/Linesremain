@@ -55,7 +55,7 @@ export const projectileSystem: SystemFn = (world: GameWorld, dt: number): void =
   );
   if (projectiles.length === 0) return;
 
-  const now = Date.now();
+  const now = performance.now();
 
   // Hoist target query outside per-projectile loop
   const targets = world.ecs.query(

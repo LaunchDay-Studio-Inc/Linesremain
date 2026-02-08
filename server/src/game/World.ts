@@ -58,7 +58,7 @@ export class GameWorld {
   readonly chunkStore: ChunkStore;
   terrainGenerator!: TerrainGenerator;
 
-  /** Day/night cycle progress: 0 = dawn, 0.5 = dusk, 0.75 = midnight */
+  /** Day/night cycle progress: 0 = midnight, 0.2 = dawn, 0.5 = noon, 0.8 = dusk */
   worldTime = 0;
 
   /** Day counter (starts at 1, increments each full day cycle) */
@@ -196,6 +196,11 @@ export class GameWorld {
       isStatic: false,
     });
 
+    this.ecs.addComponent<CraftQueueComponent>(entityId, ComponentType.CraftQueue, {
+      queue: [],
+      maxQueue: 5,
+    });
+
     this.playerEntityMap.set(playerId, entityId);
     return entityId;
   }
@@ -263,6 +268,8 @@ export class GameWorld {
       isStatic: true,
     });
 
+    // lastInteractionTime uses wall-clock ms (Date.now()) — consistent with
+    // DecaySystem's comparison via Date.now(). Resets on server restart.
     this.ecs.addComponent<DecayComponent>(entityId, ComponentType.Decay, {
       lastInteractionTime: Date.now(),
       decayStartDelay: DECAY_NO_TC_DELAY_SECONDS,
@@ -335,7 +342,7 @@ export class GameWorld {
       width: 0.4,
       height: 0.4,
       depth: 0.4,
-      isStatic: false,
+      isStatic: true, // Item drops don't move — no VelocityComponent attached
     });
 
     return entityId;
@@ -344,7 +351,6 @@ export class GameWorld {
   // ─── NPC Entity Factory ───
 
   createNPCEntity(
-    type: string,
     position: { x: number; y: number; z: number },
     config?: {
       creatureType?: NPCCreatureType;
@@ -466,7 +472,7 @@ export class GameWorld {
       damage,
       maxRange,
       distanceTraveled: 0,
-      spawnTime: Date.now(),
+      spawnTime: performance.now(),
       maxLifetime,
     });
 
@@ -496,9 +502,10 @@ export class GameWorld {
       rotation: 0,
     });
 
+    const validItems = items.filter((s): s is ItemStack => s !== null);
     this.ecs.addComponent<InventoryComponent>(entityId, ComponentType.Inventory, {
-      slots: items.filter((s) => s !== null) as ItemStack[],
-      maxSlots: items.filter((s) => s !== null).length,
+      slots: validItems,
+      maxSlots: validItems.length,
     });
 
     this.ecs.addComponent<LootableComponent>(entityId, ComponentType.Lootable, {

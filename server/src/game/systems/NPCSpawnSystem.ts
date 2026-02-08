@@ -426,15 +426,16 @@ const NIGHTTIME_TOTAL_WEIGHT = NIGHTTIME_TEMPLATES.reduce((sum, t) => sum + t.we
 const BLOOD_MOON_POOL = [...HOSTILE_TEMPLATES, ...BLOOD_MOON_TEMPLATES];
 const BLOOD_MOON_TOTAL_WEIGHT = BLOOD_MOON_POOL.reduce((sum, t) => sum + t.weight, 0);
 
-// ─── Tick Counter ───
+// ─── Tick Counter (per-world to avoid cross-instance bleed) ───
 
-let tickCounter = 0;
+const spawnTimers = new WeakMap<GameWorld, number>();
 
 // ─── System ───
 
 export function npcSpawnSystem(world: GameWorld, _dt: number): void {
-  tickCounter++;
-  if (tickCounter % SPAWN_CHECK_INTERVAL !== 0) return;
+  const counter = (spawnTimers.get(world) ?? 0) + 1;
+  spawnTimers.set(world, counter);
+  if (counter % SPAWN_CHECK_INTERVAL !== 0) return;
 
   let allNPCs = world.ecs.query(ComponentType.NPCType);
   const daytime = isDaytime(world);
@@ -522,7 +523,6 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
         if (memberY === null) continue;
 
         world.createNPCEntity(
-          template.creatureType,
           { x: memberX, y: memberY + 1, z: memberZ },
           {
             creatureType: template.creatureType,

@@ -38,21 +38,12 @@ export function hungerSystem(world: GameWorld, _dt: number): void {
   tickCounter++;
   if (tickCounter % HUNGER_CHECK_INTERVAL !== 0) return;
 
-  // Only drain player entities — NPCs should not starve
+  // Iterate player entities directly — O(P) instead of querying all Hunger entities
   const playerMap = world.getPlayerEntityMap();
-  const entities = world.ecs.query(ComponentType.Hunger);
 
-  for (const entityId of entities) {
-    // Skip non-player entities
-    let isPlayer = false;
-    for (const [, eid] of playerMap) {
-      if (eid === entityId) {
-        isPlayer = true;
-        break;
-      }
-    }
-    if (!isPlayer) continue;
-    const hunger = world.ecs.getComponent<HungerComponent>(entityId, ComponentType.Hunger)!;
+  for (const [, entityId] of playerMap) {
+    const hunger = world.ecs.getComponent<HungerComponent>(entityId, ComponentType.Hunger);
+    if (!hunger) continue;
 
     // Determine activity level from velocity
     let drain = IDLE_DRAIN;

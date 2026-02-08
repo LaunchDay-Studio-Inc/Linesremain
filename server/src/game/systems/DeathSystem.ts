@@ -34,13 +34,25 @@ export interface DeathNotification {
   };
 }
 
-let deathNotificationQueue: DeathNotification[] = [];
+// ─── Death Notification Queue (per-world to avoid cross-instance bleed) ───
 
-/** Drain all pending death notifications (called by StateBroadcaster or SocketServer) */
-export function drainDeathNotifications(): DeathNotification[] {
-  const notifications = deathNotificationQueue;
-  deathNotificationQueue = [];
-  return notifications;
+const deathQueues = new WeakMap<GameWorld, DeathNotification[]>();
+
+function getDeathQueue(world: GameWorld): DeathNotification[] {
+  let queue = deathQueues.get(world);
+  if (!queue) {
+    queue = [];
+    deathQueues.set(world, queue);
+  }
+  return queue;
+}
+
+/** Drain all pending death notifications (called by StateBroadcaster) */
+export function drainDeathNotifications(world: GameWorld): DeathNotification[] {
+  const queue = deathQueues.get(world);
+  if (!queue || queue.length === 0) return [];
+  deathQueues.set(world, []);
+  return queue;
 }
 
 // ─── System ───
@@ -59,7 +71,7 @@ export function deathSystem(world: GameWorld, _dt: number): void {
     const cause = determineCauseOfDeath(world, entityId);
     const hasBag = playerHasSleepingBag(world, playerId);
     const isLineDeath = !hasBag;
-    deathNotificationQueue.push({ playerId, cause, hasSleepingBag: hasBag, isLineDeath });
+    getDeathQueue(world).push({ playerId, cause, hasSleepingBag: hasBag, isLineDeath });
     trackDeath(playerId);
     logger.info({ playerId, cause }, 'Player death detected');
   }
@@ -81,17 +93,16 @@ export function deathSystem(world: GameWorld, _dt: number): void {
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position);
     const lootable = world.ecs.getComponent<LootableComponent>(entityId, ComponentType.Lootable);
 
-    // Roll loot drops using shared randomization logic
-    if (pos && lootable && !lootable.isLooted && lootable.lootTable.length > 0) {
+    // Roll loot and create a single loot bag (Issue 141 — avoids N individual drops)
+    if (pos && lootable && lootable.lootTable.length > 0) {
       const items = rollLootTable(lootable.lootTable);
-      for (const item of items) {
-        world.createItemDropEntity(item, {
-          x: pos.x + (Math.random() - 0.5),
-          y: pos.y + 0.5,
-          z: pos.z + (Math.random() - 0.5),
-        });
+      if (items.length > 0) {
+        world.createLootBagEntity(
+          { x: pos.x, y: pos.y + 0.5, z: pos.z },
+          items,
+          300, // 5 minute despawn
+        );
       }
-      lootable.isLooted = true;
     }
 
     // Destroy the NPC entity

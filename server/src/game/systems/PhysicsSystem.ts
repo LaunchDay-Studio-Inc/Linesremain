@@ -60,6 +60,9 @@ export function physicsSystem(world: GameWorld, dt: number): void {
     // Skip static entities
     if (collider?.isStatic) continue;
 
+    // Skip projectile entities — they have dedicated movement in ProjectileSystem
+    if (world.ecs.hasComponent(entityId, ComponentType.Projectile)) continue;
+
     const halfHeight = collider ? collider.height / 2 : 0.9;
     const halfW = collider ? collider.width / 2 : 0.3;
     const halfD = collider ? collider.depth / 2 : 0.3;

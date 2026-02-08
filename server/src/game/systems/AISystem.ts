@@ -450,8 +450,10 @@ function broadcastPackAggro(
   creatureType: string,
   packRadius: number,
   pos: PositionComponent,
+  triggerFlee: boolean,
 ): void {
   const allNPCs = world.ecs.query(ComponentType.AI, ComponentType.NPCType, ComponentType.Position);
+  const now = Date.now();
 
   for (const otherId of allNPCs) {
     if (otherId === entityId) continue;
@@ -471,7 +473,12 @@ function broadcastPackAggro(
     // Only alert idle/roaming pack members
     if (otherAi.state === AIState.Idle || otherAi.state === AIState.Roaming) {
       otherAi.targetEntityId = targetEntityId;
-      otherAi.state = AIState.Chasing;
+      if (triggerFlee) {
+        otherAi.state = AIState.Fleeing;
+        otherNpcType.fleeUntil = now + FLEE_DURATION_S * 1000;
+      } else {
+        otherAi.state = AIState.Chasing;
+      }
     }
   }
 }
@@ -523,10 +530,15 @@ export function onNPCDamaged(
     }
   }
 
-  // Pack aggro: alert nearby same-type creatures
-  if (npcType.packRadius > 0 && (ai.state === AIState.Chasing || ai.state === AIState.Attacking)) {
+  // Pack aggro: alert nearby same-type creatures (includes fleeing passive creatures)
+  if (
+    npcType.packRadius > 0 &&
+    (ai.state === AIState.Chasing || ai.state === AIState.Attacking || ai.state === AIState.Fleeing)
+  ) {
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position);
     if (pos) {
+      // Passive creatures trigger flee for pack mates; hostile/neutral trigger chase
+      const triggerFlee = npcType.behavior === AIBehavior.Passive;
       broadcastPackAggro(
         world,
         entityId,
@@ -534,6 +546,7 @@ export function onNPCDamaged(
         npcType.creatureType,
         npcType.packRadius,
         pos,
+        triggerFlee,
       );
     }
   }

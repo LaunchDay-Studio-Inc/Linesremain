@@ -124,7 +124,7 @@ export class StateBroadcaster {
 
   private onTick(world: GameWorld, tick: number): void {
     // Broadcast death notifications (every tick — deaths should be immediate)
-    this.broadcastDeathNotifications();
+    this.broadcastDeathNotifications(world);
 
     // Broadcast world events (every tick — events should be immediate)
     this.broadcastWorldEvents();
@@ -360,8 +360,8 @@ export class StateBroadcaster {
 
   // ─── Death Notification Broadcast ───
 
-  private broadcastDeathNotifications(): void {
-    const deaths = drainDeathNotifications();
+  private broadcastDeathNotifications(world: GameWorld): void {
+    const deaths = drainDeathNotifications(world);
     if (deaths.length === 0) return;
 
     for (const death of deaths) {
