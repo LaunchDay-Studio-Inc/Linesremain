@@ -292,7 +292,7 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 80;
-  pointer-events: auto;
+  pointer-events: none;
 }
 
 .tutorial-card {
@@ -350,6 +350,7 @@
   cursor: pointer;
   transition: all 0.15s ease;
   font-family: var(--font-ui);
+  pointer-events: auto;
 }
 
 .tutorial-card__skip:hover {

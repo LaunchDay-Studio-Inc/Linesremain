@@ -330,7 +330,18 @@ export const GameCanvas: React.FC = () => {
 
     // ── Pointer Lock on Click ──
     const audio = AudioManager.getInstance();
-    const handleClick = () => {
+    const handleClick = (e: MouseEvent) => {
+      // Don't capture clicks on interactive UI elements
+      const target = e.target as HTMLElement;
+      if (
+        target.tagName === 'BUTTON' ||
+        target.tagName === 'INPUT' ||
+        target.tagName === 'TEXTAREA' ||
+        target.tagName === 'SELECT'
+      ) {
+        return;
+      }
+
       if (!input.isPointerLocked()) {
         input.requestPointerLock(canvas);
       } else if (buildingPreview.active && buildingPreview.isValid) {
@@ -352,7 +363,8 @@ export const GameCanvas: React.FC = () => {
       audio.init();
       ambientSynth.init();
     };
-    canvas.addEventListener('click', handleClick);
+    // Listen on window so clicks that pass through HUD overlays still trigger pointer lock
+    window.addEventListener('mousedown', handleClick);
 
     // Prevent context menu so right-click can place blocks
     const handleContextMenu = (e: Event) => e.preventDefault();
@@ -632,7 +644,7 @@ export const GameCanvas: React.FC = () => {
     return () => {
       document.removeEventListener('pointerlockchange', handleLockChange);
       window.removeEventListener('keydown', handleUIKeys);
-      canvas.removeEventListener('click', handleClick);
+      window.removeEventListener('mousedown', handleClick);
       canvas.removeEventListener('contextmenu', handleContextMenu);
       cameraController.detach();
       playerRenderer.removeFromScene(scene);

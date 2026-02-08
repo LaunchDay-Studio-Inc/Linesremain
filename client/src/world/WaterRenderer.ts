@@ -1,26 +1,27 @@
 // ─── Water Renderer ───
 
+import { CHUNK_SIZE_X, CHUNK_SIZE_Z, SEA_LEVEL } from '@shared/constants/game';
 import * as THREE from 'three';
-import { SEA_LEVEL, CHUNK_SIZE_X, CHUNK_SIZE_Z } from '@shared/constants/game';
 
 // ─── Water Shader ───
 
 const waterVertexShader = `
 uniform float uTime;
-varying vec2 vUv;
 varying vec3 vWorldPos;
 
 void main() {
-  vUv = uv;
   vec3 pos = position;
 
-  // Gentle wave displacement
-  float wave1 = sin(pos.x * 0.3 + uTime * 0.8) * 0.08;
-  float wave2 = sin(pos.z * 0.4 + uTime * 0.6) * 0.06;
-  float wave3 = sin((pos.x + pos.z) * 0.2 + uTime * 1.2) * 0.04;
+  // Compute world position for seamless cross-chunk waves
+  vec3 worldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+
+  // Gentle wave displacement using world-space coordinates
+  float wave1 = sin(worldPos.x * 0.3 + uTime * 0.8) * 0.08;
+  float wave2 = sin(worldPos.z * 0.4 + uTime * 0.6) * 0.06;
+  float wave3 = sin((worldPos.x + worldPos.z) * 0.2 + uTime * 1.2) * 0.04;
   pos.y += wave1 + wave2 + wave3;
 
-  vWorldPos = (modelMatrix * vec4(pos, 1.0)).xyz;
+  vWorldPos = worldPos;
   gl_Position = projectionMatrix * modelViewMatrix * vec4(pos, 1.0);
 }
 `;
@@ -30,28 +31,24 @@ uniform float uTime;
 uniform vec3 uWaterColor;
 uniform float uOpacity;
 
-varying vec2 vUv;
 varying vec3 vWorldPos;
 
 void main() {
-  // Animated UV for flowing effect
-  vec2 uv = vUv;
-  uv.x += uTime * 0.02;
-  uv.y += sin(uTime * 0.3) * 0.01;
+  // Animated UV using world-space for seamless cross-chunk patterns
+  vec2 wuv = vWorldPos.xz;
+  wuv.x += uTime * 0.5;
+  wuv.y += sin(uTime * 0.3) * 0.3;
 
-  // Wave pattern
-  float wave = sin(uv.x * 20.0 + uTime * 1.5) * 0.5 + 0.5;
-  wave *= sin(uv.y * 15.0 + uTime * 1.0) * 0.5 + 0.5;
+  // Wave pattern in world space
+  float wave = sin(wuv.x * 0.6 + uTime * 1.5) * 0.5 + 0.5;
+  wave *= sin(wuv.y * 0.5 + uTime * 1.0) * 0.5 + 0.5;
 
   // Subtle surface variation
   float sparkle = pow(wave, 8.0) * 0.3;
 
   vec3 color = uWaterColor + vec3(sparkle * 0.2, sparkle * 0.3, sparkle * 0.4);
 
-  // Depth-based opacity (darker at edges)
-  float edgeFade = smoothstep(0.0, 0.1, min(vUv.x, min(vUv.y, min(1.0 - vUv.x, 1.0 - vUv.y))));
-
-  gl_FragColor = vec4(color, uOpacity * edgeFade);
+  gl_FragColor = vec4(color, uOpacity);
 }
 `;
 
