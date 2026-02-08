@@ -63,6 +63,9 @@ export class InputManager {
   // Keybinds
   keybinds: KeybindMap = { ...DEFAULT_KEYBINDS };
 
+  // Element-level keyboard attachment (for iframe focus issues)
+  private attachedElement: HTMLElement | null = null;
+
   private constructor() {
     window.addEventListener('keydown', this.onKeyDown);
     window.addEventListener('keyup', this.onKeyUp);
@@ -93,6 +96,28 @@ export class InputManager {
 
   isPointerLocked(): boolean {
     return this.pointerLocked;
+  }
+
+  /**
+   * Attach keyboard listeners directly to an element.
+   * Critical for iframe environments (e.g., Codespaces) where window-level
+   * keyboard events may not fire when the iframe lacks focus.
+   */
+  attachToElement(el: HTMLElement): void {
+    this.attachedElement = el;
+    el.addEventListener('keydown', this.onKeyDown);
+    el.addEventListener('keyup', this.onKeyUp);
+  }
+
+  /**
+   * Remove keyboard listeners from the attached element.
+   */
+  detachFromElement(): void {
+    if (this.attachedElement) {
+      this.attachedElement.removeEventListener('keydown', this.onKeyDown);
+      this.attachedElement.removeEventListener('keyup', this.onKeyUp);
+      this.attachedElement = null;
+    }
   }
 
   // ── Keyboard Queries ──
@@ -135,6 +160,9 @@ export class InputManager {
     // Don't capture game input when typing in form fields
     const tag = (e.target as HTMLElement)?.tagName;
     if (tag === 'INPUT' || tag === 'TEXTAREA') return;
+
+    // Debug: Log keyboard events to help diagnose focus issues
+    console.log('InputManager keydown:', e.code);
 
     // Prevent default for game & navigation keys (not all keys, allow browser shortcuts)
     if (PREVENT_DEFAULT_KEYS.has(e.code)) {
@@ -191,6 +219,7 @@ export class InputManager {
     window.removeEventListener('mousemove', this.onMouseMove);
     window.removeEventListener('wheel', this.onWheel);
     document.removeEventListener('pointerlockchange', this.onPointerLockChange);
+    this.detachFromElement();
     InputManager.instance = null;
   }
 }

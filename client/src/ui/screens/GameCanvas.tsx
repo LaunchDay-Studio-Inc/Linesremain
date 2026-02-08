@@ -99,6 +99,13 @@ export const GameCanvas: React.FC = () => {
     key: number;
   }>({ text: '', subtitle: undefined, duration: 5000, key: 0 });
 
+  // Debug state for diagnosing input issues in iframe environments
+  const [debugState, setDebugState] = useState<{
+    hasFocus: boolean;
+    pointerLocked: boolean;
+    lastKey: string;
+  }>({ hasFocus: false, pointerLocked: false, lastKey: '' });
+
   // Building panel callbacks
   const handleSelectPiece = useCallback((pieceType: BuildingPieceType, tier: BuildingTier) => {
     buildingPreviewRef.current?.activate(pieceType, tier);
@@ -128,6 +135,8 @@ export const GameCanvas: React.FC = () => {
 
     // ── Input Manager ──
     const input = InputManager.getInstance();
+    // Attach keyboard listeners directly to canvas (critical for iframe environments)
+    input.attachToElement(canvas);
 
     // ── Sky Renderer (replaces manual lighting — handles sky dome, sun/moon, ambient, fog) ──
     const skyRenderer = new SkyRenderer(scene);
@@ -428,6 +437,21 @@ export const GameCanvas: React.FC = () => {
 
     // ── Game Loop ──
     engine.onUpdate((dt) => {
+      // Recover canvas focus if lost (critical for iframe environments like Codespaces)
+      if (document.activeElement !== canvas) {
+        const tag = document.activeElement?.tagName;
+        if (tag !== 'INPUT' && tag !== 'TEXTAREA' && tag !== 'SELECT') {
+          canvas.focus();
+        }
+      }
+
+      // Update debug state for diagnostics overlay
+      setDebugState({
+        hasFocus: document.activeElement === canvas,
+        pointerLocked: input.isPointerLocked(),
+        lastKey: Array.from(input['keysDown']).pop() || '',
+      });
+
       // Player update
       playerController.update(dt);
 
@@ -700,6 +724,7 @@ export const GameCanvas: React.FC = () => {
       chunkManager.dispose();
       audio.dispose();
       engine.dispose();
+      input.detachFromElement();
       input.dispose();
     };
   }, []);
@@ -711,6 +736,27 @@ export const GameCanvas: React.FC = () => {
         tabIndex={0}
         style={{ display: 'block', width: '100%', height: '100%', outline: 'none' }}
       />
+
+      {/* Debug overlay for input diagnostics */}
+      <div
+        style={{
+          position: 'fixed',
+          top: 10,
+          left: 10,
+          background: 'rgba(0, 0, 0, 0.7)',
+          color: '#0f0',
+          fontFamily: 'monospace',
+          fontSize: '12px',
+          padding: '8px',
+          borderRadius: '4px',
+          pointerEvents: 'none',
+          zIndex: 9999,
+        }}
+      >
+        <div>Focus: {debugState.hasFocus ? 'CANVAS' : 'OTHER'}</div>
+        <div>PtrLock: {debugState.pointerLocked ? 'YES' : 'NO'}</div>
+        <div>LastKey: {debugState.lastKey || 'none'}</div>
+      </div>
 
       {/* Debug overlay */}
       <FPSCounter getRenderer={getRenderer} />
