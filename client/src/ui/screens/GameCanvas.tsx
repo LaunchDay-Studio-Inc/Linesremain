@@ -41,6 +41,7 @@ import {
   getLastServerTick,
   getLocalPlayerEntityId,
   setOnBlockChanged,
+  worldTimeState,
 } from '../../network/MessageHandler';
 import { socketClient } from '../../network/SocketClient';
 import { useAchievementStore } from '../../stores/useAchievementStore';
@@ -61,6 +62,7 @@ import { ChunkManager } from '../../world/ChunkManager';
 import { ClientTerrainGenerator } from '../../world/ClientTerrainGenerator';
 import { SkyRenderer } from '../../world/SkyRenderer';
 import { WaterRenderer } from '../../world/WaterRenderer';
+import { WeatherSystem } from '../../world/WeatherSystem';
 import { CinematicText } from '../hud/CinematicText';
 import { FPSCounter } from '../hud/FPSCounter';
 import { HUD } from '../hud/HUD';
@@ -170,6 +172,13 @@ export const GameCanvas: React.FC = () => {
 
     // ── Water Renderer (animated shader water planes) ──
     const waterRenderer = new WaterRenderer(scene);
+
+    // ── Weather System (rain, clouds, fog adjustments) ──
+    const weatherSystem = new WeatherSystem(scene);
+    weatherSystem.setAmbientLight(skyRenderer.getAmbientLight());
+    if (scene.fog instanceof THREE.Fog) {
+      weatherSystem.setFog(scene.fog);
+    }
 
     // ── Particle System ──
     const particleSystem = new ParticleSystem(scene);
@@ -485,6 +494,8 @@ export const GameCanvas: React.FC = () => {
       } else if (payload.eventType === 'supply_drop' && payload.active && payload.position) {
         const dropId = `drop_${payload.position.x}_${payload.position.z}`;
         supplyDropRenderer.addDrop(dropId, payload.position);
+      } else if (payload.eventType === 'fog') {
+        weatherSystem.setWeather(payload.active ? 'cloudy' : 'clear');
       }
     };
 
@@ -554,10 +565,28 @@ export const GameCanvas: React.FC = () => {
       waterRenderer.syncWithChunks(chunkManager.getLoadedChunkKeys());
       waterRenderer.update(dt);
 
-      // Day/night cycle (accelerated: 1 game day = DAY_LENGTH_SECONDS real seconds)
-      worldTime = (worldTime + dt / DAY_LENGTH_SECONDS) % 1;
+      // Day/night cycle — sync with server time, interpolate between broadcasts
+      if (!isOffline) {
+        const serverTime = worldTimeState.timeOfDay;
+        let diff = serverTime - worldTime;
+        // Handle wrapping (e.g., 0.99 → 0.01)
+        if (diff > 0.5) diff -= 1;
+        if (diff < -0.5) diff += 1;
+        // Snap if too far off, otherwise blend
+        if (Math.abs(diff) > 0.1) {
+          worldTime = serverTime;
+        } else {
+          worldTime = (((worldTime + diff * 0.05 + dt / DAY_LENGTH_SECONDS) % 1) + 1) % 1;
+        }
+      } else {
+        worldTime = (worldTime + dt / DAY_LENGTH_SECONDS) % 1;
+      }
       skyRenderer.update(worldTime);
       skyRenderer.followCamera(camera);
+
+      // Weather system update (rain, clouds follow player)
+      _playerVec.set(pos.x, pos.y, pos.z);
+      weatherSystem.update(dt, _playerVec);
 
       // Animation system
       animationSystem.update(dt);
@@ -793,6 +822,14 @@ export const GameCanvas: React.FC = () => {
       if (healthPruneCounter >= 300) {
         healthPruneCounter = 0;
         combatEffects.pruneHealthTracking(_activeHealthIds);
+
+        // Also prune stale EntityInterpolation entries (entities no longer in server state)
+        for (const interpId of entityInterpolation.getEntityIds()) {
+          const numId = parseInt(interpId, 10);
+          if (!isNaN(numId) && !entities.has(numId)) {
+            entityInterpolation.removeEntity(interpId);
+          }
+        }
       }
 
       // Resource node rendering (billboard health bars, proximity checks)
@@ -977,6 +1014,7 @@ export const GameCanvas: React.FC = () => {
       lootBagRenderer.dispose();
       lightingSystem.dispose();
       supplyDropRenderer.dispose();
+      weatherSystem.dispose();
       socketClient.off(ServerMessage.WorldEvent, handleWorldEvent);
       socketClient.off(ServerMessage.JournalFound, handleJournalFound);
       socketClient.off(ServerMessage.CinematicText, handleCinematicText);

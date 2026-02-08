@@ -460,7 +460,6 @@ interface NPCInstance {
 export class NPCRenderer {
   private scene: THREE.Scene;
   private npcs = new Map<number, NPCInstance>();
-  private textureCache = new Map<string, THREE.CanvasTexture>();
 
   constructor(scene: THREE.Scene) {
     this.scene = scene;
@@ -656,15 +655,16 @@ export class NPCRenderer {
       const spriteMat = npc.sprite.material as THREE.SpriteMaterial;
       spriteMat.map?.dispose();
       spriteMat.dispose();
+      const healthMat = npc.healthBar.material as THREE.SpriteMaterial;
+      healthMat.map?.dispose();
+      healthMat.dispose();
       const nameMat = npc.nameLabel.material as THREE.SpriteMaterial;
       nameMat.map?.dispose();
       nameMat.dispose();
     }
     this.npcs.clear();
 
-    for (const [, texture] of this.textureCache) {
-      texture.dispose();
-    }
-    this.textureCache.clear();
+    // Clear module-level sprite cache
+    spriteCache.clear();
   }
 }

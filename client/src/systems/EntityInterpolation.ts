@@ -167,8 +167,8 @@ export class EntityInterpolation {
     return this.entities.has(entityId);
   }
 
-  getEntityIds(): string[] {
-    return Array.from(this.entities.keys());
+  getEntityIds(): IterableIterator<string> {
+    return this.entities.keys();
   }
 
   // ─── Cleanup ───

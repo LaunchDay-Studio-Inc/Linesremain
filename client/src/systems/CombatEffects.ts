@@ -39,6 +39,7 @@ const DAMAGE_NUMBER_RISE_SPEED = 2.0;
 const DAMAGE_NUMBER_SPREAD = 0.8;
 const KILL_FEED_MAX = 6;
 const KILL_FEED_DURATION = 8000; // ms
+const MAX_FLOATING_NUMBERS = 30;
 
 // ─── Canvas Texture Helpers ───
 
@@ -130,6 +131,11 @@ export class CombatEffects {
   // Local player entity ID (set externally)
   private localPlayerEntityId: number | null = null;
 
+  // Reusable vectors to avoid per-event allocations
+  private _tempPos = new THREE.Vector3();
+  private _tempDir = new THREE.Vector3();
+  private _tempOffset = new THREE.Vector3();
+
   constructor(scene: THREE.Scene, particles: ParticleSystem) {
     this.scene = scene;
     this.particles = particles;
@@ -190,15 +196,15 @@ export class CombatEffects {
   // ─── Damage Events ───
 
   private onEntityDamaged(entity: EntityHealthState, damage: number): void {
-    const pos = new THREE.Vector3(entity.position.x, entity.position.y, entity.position.z);
+    this._tempPos.set(entity.position.x, entity.position.y, entity.position.z);
 
     // Blood particles + hit sparks
-    this.particles.emitBlood(pos);
-    this.particles.emitHitSpark(pos);
+    this.particles.emitBlood(this._tempPos);
+    this.particles.emitHitSpark(this._tempPos);
 
     // Floating damage number
     const isCrit = damage >= 50;
-    this.spawnDamageNumber(pos, damage, isCrit);
+    this.spawnDamageNumber(this._tempPos, damage, isCrit);
 
     // Check for death
     if (entity.health.current <= 0) {
@@ -209,16 +215,17 @@ export class CombatEffects {
   private onEntityHealed(entity: EntityHealthState, amount: number): void {
     if (amount < 1) return; // Ignore tiny regen ticks visually
 
-    const pos = new THREE.Vector3(entity.position.x, entity.position.y, entity.position.z);
-    this.spawnHealNumber(pos, amount);
+    this._tempPos.set(entity.position.x, entity.position.y, entity.position.z);
+    this.spawnHealNumber(this._tempPos, amount);
   }
 
   private onEntityDeath(entity: EntityHealthState): void {
-    const pos = new THREE.Vector3(entity.position.x, entity.position.y, entity.position.z);
+    this._tempPos.set(entity.position.x, entity.position.y, entity.position.z);
 
     // Extra blood burst on death
-    this.particles.emitBlood(pos);
-    this.particles.emitBlood(pos, new THREE.Vector3(0, 1, 0));
+    this.particles.emitBlood(this._tempPos);
+    this._tempDir.set(0, 1, 0);
+    this.particles.emitBlood(this._tempPos, this._tempDir);
   }
 
   // ─── Projectile Impact ───
@@ -274,7 +281,22 @@ export class CombatEffects {
 
   // ─── Floating Damage Numbers ───
 
+  /** Evict the oldest floating number to stay within the cap */
+  private evictOldestNumber(): void {
+    const oldest = this.floatingNumbers.shift();
+    if (oldest) {
+      this.scene.remove(oldest.sprite);
+      const mat = oldest.sprite.material as THREE.SpriteMaterial;
+      mat.map?.dispose();
+      mat.dispose();
+    }
+  }
+
   private spawnDamageNumber(worldPos: THREE.Vector3, damage: number, isCrit: boolean): void {
+    if (this.floatingNumbers.length >= MAX_FLOATING_NUMBERS) {
+      this.evictOldestNumber();
+    }
+
     const texture = createDamageNumberTexture(damage, isCrit);
     const material = new THREE.SpriteMaterial({
       map: texture,
@@ -285,12 +307,12 @@ export class CombatEffects {
     const sprite = new THREE.Sprite(material);
 
     // Randomize position slightly to avoid overlap
-    const offset = new THREE.Vector3(
+    this._tempOffset.set(
       (Math.random() - 0.5) * DAMAGE_NUMBER_SPREAD,
       1.5 + Math.random() * 0.5,
       (Math.random() - 0.5) * DAMAGE_NUMBER_SPREAD,
     );
-    sprite.position.copy(worldPos).add(offset);
+    sprite.position.copy(worldPos).add(this._tempOffset);
 
     const scale = isCrit ? 1.0 : 0.7;
     sprite.scale.set(scale * 2, scale, 1);
@@ -310,6 +332,10 @@ export class CombatEffects {
   }
 
   private spawnHealNumber(worldPos: THREE.Vector3, amount: number): void {
+    if (this.floatingNumbers.length >= MAX_FLOATING_NUMBERS) {
+      this.evictOldestNumber();
+    }
+
     const texture = createHealNumberTexture(amount);
     const material = new THREE.SpriteMaterial({
       map: texture,
@@ -319,9 +345,8 @@ export class CombatEffects {
     });
     const sprite = new THREE.Sprite(material);
 
-    sprite.position
-      .copy(worldPos)
-      .add(new THREE.Vector3((Math.random() - 0.5) * 0.3, 1.8, (Math.random() - 0.5) * 0.3));
+    this._tempOffset.set((Math.random() - 0.5) * 0.3, 1.8, (Math.random() - 0.5) * 0.3);
+    sprite.position.copy(worldPos).add(this._tempOffset);
     sprite.scale.set(1.4, 0.7, 1);
 
     this.scene.add(sprite);

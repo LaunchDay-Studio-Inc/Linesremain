@@ -32,6 +32,10 @@ export class AudioManager {
   private grassNoiseBuffer: AudioBuffer | null = null;
   private stoneNoiseBuffer: AudioBuffer | null = null;
 
+  // Pre-cached noise buffers for block break and hit sounds
+  private blockBreakNoiseBuffer: AudioBuffer | null = null;
+  private hitNoiseBuffer: AudioBuffer | null = null;
+
   static getInstance(): AudioManager {
     if (!instance) {
       instance = new AudioManager();
@@ -164,6 +168,34 @@ export class AudioManager {
     return this.stoneNoiseBuffer;
   }
 
+  /** Ensure the block break noise buffer is pre-cached */
+  private getBlockBreakNoiseBuffer(ctx: AudioContext): AudioBuffer {
+    if (!this.blockBreakNoiseBuffer || this.blockBreakNoiseBuffer.sampleRate !== ctx.sampleRate) {
+      const duration = 0.25;
+      const bufferSize = Math.ceil(ctx.sampleRate * duration);
+      this.blockBreakNoiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = this.blockBreakNoiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.3;
+      }
+    }
+    return this.blockBreakNoiseBuffer;
+  }
+
+  /** Ensure the hit noise buffer is pre-cached */
+  private getHitNoiseBuffer(ctx: AudioContext): AudioBuffer {
+    if (!this.hitNoiseBuffer || this.hitNoiseBuffer.sampleRate !== ctx.sampleRate) {
+      const duration = 0.1;
+      const bufferSize = Math.ceil(ctx.sampleRate * duration);
+      this.hitNoiseBuffer = ctx.createBuffer(1, bufferSize, ctx.sampleRate);
+      const data = this.hitNoiseBuffer.getChannelData(0);
+      for (let i = 0; i < bufferSize; i++) {
+        data[i] = (Math.random() * 2 - 1) * 0.5;
+      }
+    }
+    return this.hitNoiseBuffer;
+  }
+
   /** Grass footstep: short burst of filtered white noise (earthy thud) */
   private playFootstepGrass(): void {
     const ctx = this.ensureContext();
@@ -252,15 +284,9 @@ export class AudioManager {
     osc.frequency.setValueAtTime(300, now);
     osc.frequency.exponentialRampToValueAtTime(80, now + duration);
 
-    // Noise layer
-    const noiseSize = Math.ceil(ctx.sampleRate * duration);
-    const noiseBuffer = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < noiseSize; i++) {
-      noiseData[i] = (Math.random() * 2 - 1) * 0.3;
-    }
+    // Noise layer (reuse pre-cached buffer)
     const noiseSource = ctx.createBufferSource();
-    noiseSource.buffer = noiseBuffer;
+    noiseSource.buffer = this.getBlockBreakNoiseBuffer(ctx);
 
     const noiseFilter = ctx.createBiquadFilter();
     noiseFilter.type = 'lowpass';
@@ -338,15 +364,9 @@ export class AudioManager {
     osc.frequency.setValueAtTime(200, now);
     osc.frequency.exponentialRampToValueAtTime(60, now + duration);
 
-    // Noise burst
-    const noiseSize = Math.ceil(ctx.sampleRate * duration);
-    const noiseBuffer = ctx.createBuffer(1, noiseSize, ctx.sampleRate);
-    const noiseData = noiseBuffer.getChannelData(0);
-    for (let i = 0; i < noiseSize; i++) {
-      noiseData[i] = (Math.random() * 2 - 1) * 0.5;
-    }
+    // Noise burst (reuse pre-cached buffer)
     const noiseSource = ctx.createBufferSource();
-    noiseSource.buffer = noiseBuffer;
+    noiseSource.buffer = this.getHitNoiseBuffer(ctx);
 
     const noiseFilter = ctx.createBiquadFilter();
     noiseFilter.type = 'bandpass';
@@ -484,6 +504,8 @@ export class AudioManager {
     }
     this.grassNoiseBuffer = null;
     this.stoneNoiseBuffer = null;
+    this.blockBreakNoiseBuffer = null;
+    this.hitNoiseBuffer = null;
     instance = null;
   }
 }
