@@ -223,6 +223,13 @@ function createPillarGeometry(): THREE.BufferGeometry {
   );
 }
 
+function createCampfireGeometry(): THREE.BufferGeometry {
+  return getOrCreateGeometry('campfire', () => {
+    // Low cylinder for the stone ring base
+    return new THREE.CylinderGeometry(0.45, 0.5, 0.2, 8);
+  });
+}
+
 // ─── Helper: Merge BufferGeometries ───
 
 function mergeGeometries(geometries: THREE.BufferGeometry[]): THREE.BufferGeometry | null {
@@ -289,6 +296,7 @@ function getGeometryForPiece(pieceType: BuildingPieceType): THREE.BufferGeometry
     case BuildingPieceType.Door: return createDoorGeometry();
     case BuildingPieceType.Fence: return createFenceGeometry();
     case BuildingPieceType.Pillar: return createPillarGeometry();
+    case BuildingPieceType.Campfire: return createCampfireGeometry();
     default: return createFoundationGeometry();
   }
 }
@@ -324,6 +332,15 @@ export class BuildingRenderer {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     mesh.userData = { entityId, pieceType, tier };
+
+    // Campfire: replace material with stone gray and attach warm point light
+    if (pieceType === BuildingPieceType.Campfire) {
+      mesh.material = new THREE.MeshStandardMaterial({ color: 0x808080, roughness: 0.9 });
+      const fireLight = new THREE.PointLight(0xff8c00, 1.5, 15, 2);
+      fireLight.position.set(0, 0.5, 0);
+      fireLight.castShadow = false;
+      mesh.add(fireLight);
+    }
 
     this.scene.add(mesh);
     this.meshes.set(entityId, mesh);

@@ -267,6 +267,23 @@ export const BUILDING_REGISTRY: Record<string, BuildingPieceStats> = {
       [BuildingTier.Armored]: [{ itemId: 12, quantity: 13 }],
     },
   },
+  [BuildingPieceType.Campfire]: {
+    type: BuildingPieceType.Campfire,
+    healthPerTier: {
+      [BuildingTier.Twig]: 100,
+      [BuildingTier.Wood]: 100,
+      [BuildingTier.Stone]: 0,
+      [BuildingTier.Metal]: 0,
+      [BuildingTier.Armored]: 0,
+    },
+    upgradeCosts: {
+      [BuildingTier.Twig]: [],
+      [BuildingTier.Wood]: [],
+      [BuildingTier.Stone]: [],
+      [BuildingTier.Metal]: [],
+      [BuildingTier.Armored]: [],
+    },
+  },
 };
 
 // ─── Decay Constants ───

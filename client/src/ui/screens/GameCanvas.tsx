@@ -18,14 +18,17 @@ import { LocalPlayerController } from '../../entities/LocalPlayerController';
 import { AnimationSystem } from '../../systems/AnimationSystem';
 import { BlockInteraction } from '../../systems/BlockInteraction';
 import { BuildingPreview } from '../../entities/BuildingPreview';
+import { NPCRenderer } from '../../entities/NPCRenderer';
+import { CombatEffects, type EntityHealthState } from '../../systems/CombatEffects';
+import { EntityInterpolation } from '../../systems/EntityInterpolation';
 import { generateSpriteSheet } from '../../assets/SpriteGenerator';
 import { useUIStore } from '../../stores/useUIStore';
 import { useChatStore } from '../../stores/useChatStore';
 import { socketClient } from '../../network/SocketClient';
 import { SEA_LEVEL, CHUNK_SIZE_X, CHUNK_SIZE_Y, CHUNK_SIZE_Z, DAY_LENGTH_SECONDS } from '@shared/constants/game';
 import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
-import { ClientMessage } from '@shared/types/network';
-import { setOnBlockChanged } from '../../network/MessageHandler';
+import { ClientMessage, type InputPayload } from '@shared/types/network';
+import { setOnBlockChanged, getEntities, getLocalPlayerEntityId, getLastServerTick } from '../../network/MessageHandler';
 import { HUD } from '../hud/HUD';
 import { FPSCounter } from '../hud/FPSCounter';
 import { InventoryPanel } from '../panels/InventoryPanel';
@@ -115,6 +118,22 @@ export const GameCanvas: React.FC = () => {
     const buildingPreview = new BuildingPreview(scene, camera);
     buildingPreviewRef.current = buildingPreview;
     chunkManagerRef.current = chunkManager;
+
+    // ── NPC Renderer (creatures: passive animals, hostiles, neutrals) ──
+    const npcRenderer = new NPCRenderer(scene);
+
+    // ── Combat Effects (floating damage numbers, blood particles) ──
+    const combatEffects = new CombatEffects(scene, particleSystem);
+
+    // ── Entity Interpolation (smooth remote entity movement) ──
+    const entityInterpolation = new EntityInterpolation();
+
+    // ── Remote Player Tracking ──
+    const remotePlayerRenderers = new Map<number, PlayerRenderer>();
+    let lastFedTick = 0;
+    let inputSeq = 0;
+    let inputTimer = 0;
+    const INPUT_SEND_INTERVAL = 1 / 20; // Send input 20 times per second
 
     // ── Player Sprite & Renderer ──
     const { canvas: spriteCanvas, config: spriteConfig } = generateSpriteSheet('#ffffff');
@@ -251,6 +270,119 @@ export const GameCanvas: React.FC = () => {
       // Animation system
       animationSystem.update(dt);
 
+      // NPC rendering — sync NPC entities from server with renderer
+      const entities = getEntities();
+      const localPlayerId = getLocalPlayerEntityId();
+
+      // Feed entity interpolation snapshots when new server tick arrives
+      const currentTick = getLastServerTick();
+      if (currentTick > lastFedTick) {
+        lastFedTick = currentTick;
+        const now = Date.now();
+        for (const [entityId, entity] of entities) {
+          if (entityId === localPlayerId) continue;
+          const entPos = entity.components['Position'] as { x: number; y: number; z: number } | undefined;
+          if (entPos) {
+            const rot = entity.components['Rotation'] as { yaw?: number } | undefined;
+            entityInterpolation.addSnapshot(
+              String(entityId),
+              now,
+              new THREE.Vector3(entPos.x, entPos.y, entPos.z),
+              rot?.yaw ?? 0,
+            );
+          }
+        }
+      }
+      entityInterpolation.update(Date.now());
+
+      const npcEntityData = new Map<number, {
+        position: { x: number; y: number; z: number };
+        health?: { current: number; max: number };
+      }>();
+      const activeNpcIds = new Set<number>();
+
+      for (const [entityId, entity] of entities) {
+        if (entityId === localPlayerId) continue;
+        const npcType = entity.components['NPCType'] as { creatureType?: string } | undefined;
+        if (!npcType?.creatureType) continue;
+
+        activeNpcIds.add(entityId);
+        const entPos = entity.components['Position'] as { x: number; y: number; z: number } | undefined;
+        const entHealth = entity.components['Health'] as { current: number; max: number } | undefined;
+
+        if (entPos) {
+          if (!npcRenderer.hasNPC(entityId)) {
+            npcRenderer.addNPC(entityId, npcType.creatureType, new THREE.Vector3(entPos.x, entPos.y, entPos.z));
+          }
+          npcEntityData.set(entityId, { position: entPos, health: entHealth });
+        }
+      }
+
+      // Remove NPCs that are no longer in the entity list
+      npcRenderer.syncActiveEntities(activeNpcIds);
+
+      npcRenderer.update(dt, camera, npcEntityData);
+
+      // Remote player rendering — sync remote player entities with renderers
+      const activeRemotePlayerIds = new Set<number>();
+      for (const [entityId, entity] of entities) {
+        if (entityId === localPlayerId) continue;
+        if (entity.components['NPCType']) continue;
+        const entPos = entity.components['Position'] as { x: number; y: number; z: number } | undefined;
+        if (!entPos) continue;
+
+        activeRemotePlayerIds.add(entityId);
+
+        // Create renderer for new remote players
+        if (!remotePlayerRenderers.has(entityId)) {
+          const hue = (entityId * 137) % 360;
+          const color = `hsl(${hue}, 70%, 60%)`;
+          const { canvas: rSprite, config: rConfig } = generateSpriteSheet(color);
+          const rRenderer = new PlayerRenderer(rSprite, rConfig);
+          rRenderer.addToScene(scene);
+          animationSystem.register(String(entityId), rRenderer);
+          remotePlayerRenderers.set(entityId, rRenderer);
+        }
+
+        // Update position (prefer interpolated)
+        const renderer = remotePlayerRenderers.get(entityId)!;
+        const interpPos = entityInterpolation.getPosition(String(entityId));
+        if (interpPos) {
+          renderer.setPosition(interpPos.x, interpPos.y, interpPos.z);
+        } else {
+          renderer.setPosition(entPos.x, entPos.y, entPos.z);
+        }
+      }
+
+      // Remove departed remote players
+      for (const [eid, renderer] of remotePlayerRenderers) {
+        if (!activeRemotePlayerIds.has(eid)) {
+          renderer.removeFromScene(scene);
+          renderer.dispose();
+          animationSystem.unregister(String(eid));
+          entityInterpolation.removeEntity(String(eid));
+          remotePlayerRenderers.delete(eid);
+        }
+      }
+
+      // Combat effects — detect health changes and spawn damage numbers / blood
+      const healthStates: EntityHealthState[] = [];
+      for (const [entityId, entity] of entities) {
+        const entPos = entity.components['Position'] as { x: number; y: number; z: number } | undefined;
+        const entHealth = entity.components['Health'] as { current: number; max: number } | undefined;
+        if (entPos && entHealth) {
+          healthStates.push({
+            entityId,
+            position: entPos,
+            health: entHealth,
+            isNPC: !!entity.components['NPCType'],
+            isPlayer: !entity.components['NPCType'],
+          });
+        }
+      }
+      combatEffects.processEntityStates(healthStates);
+      combatEffects.update(dt);
+
       // Block interaction (raycast, breaking, placing)
       blockInteraction.update(dt);
 
@@ -263,6 +395,27 @@ export const GameCanvas: React.FC = () => {
 
       // Camera
       cameraController.update(dt);
+
+      // Send player input to server at fixed rate
+      inputTimer += dt;
+      if (inputTimer >= INPUT_SEND_INTERVAL) {
+        inputTimer -= INPUT_SEND_INTERVAL;
+        inputSeq++;
+        const keybinds = input.keybinds;
+        const inputPayload: InputPayload = {
+          seq: inputSeq,
+          forward: (input.isKeyDown(keybinds.moveForward) ? 1 : 0) - (input.isKeyDown(keybinds.moveBackward) ? 1 : 0),
+          right: (input.isKeyDown(keybinds.moveRight) ? 1 : 0) - (input.isKeyDown(keybinds.moveLeft) ? 1 : 0),
+          jump: input.isKeyDown(keybinds.jump),
+          crouch: input.isKeyDown(keybinds.crouch),
+          sprint: input.isKeyDown(keybinds.sprint),
+          rotation: playerController.getYaw(),
+          primaryAction: false,
+          secondaryAction: false,
+          selectedSlot: 0,
+        };
+        socketClient.emit(ClientMessage.Input, inputPayload);
+      }
 
       // Reset input frame state
       input.resetFrameState();
@@ -283,9 +436,18 @@ export const GameCanvas: React.FC = () => {
       canvas.removeEventListener('contextmenu', handleContextMenu);
       cameraController.detach();
       playerRenderer.removeFromScene(scene);
+      // Clean up remote player renderers
+      for (const [, renderer] of remotePlayerRenderers) {
+        renderer.removeFromScene(scene);
+        renderer.dispose();
+      }
+      remotePlayerRenderers.clear();
+      entityInterpolation.clear();
       buildingPreview.dispose();
       blockInteraction.dispose();
       animationSystem.dispose();
+      npcRenderer.dispose();
+      combatEffects.dispose();
       particleSystem.dispose();
       waterRenderer.dispose();
       skyRenderer.dispose();

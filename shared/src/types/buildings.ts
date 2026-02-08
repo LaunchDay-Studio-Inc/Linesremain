@@ -16,6 +16,7 @@ export enum BuildingPieceType {
   FloorGrill = 'FloorGrill',
   Fence = 'Fence',
   Pillar = 'Pillar',
+  Campfire = 'Campfire',
 }
 
 export enum BuildingTier {

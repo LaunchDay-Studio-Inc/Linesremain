@@ -1,8 +1,14 @@
 // ─── NPC Renderer ───
 // Renders NPC creatures as billboard sprites with procedural Canvas2D textures.
-// Supports 7 creature types, idle/walk animations, and floating health bars.
+// Supports 7 creature types, idle/walk animations, floating health bars,
+// and name labels visible within 15 blocks.
 
 import * as THREE from 'three';
+
+// ─── Constants ───
+
+const NAME_LABEL_RANGE = 15; // blocks — show name when player is within this distance
+const NAME_LABEL_RANGE_SQ = NAME_LABEL_RANGE * NAME_LABEL_RANGE;
 
 // ─── Creature Visual Config ───
 
@@ -15,6 +21,7 @@ interface CreatureVisual {
   hasHorns: boolean;
   hasTail: boolean;
   bodyShape: 'round' | 'tall' | 'wide' | 'hunched';
+  displayName: string;
 }
 
 const CREATURE_VISUALS: Record<string, CreatureVisual> = {
@@ -22,36 +29,43 @@ const CREATURE_VISUALS: Record<string, CreatureVisual> = {
     bodyColor: '#c9a96e', eyeColor: '#ffdd00',
     width: 48, height: 48, legCount: 4,
     hasHorns: false, hasTail: true, bodyShape: 'round',
+    displayName: 'Dust Hopper',
   },
   RidgeGrazer: {
     bodyColor: '#8b7d6b', eyeColor: '#553311',
     width: 64, height: 56, legCount: 4,
     hasHorns: true, hasTail: true, bodyShape: 'wide',
+    displayName: 'Ridge Grazer',
   },
   TuskWalker: {
     bodyColor: '#6b5b4f', eyeColor: '#ff4400',
     width: 72, height: 64, legCount: 4,
     hasHorns: true, hasTail: false, bodyShape: 'wide',
+    displayName: 'Tusk Walker',
   },
   HuskWalker: {
     bodyColor: '#4a5a3a', eyeColor: '#ccff00',
     width: 56, height: 72, legCount: 2,
     hasHorns: false, hasTail: false, bodyShape: 'tall',
+    displayName: 'Husk Walker',
   },
   SporeCrawler: {
     bodyColor: '#5a4a6a', eyeColor: '#ff00ff',
     width: 52, height: 44, legCount: 6,
     hasHorns: false, hasTail: false, bodyShape: 'round',
+    displayName: 'Spore Crawler',
   },
   MireBrute: {
     bodyColor: '#3a4a3a', eyeColor: '#ff3300',
     width: 80, height: 80, legCount: 2,
     hasHorns: true, hasTail: false, bodyShape: 'hunched',
+    displayName: 'Mire Brute',
   },
   ShoreSnapper: {
     bodyColor: '#4a6a7a', eyeColor: '#00ffcc',
     width: 56, height: 40, legCount: 4,
     hasHorns: false, hasTail: true, bodyShape: 'wide',
+    displayName: 'Shore Snapper',
   },
 };
 
@@ -185,6 +199,45 @@ function darkenColor(hex: string, amount: number): string {
   return `#${nr.toString(16).padStart(2, '0')}${ng.toString(16).padStart(2, '0')}${nb.toString(16).padStart(2, '0')}`;
 }
 
+// ─── Name Label ───
+
+function createNameLabelSprite(displayName: string): THREE.Sprite {
+  const canvas = document.createElement('canvas');
+  canvas.width = 256;
+  canvas.height = 32;
+  const ctx = canvas.getContext('2d')!;
+
+  ctx.clearRect(0, 0, 256, 32);
+
+  // Text
+  ctx.font = 'bold 18px monospace';
+  ctx.textAlign = 'center';
+  ctx.textBaseline = 'middle';
+
+  // Shadow
+  ctx.fillStyle = 'rgba(0,0,0,0.7)';
+  ctx.fillText(displayName, 129, 17);
+
+  // Main text
+  ctx.fillStyle = '#ffffff';
+  ctx.fillText(displayName, 128, 16);
+
+  const texture = new THREE.CanvasTexture(canvas);
+  texture.minFilter = THREE.LinearFilter;
+  texture.magFilter = THREE.LinearFilter;
+
+  const material = new THREE.SpriteMaterial({
+    map: texture,
+    transparent: true,
+    depthWrite: false,
+  });
+
+  const sprite = new THREE.Sprite(material);
+  sprite.scale.set(2.0, 0.25, 1);
+  sprite.visible = false;
+  return sprite;
+}
+
 // ─── Health Bar ───
 
 function createHealthBarSprite(): THREE.Sprite {
@@ -246,6 +299,7 @@ interface NPCInstance {
   group: THREE.Group;
   sprite: THREE.Sprite;
   healthBar: THREE.Sprite;
+  nameLabel: THREE.Sprite;
   animFrame: number;
   lastHealth: number;
   healthBarVisible: boolean;
@@ -296,6 +350,11 @@ export class NPCRenderer {
     healthBar.visible = false;
     group.add(healthBar);
 
+    // Name label (hidden by default, shown when player is within range)
+    const nameLabel = createNameLabelSprite(visual.displayName);
+    nameLabel.position.y = spriteScale * 1.5 + 0.55;
+    group.add(nameLabel);
+
     this.scene.add(group);
 
     this.npcs.set(entityId, {
@@ -304,6 +363,7 @@ export class NPCRenderer {
       group,
       sprite,
       healthBar,
+      nameLabel,
       animFrame: Math.random() * 100, // Stagger animations
       lastHealth: 1.0,
       healthBarVisible: false,
@@ -325,6 +385,10 @@ export class NPCRenderer {
     const healthMat = npc.healthBar.material as THREE.SpriteMaterial;
     healthMat.map?.dispose();
     healthMat.dispose();
+
+    const nameMat = npc.nameLabel.material as THREE.SpriteMaterial;
+    nameMat.map?.dispose();
+    nameMat.dispose();
 
     this.npcs.delete(entityId);
   }
@@ -360,6 +424,15 @@ export class NPCRenderer {
       // Billboard — face camera
       npc.sprite.lookAt(camera.position);
 
+      // Distance to camera (for name label visibility)
+      const dx = data.position.x - camera.position.x;
+      const dy = data.position.y - camera.position.y;
+      const dz = data.position.z - camera.position.z;
+      const distSq = dx * dx + dy * dy + dz * dz;
+
+      // Name label — show when player is within 15 blocks
+      npc.nameLabel.visible = distSq <= NAME_LABEL_RANGE_SQ;
+
       // Health bar
       if (data.health) {
         const healthPercent = data.health.current / data.health.max;
@@ -394,6 +467,15 @@ export class NPCRenderer {
     return npc ? npc.group.position.clone() : null;
   }
 
+  /** Remove any tracked NPCs not present in the active set */
+  syncActiveEntities(activeIds: Set<number>): void {
+    for (const entityId of this.npcs.keys()) {
+      if (!activeIds.has(entityId)) {
+        this.removeNPC(entityId);
+      }
+    }
+  }
+
   // ─── Cleanup ───
 
   dispose(): void {
@@ -402,6 +484,9 @@ export class NPCRenderer {
       const spriteMat = npc.sprite.material as THREE.SpriteMaterial;
       spriteMat.map?.dispose();
       spriteMat.dispose();
+      const nameMat = npc.nameLabel.material as THREE.SpriteMaterial;
+      nameMat.map?.dispose();
+      nameMat.dispose();
     }
     this.npcs.clear();
 

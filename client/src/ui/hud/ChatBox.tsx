@@ -1,6 +1,8 @@
 // ─── Chat Box ───
 
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import { ClientMessage } from '@shared/types/network';
+import React, { useCallback, useEffect, useRef, useState } from 'react';
+import { socketClient } from '../../network/SocketClient';
 import { useChatStore } from '../../stores/useChatStore';
 import '../../styles/hud.css';
 
@@ -12,7 +14,6 @@ export const ChatBox: React.FC = () => {
   const messages = useChatStore((s) => s.messages);
   const isOpen = useChatStore((s) => s.isOpen);
   const setOpen = useChatStore((s) => s.setOpen);
-  const addMessage = useChatStore((s) => s.addMessage);
 
   const [input, setInput] = useState('');
   const [now, setNow] = useState(Date.now());
@@ -55,12 +56,12 @@ export const ChatBox: React.FC = () => {
       e.preventDefault();
       const trimmed = input.trim();
       if (trimmed.length > 0) {
-        addMessage('You', trimmed, 'global');
+        socketClient.emit(ClientMessage.Chat, { message: trimmed });
       }
       setInput('');
       setOpen(false);
     },
-    [input, addMessage, setOpen],
+    [input, setOpen],
   );
 
   const handleKeyDown = useCallback(
@@ -88,9 +89,7 @@ export const ChatBox: React.FC = () => {
               key={msg.id}
               className={`chat-message chat-message--${msg.channel}${faded ? ' chat-message--faded' : ''}`}
             >
-              {msg.channel !== 'system' && (
-                <strong>{msg.sender}: </strong>
-              )}
+              {msg.channel !== 'system' && <strong>{msg.sender}: </strong>}
               {msg.message}
             </div>
           );

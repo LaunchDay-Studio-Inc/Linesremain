@@ -1,15 +1,16 @@
 // ─── HUD Container ───
 
 import React from 'react';
+import '../../styles/hud.css';
+import { ChatBox } from './ChatBox';
+import { Crosshair } from './Crosshair';
+import { DamageIndicator } from './DamageIndicator';
 import { HealthBar } from './HealthBar';
 import { Hotbar } from './Hotbar';
 import { Minimap } from './Minimap';
-import { Crosshair } from './Crosshair';
-import { ChatBox } from './ChatBox';
-import { StatusEffects } from './StatusEffects';
-import { DamageIndicator } from './DamageIndicator';
 import { PickupNotifications } from './PickupNotifications';
-import '../../styles/hud.css';
+import { ReconnectOverlay } from './ReconnectOverlay';
+import { StatusEffects } from './StatusEffects';
 
 export const HUD: React.FC = () => {
   return (
@@ -22,6 +23,7 @@ export const HUD: React.FC = () => {
       <StatusEffects />
       <DamageIndicator />
       <PickupNotifications />
+      <ReconnectOverlay />
     </div>
   );
 };

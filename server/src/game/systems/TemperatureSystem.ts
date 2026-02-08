@@ -14,6 +14,7 @@ import {
   HEAT_THRESHOLD,
   COLD_DAMAGE_RATE,
   HEAT_DAMAGE_RATE,
+  BuildingPieceType,
   type PositionComponent,
   type TemperatureComponent,
   type HealthComponent,
@@ -100,7 +101,7 @@ export function temperatureSystem(world: GameWorld, _dt: number): void {
           ComponentType.Building,
         )!;
         // Convention: 'campfire' piece type
-        if (building.pieceType === ('campfire' as import('@lineremain/shared').BuildingPieceType)) {
+        if (building.pieceType === BuildingPieceType.Campfire) {
           nearFire = true;
           break;
         }

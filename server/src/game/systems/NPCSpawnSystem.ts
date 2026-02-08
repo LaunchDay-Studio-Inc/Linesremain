@@ -1,6 +1,8 @@
 // ─── NPC Spawn System ───
 // Spawns NPCs near connected players. Maintains a target population
 // per player and respawns creatures when the local count drops below threshold.
+// Passive/neutral creatures spawn any time; hostile creatures only at night.
+// Hostiles despawn during the day if far from players.
 
 import type { GameWorld } from '../World.js';
 import {
@@ -9,7 +11,9 @@ import {
   AIBehavior,
   type PositionComponent,
   type LootTableEntry,
+  type NPCTypeComponent,
 } from '@lineremain/shared';
+import { isDaytime } from './DayNightSystem.js';
 import { logger } from '../../utils/logger.js';
 
 // ─── Constants ───
@@ -26,8 +30,17 @@ const SPAWN_RADIUS = 80;
 /** Minimum distance from player for new spawns (blocks) */
 const MIN_SPAWN_DISTANCE = 30;
 
+/** Maximum passive/neutral NPCs worldwide */
+const MAX_PASSIVE_NPCS = 30;
+
+/** Maximum hostile NPCs worldwide */
+const MAX_HOSTILE_NPCS = 10;
+
 /** Maximum total NPCs in the world */
-const MAX_TOTAL_NPCS = 100;
+const MAX_TOTAL_NPCS = MAX_PASSIVE_NPCS + MAX_HOSTILE_NPCS;
+
+/** Distance beyond which hostile NPCs despawn during the day */
+const HOSTILE_DESPAWN_DISTANCE = 80;
 
 // ─── Creature Definitions ───
 
@@ -46,10 +59,10 @@ interface CreatureTemplate {
   colliderHeight: number;
   lootTable: LootTableEntry[];
   weight: number; // relative spawn weight
+  groupSize?: { min: number; max: number }; // for group spawning
 }
 
-const CREATURE_TEMPLATES: CreatureTemplate[] = [
-  // ── Passive Creatures ──
+const PASSIVE_TEMPLATES: CreatureTemplate[] = [
   {
     creatureType: NPCCreatureType.DustHopper,
     behavior: AIBehavior.Passive,
@@ -69,6 +82,7 @@ const CREATURE_TEMPLATES: CreatureTemplate[] = [
       { itemId: 8, quantity: 1, chance: 0.3 },    // Animal Fat
     ],
     weight: 30,
+    groupSize: { min: 2, max: 4 },
   },
   {
     creatureType: NPCCreatureType.RidgeGrazer,
@@ -90,9 +104,11 @@ const CREATURE_TEMPLATES: CreatureTemplate[] = [
       { itemId: 9, quantity: 2, chance: 0.5 },    // Bone
     ],
     weight: 20,
+    groupSize: { min: 3, max: 5 },
   },
+];
 
-  // ── Neutral Creatures ──
+const NEUTRAL_TEMPLATES: CreatureTemplate[] = [
   {
     creatureType: NPCCreatureType.TuskWalker,
     behavior: AIBehavior.Neutral,
@@ -134,8 +150,9 @@ const CREATURE_TEMPLATES: CreatureTemplate[] = [
     ],
     weight: 8,
   },
+];
 
-  // ── Hostile Creatures ──
+const HOSTILE_TEMPLATES: CreatureTemplate[] = [
   {
     creatureType: NPCCreatureType.HuskWalker,
     behavior: AIBehavior.Hostile,
@@ -199,8 +216,13 @@ const CREATURE_TEMPLATES: CreatureTemplate[] = [
   },
 ];
 
-// Precompute total weight for weighted random selection
-const TOTAL_WEIGHT = CREATURE_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
+// Combined passive+neutral pool for daytime spawning
+const DAYTIME_TEMPLATES = [...PASSIVE_TEMPLATES, ...NEUTRAL_TEMPLATES];
+const DAYTIME_TOTAL_WEIGHT = DAYTIME_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
+
+// All templates for nighttime spawning (hostile gets extra weight at night)
+const NIGHTTIME_TEMPLATES = [...PASSIVE_TEMPLATES, ...NEUTRAL_TEMPLATES, ...HOSTILE_TEMPLATES];
+const NIGHTTIME_TOTAL_WEIGHT = NIGHTTIME_TEMPLATES.reduce((sum, t) => sum + t.weight, 0);
 
 // ─── Tick Counter ───
 
@@ -212,8 +234,27 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
   tickCounter++;
   if (tickCounter % SPAWN_CHECK_INTERVAL !== 0) return;
 
-  // Count total NPCs
   const allNPCs = world.ecs.query(ComponentType.NPCType);
+  const daytime = isDaytime(world);
+
+  // ── Despawn distant hostiles during daytime ──
+  if (daytime) {
+    despawnDistantHostiles(world, allNPCs);
+  }
+
+  // Count total NPCs and split by behavior
+  let passiveCount = 0;
+  let hostileCount = 0;
+  for (const npcId of allNPCs) {
+    const npcType = world.ecs.getComponent<NPCTypeComponent>(npcId, ComponentType.NPCType);
+    if (!npcType) continue;
+    if (npcType.behavior === AIBehavior.Hostile) {
+      hostileCount++;
+    } else {
+      passiveCount++;
+    }
+  }
+
   if (allNPCs.length >= MAX_TOTAL_NPCS) return;
 
   // Get all player positions
@@ -242,31 +283,57 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
     if (toSpawn <= 0) continue;
 
     for (let i = 0; i < toSpawn; i++) {
-      if (allNPCs.length + i >= MAX_TOTAL_NPCS) break;
+      // Select template based on time of day and population caps
+      const template = pickTemplate(daytime, passiveCount, hostileCount);
+      if (!template) continue;
 
-      const template = pickWeightedTemplate();
       const spawnPos = findSpawnPosition(world, playerPos);
       if (!spawnPos) continue;
 
-      world.createNPCEntity(template.creatureType, spawnPos, {
-        creatureType: template.creatureType,
-        behavior: template.behavior,
-        health: template.health,
-        damage: template.damage,
-        walkSpeed: template.walkSpeed,
-        runSpeed: template.runSpeed,
-        aggroRange: template.aggroRange,
-        attackRange: template.attackRange,
-        attackCooldown: template.attackCooldown,
-        wanderRadius: template.wanderRadius,
-        colliderWidth: template.colliderWidth,
-        colliderHeight: template.colliderHeight,
-        lootTable: template.lootTable,
-      });
+      // Group spawning for passive animals
+      const groupSize = template.groupSize
+        ? template.groupSize.min + Math.floor(Math.random() * (template.groupSize.max - template.groupSize.min + 1))
+        : 1;
+
+      for (let g = 0; g < groupSize; g++) {
+        // Check caps before each individual spawn
+        if (template.behavior === AIBehavior.Hostile && hostileCount >= MAX_HOSTILE_NPCS) break;
+        if (template.behavior !== AIBehavior.Hostile && passiveCount >= MAX_PASSIVE_NPCS) break;
+
+        // Offset group members slightly from the spawn position
+        const offsetX = g === 0 ? 0 : (Math.random() - 0.5) * 6;
+        const offsetZ = g === 0 ? 0 : (Math.random() - 0.5) * 6;
+        const memberX = spawnPos.x + offsetX;
+        const memberZ = spawnPos.z + offsetZ;
+        const memberY = findSurfaceY(world, Math.floor(memberX), Math.floor(memberZ));
+        if (memberY === null) continue;
+
+        world.createNPCEntity(template.creatureType, { x: memberX, y: memberY + 1, z: memberZ }, {
+          creatureType: template.creatureType,
+          behavior: template.behavior,
+          health: template.health,
+          damage: template.damage,
+          walkSpeed: template.walkSpeed,
+          runSpeed: template.runSpeed,
+          aggroRange: template.aggroRange,
+          attackRange: template.attackRange,
+          attackCooldown: template.attackCooldown,
+          wanderRadius: template.wanderRadius,
+          colliderWidth: template.colliderWidth,
+          colliderHeight: template.colliderHeight,
+          lootTable: template.lootTable,
+        });
+
+        if (template.behavior === AIBehavior.Hostile) {
+          hostileCount++;
+        } else {
+          passiveCount++;
+        }
+      }
 
       logger.debug(
-        { creature: template.creatureType, x: spawnPos.x, z: spawnPos.z },
-        'Spawned NPC',
+        { creature: template.creatureType, x: spawnPos.x, z: spawnPos.z, groupSize },
+        'Spawned NPC group',
       );
     }
   }
@@ -274,13 +341,36 @@ export function npcSpawnSystem(world: GameWorld, _dt: number): void {
 
 // ─── Helpers ───
 
-function pickWeightedTemplate(): CreatureTemplate {
-  let roll = Math.random() * TOTAL_WEIGHT;
-  for (const template of CREATURE_TEMPLATES) {
+function pickTemplate(
+  daytime: boolean,
+  passiveCount: number,
+  hostileCount: number,
+): CreatureTemplate | null {
+  // During day: only spawn passive/neutral
+  // At night: spawn all types (hostiles included)
+  if (daytime) {
+    if (passiveCount >= MAX_PASSIVE_NPCS) return null;
+    return pickWeightedTemplate(DAYTIME_TEMPLATES, DAYTIME_TOTAL_WEIGHT);
+  }
+
+  // Night: prefer hostiles if under cap, but allow passives too
+  if (hostileCount >= MAX_HOSTILE_NPCS && passiveCount >= MAX_PASSIVE_NPCS) return null;
+
+  // If hostile cap reached, only pick from daytime pool
+  if (hostileCount >= MAX_HOSTILE_NPCS) {
+    return pickWeightedTemplate(DAYTIME_TEMPLATES, DAYTIME_TOTAL_WEIGHT);
+  }
+
+  return pickWeightedTemplate(NIGHTTIME_TEMPLATES, NIGHTTIME_TOTAL_WEIGHT);
+}
+
+function pickWeightedTemplate(templates: CreatureTemplate[], totalWeight: number): CreatureTemplate {
+  let roll = Math.random() * totalWeight;
+  for (const template of templates) {
     roll -= template.weight;
     if (roll <= 0) return template;
   }
-  return CREATURE_TEMPLATES[0]!;
+  return templates[0]!;
 }
 
 function findSpawnPosition(
@@ -315,4 +405,40 @@ function findSurfaceY(world: GameWorld, worldX: number, worldZ: number): number 
     }
   }
   return null;
+}
+
+function despawnDistantHostiles(world: GameWorld, allNPCs: number[]): void {
+  const playerMap = world.getPlayerEntityMap();
+  if (playerMap.size === 0) return;
+
+  // Collect player positions
+  const playerPositions: PositionComponent[] = [];
+  for (const [, entityId] of playerMap) {
+    const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position);
+    if (pos) playerPositions.push(pos);
+  }
+
+  for (const npcId of allNPCs) {
+    const npcType = world.ecs.getComponent<NPCTypeComponent>(npcId, ComponentType.NPCType);
+    if (!npcType || npcType.behavior !== AIBehavior.Hostile) continue;
+
+    const npcPos = world.ecs.getComponent<PositionComponent>(npcId, ComponentType.Position);
+    if (!npcPos) continue;
+
+    // Check if any player is close enough to keep this hostile alive
+    let nearPlayer = false;
+    for (const pPos of playerPositions) {
+      const dx = npcPos.x - pPos.x;
+      const dz = npcPos.z - pPos.z;
+      if (dx * dx + dz * dz <= HOSTILE_DESPAWN_DISTANCE * HOSTILE_DESPAWN_DISTANCE) {
+        nearPlayer = true;
+        break;
+      }
+    }
+
+    if (!nearPlayer) {
+      world.ecs.destroyEntity(npcId);
+      logger.debug({ npc: npcId, creature: npcType.creatureType }, 'Despawned hostile NPC (daytime)');
+    }
+  }
 }
