@@ -62,6 +62,12 @@ export const players = pgTable(
     nightsSurvived: integer('nights_survived').default(0).notNull(),
     bloodMoonsSurvived: integer('blood_moons_survived').default(0).notNull(),
     biomesVisitedSet: jsonb('biomes_visited_set').default([]).notNull(),
+    // Lineage fields
+    generation: integer('generation').default(1).notNull(),
+    lineageStartedAt: timestamp('lineage_started_at', { withTimezone: true })
+      .defaultNow()
+      .notNull(),
+    ancestors: jsonb('ancestors').default([]).notNull(), // AncestorRecord[]
   },
   (table) => ({
     emailIdx: index('players_email_idx').on(table.email),

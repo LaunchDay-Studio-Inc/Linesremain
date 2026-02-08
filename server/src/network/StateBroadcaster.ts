@@ -56,6 +56,7 @@ import { drainWipeWarnings } from '../game/systems/WipeSystem.js';
 import { drainWorldEvents } from '../game/systems/WorldEventSystem.js';
 import type { GameWorld } from '../game/World.js';
 import type { SocketServer } from './SocketServer.js';
+import { markLineDeath } from './SocketServer.js';
 
 // ─── Types ───
 
@@ -367,9 +368,28 @@ export class StateBroadcaster {
         killerName: null,
         cause: death.cause,
         hasSleepingBag: death.hasSleepingBag,
+        isLineDeath: death.isLineDeath,
+        lineage: death.lineage
+          ? {
+              generation: death.lineage.generation,
+              ancestorSummary: {
+                survivedSeconds: death.lineage.ancestorSummary.survivedSeconds,
+                enemiesKilled: death.lineage.ancestorSummary.enemiesKilled,
+                buildingsPlaced: death.lineage.ancestorSummary.buildingsPlaced,
+                causeOfDeath: death.lineage.ancestorSummary.causeOfDeath,
+              },
+              inheritedXP: death.lineage.inheritedXP,
+              inheritedBlueprints: death.lineage.inheritedBlueprints,
+            }
+          : undefined,
       };
 
       this.socketServer.emitToPlayer(death.playerId, ServerMessage.Death, payload);
+
+      // Track line deaths so the respawn handler knows to process lineage
+      if (death.isLineDeath) {
+        markLineDeath(death.playerId, death.cause);
+      }
     }
   }
 

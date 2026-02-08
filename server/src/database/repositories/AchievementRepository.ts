@@ -66,6 +66,7 @@ export class AchievementRepository {
         nightsSurvived: players.nightsSurvived,
         bloodMoonsSurvived: players.bloodMoonsSurvived,
         biomesVisitedSet: players.biomesVisitedSet,
+        generation: players.generation,
       })
       .from(players)
       .where(eq(players.id, playerId))

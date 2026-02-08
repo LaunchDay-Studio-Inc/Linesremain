@@ -82,6 +82,7 @@ export enum ServerMessage {
   SeasonInfo = 's:season_info',
   WipeWarning = 's:wipe_warning',
   Explosion = 's:explosion',
+  Lineage = 's:lineage',
   StoreItems = 'store:items',
   StorePurchaseResult = 'store:purchaseResult',
   BattlePassState = 'battlePass:state',
@@ -270,6 +271,21 @@ export interface DeathPayload {
   killerName: string | null;
   cause: string; // 'player', 'animal', 'hunger', 'thirst', 'cold', 'heat', 'fall', 'bleeding'
   hasSleepingBag: boolean;
+  // Lineage fields (populated on true death)
+  isLineDeath: boolean; // true = no sleeping bag, lineage advances
+  lineage?: LineagePayload; // present only on line deaths
+}
+
+export interface LineagePayload {
+  generation: number; // NEW generation number (after increment)
+  ancestorSummary: {
+    survivedSeconds: number;
+    enemiesKilled: number;
+    buildingsPlaced: number;
+    causeOfDeath: string;
+  };
+  inheritedXP: number;
+  inheritedBlueprints: number; // count of carried blueprints
 }
 
 export interface NotificationPayload {

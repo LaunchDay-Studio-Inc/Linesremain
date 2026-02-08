@@ -28,7 +28,7 @@ import { logger } from '../utils/logger.js';
 import { loadPlayerStats, unloadPlayerStats } from '../game/systems/AchievementSystem.js';
 import { loadPlayerBlueprints, unloadPlayerBlueprints } from '../game/systems/BlueprintSystem.js';
 import { closePlayerContainer } from '../game/systems/ContainerSystem.js';
-import { processRespawn } from '../game/systems/RespawnSystem.js';
+import { processLineageDeath, processRespawn } from '../game/systems/RespawnSystem.js';
 import { getSeasonInfo } from '../game/systems/WipeSystem.js';
 import { registerBlockHandlers } from './handlers/BlockHandler.js';
 import { registerBuildingHandlers } from './handlers/BuildingHandler.js';
@@ -67,6 +67,21 @@ interface DisconnectedPlayer {
 
 /** Grace period before removing disconnected player entity (seconds) */
 const DISCONNECT_GRACE_PERIOD = 30;
+
+/** Track players who had a line death (no sleeping bag) — consumed on respawn */
+const pendingLineDeaths = new Map<string, string>(); // playerId → cause of death
+
+/** Mark a player as having a line death (called by StateBroadcaster when processing death notifications) */
+export function markLineDeath(playerId: string, cause: string): void {
+  pendingLineDeaths.set(playerId, cause);
+}
+
+/** Check and consume a player's line death flag (called by respawn handler) */
+function consumeLineDeath(playerId: string): string | null {
+  const cause = pendingLineDeaths.get(playerId) ?? null;
+  pendingLineDeaths.delete(playerId);
+  return cause;
+}
 
 // ─── Socket Server Manager ───
 
@@ -167,6 +182,18 @@ export class SocketServer {
       wipeTimestamp: seasonInfo.wipeTimestamp,
       seasonStartedAt: seasonInfo.seasonStartedAt,
     });
+
+    // Send lineage info
+    playerRepository
+      .getLineage(playerId)
+      .then((lineage) => {
+        if (lineage) {
+          socket.emit(ServerMessage.Lineage, lineage);
+        }
+      })
+      .catch((err) => {
+        logger.error({ err, playerId }, 'Failed to load lineage data');
+      });
 
     logger.info(
       {
@@ -321,7 +348,7 @@ export class SocketServer {
     registerEndgameHandlers(this.io, socket, world, getPlayerId);
 
     // Respawn handler — creates fresh entity via RespawnSystem
-    socket.on(ClientMessage.Respawn, (data?: unknown) => {
+    socket.on(ClientMessage.Respawn, async (data?: unknown) => {
       // Only respawn if player entity was removed by DeathSystem
       const existingEntity = world.getPlayerEntity(player.playerId);
       if (existingEntity !== undefined) {
@@ -337,14 +364,38 @@ export class SocketServer {
       const payload = data as RespawnPayload | undefined;
       const respawnType = payload?.spawnOption === 'bag' ? 'bag' : 'random';
 
+      // Check if this is a line death (no sleeping bag at death time)
+      const lineDeathCause = consumeLineDeath(player.playerId);
+      const isLineDeath = lineDeathCause !== null;
+
+      // Process lineage advancement for line deaths
+      if (isLineDeath) {
+        try {
+          const lineageResult = await processLineageDeath(player.playerId, lineDeathCause);
+
+          // Send updated lineage to client
+          player.socket.emit(ServerMessage.Lineage, {
+            generation: lineageResult.newGeneration,
+            ancestors: [lineageResult.ancestor],
+          });
+
+          logger.info(
+            { playerId: player.playerId, generation: lineageResult.newGeneration },
+            'Lineage advanced on respawn',
+          );
+        } catch (err) {
+          logger.error({ err, playerId: player.playerId }, 'Failed to process lineage death');
+        }
+      }
+
       // Create fresh player entity with starting gear
-      const newEntityId = processRespawn(world, player.playerId, respawnType);
+      const newEntityId = processRespawn(world, player.playerId, respawnType, isLineDeath);
       player.entityId = newEntityId;
 
       // Send fresh snapshot to the respawned player
       this.sendInitialSnapshot(player);
 
-      logger.info({ playerId: player.playerId, entityId: newEntityId }, 'Player respawned');
+      logger.info({ playerId: player.playerId, entityId: newEntityId, isLineDeath }, 'Player respawned');
     });
   }
 

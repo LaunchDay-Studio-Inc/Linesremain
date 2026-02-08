@@ -228,6 +228,17 @@ export function initializeMessageHandlers(): void {
     });
   });
 
+  // Lineage info (sent on connect and after line death respawn)
+  socketClient.on(ServerMessage.Lineage, (data) => {
+    const lineage = data as { generation: number; ancestors: unknown[] };
+    if (lineage) {
+      useGameStore.getState().setLineage({
+        generation: lineage.generation,
+        ancestors: (lineage.ancestors ?? []) as import('@lineremain/shared').AncestorRecord[],
+      });
+    }
+  });
+
   // Explosion effects (for rendering - store for particle system)
   socketClient.on(ServerMessage.Explosion, (_data) => {
     // Explosion visual effects are handled by the rendering layer
@@ -353,7 +364,14 @@ function handleDeath(death: DeathPayload): void {
   const pos = usePlayerStore.getState().position;
   usePlayerStore.getState().setDeathPosition({ x: pos.x, y: pos.y, z: pos.z });
   useGameStore.getState().setHasSleepingBag(death.hasSleepingBag ?? false);
-  useGameStore.getState().setScreen('dead');
+
+  if (death.isLineDeath && death.lineage) {
+    // True death — show legacy screen with lineage data
+    useGameStore.getState().setLegacyData(death.lineage);
+    useGameStore.getState().setScreen('legacy');
+  } else {
+    useGameStore.getState().setScreen('dead');
+  }
 }
 
 // ─── Chat Handler ───

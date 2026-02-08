@@ -3,6 +3,7 @@
 // Players: creates loot bags via RespawnSystem, queues death notifications.
 // NPCs: rolls loot from loot tables, creates item drops, destroys entity.
 
+import type { AncestorRecord } from '@lineremain/shared';
 import {
   ComponentType,
   type HealthComponent,
@@ -21,6 +22,13 @@ export interface DeathNotification {
   playerId: string;
   cause: string;
   hasSleepingBag: boolean;
+  isLineDeath: boolean; // true = no sleeping bag, lineage advances
+  lineage?: {
+    generation: number;
+    ancestorSummary: AncestorRecord;
+    inheritedXP: number;
+    inheritedBlueprints: number;
+  };
 }
 
 const deathNotificationQueue: DeathNotification[] = [];
@@ -47,7 +55,8 @@ export function deathSystem(world: GameWorld, _dt: number): void {
 
     const cause = determineCauseOfDeath(world, entityId);
     const hasBag = playerHasSleepingBag(world, playerId);
-    deathNotificationQueue.push({ playerId, cause, hasSleepingBag: hasBag });
+    const isLineDeath = !hasBag;
+    deathNotificationQueue.push({ playerId, cause, hasSleepingBag: hasBag, isLineDeath });
     trackDeath(playerId);
     logger.info({ playerId, cause }, 'Player death detected');
   }

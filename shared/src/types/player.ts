@@ -23,3 +23,22 @@ export interface PlayerStats {
   totalKills: number;
   totalDeaths: number;
 }
+
+// ─── Lineage Types ───
+
+export interface AncestorRecord {
+  generation: number;
+  survivedSeconds: number;
+  enemiesKilled: number;
+  buildingsPlaced: number;
+  causeOfDeath: string;
+}
+
+export interface PlayerLineage {
+  generation: number; // starts at 1
+  totalDeaths: number;
+  inheritedXP: number; // XP carried forward this generation
+  inheritedBlueprints: number[]; // blueprint IDs from ancestors
+  lineageStartedAt: number; // timestamp (epoch ms)
+  ancestors: AncestorRecord[]; // last 5 ancestors
+}

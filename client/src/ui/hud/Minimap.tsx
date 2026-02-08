@@ -4,6 +4,7 @@
 
 import { BiomeType, SEA_LEVEL } from '@lineremain/shared';
 import React, { useCallback, useEffect, useRef } from 'react';
+import { useGameStore } from '../../stores/useGameStore';
 import { usePlayerStore } from '../../stores/usePlayerStore';
 import '../../styles/hud.css';
 import { ClientTerrainGenerator } from '../../world/ClientTerrainGenerator';
@@ -42,6 +43,7 @@ export const Minimap: React.FC = () => {
   const yaw = usePlayerStore((s) => s.yaw);
   const deathPosition = usePlayerStore((s) => s.deathPosition);
   const deathTime = usePlayerStore((s) => s.deathTime);
+  const generation = useGameStore((s) => s.lineage?.generation ?? 1);
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const terrainCanvasRef = useRef<HTMLCanvasElement | null>(null);
   const lastTerrainPosRef = useRef({ x: 0, z: 0 });
@@ -222,6 +224,23 @@ export const Minimap: React.FC = () => {
       <span className="minimap__coords">
         {Math.round(position.x)}, {Math.round(position.y)}, {Math.round(position.z)}
       </span>
+      {generation > 1 && (
+        <span
+          style={{
+            display: 'block',
+            textAlign: 'center',
+            fontSize: '10px',
+            fontWeight: 600,
+            color: '#F0A500',
+            letterSpacing: '1px',
+            marginTop: '2px',
+            textShadow: '0 1px 3px rgba(0,0,0,0.8)',
+            fontFamily: 'var(--font-ui)',
+          }}
+        >
+          GEN {generation}
+        </span>
+      )}
     </div>
   );
 };

@@ -267,6 +267,37 @@ export const ACHIEVEMENTS: Record<string, AchievementDefinition> = {
     requirement: { stat: 'blood_moons_survived', threshold: 1 },
     hidden: true,
   },
+
+  // ═══════════════════════════════════════
+  // LINEAGE (3 achievements)
+  // ═══════════════════════════════════════
+  generation_2: {
+    id: 'generation_2',
+    name: 'Legacy Begins',
+    description: 'Reach Generation 2.',
+    category: AchievementCategory.Meta,
+    icon: '🧬',
+    xpReward: 100,
+    requirement: { stat: 'generation', threshold: 2 },
+  },
+  generation_5: {
+    id: 'generation_5',
+    name: 'Enduring Line',
+    description: 'Reach Generation 5.',
+    category: AchievementCategory.Meta,
+    icon: '👑',
+    xpReward: 500,
+    requirement: { stat: 'generation', threshold: 5 },
+  },
+  generation_10: {
+    id: 'generation_10',
+    name: 'Eternal Lineage',
+    description: 'Reach Generation 10.',
+    category: AchievementCategory.Meta,
+    icon: '⚜',
+    xpReward: 2000,
+    requirement: { stat: 'generation', threshold: 10 },
+  },
 };
 
 /** Get all achievement definitions as an array */

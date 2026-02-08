@@ -71,6 +71,8 @@ interface PlayerStats {
   bloodMoonsSurvived: number;
   biomesVisitedSet: string[];
   unlockedAchievements: Set<string>;
+  generation: number;
+  totalPlaytimeSeconds: number;
   dirty: boolean;
 }
 
@@ -102,6 +104,8 @@ export async function loadPlayerStats(playerId: string): Promise<void> {
     bloodMoonsSurvived: dbStats.bloodMoonsSurvived,
     biomesVisitedSet: (dbStats.biomesVisitedSet as string[]) ?? [],
     unlockedAchievements: new Set(achievements),
+    generation: dbStats.generation,
+    totalPlaytimeSeconds: dbStats.totalPlaytimeSeconds,
     dirty: false,
   });
 }
@@ -155,6 +159,8 @@ function getOrCreateStats(playerId: string): PlayerStats {
       bloodMoonsSurvived: 0,
       biomesVisitedSet: [],
       unlockedAchievements: new Set(),
+      generation: 1,
+      totalPlaytimeSeconds: 0,
       dirty: false,
     };
     playerStatsCache.set(playerId, stats);
@@ -210,6 +216,7 @@ function checkAchievements(playerId: string): void {
     nights_survived: stats.nightsSurvived,
     blood_moons_survived: stats.bloodMoonsSurvived,
     level: stats.level,
+    generation: stats.generation,
   };
 
   for (const achievement of Object.values(ACHIEVEMENTS)) {
@@ -359,6 +366,13 @@ export function trackEat(playerId: string): void {
 
 export function trackBlockPlace(playerId: string): void {
   awardXP(playerId, XP_AWARDS.blockPlace, 'block_place');
+}
+
+export function trackGeneration(playerId: string, generation: number): void {
+  const stats = getOrCreateStats(playerId);
+  stats.generation = generation;
+  stats.dirty = true;
+  checkAchievements(playerId);
 }
 
 // ─── Periodic flush (called from game loop) ───

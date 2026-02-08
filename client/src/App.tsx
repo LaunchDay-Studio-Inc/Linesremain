@@ -8,6 +8,7 @@ import { useGameStore } from './stores/useGameStore';
 import { CharacterSelect } from './ui/screens/CharacterSelect';
 import { DeathScreen } from './ui/screens/DeathScreen';
 import { GameCanvas } from './ui/screens/GameCanvas';
+import { LegacyScreen } from './ui/screens/LegacyScreen';
 import { LoadingScreen } from './ui/screens/LoadingScreen';
 import { MainMenu } from './ui/screens/MainMenu';
 
@@ -48,7 +49,7 @@ export const App: React.FC = () => {
 
   // Start/stop input sender based on connection and screen state
   useEffect(() => {
-    if (isConnected && (screen === 'playing' || screen === 'dead')) {
+    if (isConnected && (screen === 'playing' || screen === 'dead' || screen === 'legacy')) {
       startInputSender();
       return () => {
         stopInputSender();
@@ -78,6 +79,13 @@ export const App: React.FC = () => {
         <>
           <GameCanvas />
           <DeathScreen />
+        </>
+      );
+    case 'legacy':
+      return (
+        <>
+          <GameCanvas />
+          <LegacyScreen />
         </>
       );
     default:
