@@ -629,32 +629,180 @@ export const ITEM_REGISTRY: Record<number, ItemDefinition> = {
   // ═══════════════════════════════════════
   // JOURNAL FRAGMENTS (68-87)
   // ═══════════════════════════════════════
-  68: { id: 68, name: 'Journal Fragment #1', category: ItemCategory.Resource, maxStack: 1, description: 'A weathered page. "Day 1 — The line holds. We built the wall higher today..."' },
-  69: { id: 69, name: 'Journal Fragment #2', category: ItemCategory.Resource, maxStack: 1, description: 'A torn page. "Day 14 — They come every night now. The husks never tire..."' },
-  70: { id: 70, name: 'Journal Fragment #3', category: ItemCategory.Resource, maxStack: 1, description: 'A stained page. "Day 23 — Lost two more. Maria says we should abandon the east tower..."' },
-  71: { id: 71, name: 'Journal Fragment #4', category: ItemCategory.Resource, maxStack: 1, description: 'A crumpled page. "Day 31 — The blood moon rose again. Fourth time. They brought something new..."' },
-  72: { id: 72, name: 'Journal Fragment #5', category: ItemCategory.Resource, maxStack: 1, description: 'A faded page. "Day 40 — Found the old supply cache in the forest. Enough ammo for a week..."' },
-  73: { id: 73, name: 'Journal Fragment #6', category: ItemCategory.Resource, maxStack: 1, description: 'A damp page. "Day 45 — The fog rolled in thick today. Could barely see the wall..."' },
-  74: { id: 74, name: 'Journal Fragment #7', category: ItemCategory.Resource, maxStack: 1, description: 'A brittle page. "Day 52 — The cold ones appeared in the northern peaks. Blue eyes in the blizzard..."' },
-  75: { id: 75, name: 'Journal Fragment #8', category: ItemCategory.Resource, maxStack: 1, description: 'A bloodstained page. "Day 58 — They breached the western section. We held, barely..."' },
-  76: { id: 76, name: 'Journal Fragment #9', category: ItemCategory.Resource, maxStack: 1, description: 'A charred page. "Day 63 — Lit a signal fire. No one came. Are we the last ones?"' },
-  77: { id: 77, name: 'Journal Fragment #10', category: ItemCategory.Resource, maxStack: 1, description: 'A carefully folded page. "Day 70 — Three camps spotted to the south. Others survived..."' },
-  78: { id: 78, name: 'Journal Fragment #11', category: ItemCategory.Resource, maxStack: 1, description: 'A water-damaged page. "Day 75 — The swamp creatures are the worst. You can hear them before you see them..."' },
-  79: { id: 79, name: 'Journal Fragment #12', category: ItemCategory.Resource, maxStack: 1, description: 'A page wrapped in cloth. "Day 82 — Found an old armory. The metal doors still hold..."' },
-  80: { id: 80, name: 'Journal Fragment #13', category: ItemCategory.Resource, maxStack: 1, description: 'A scrawled page. "Day 89 — The dust hoppers are friendly if you don\'t startle them..."' },
-  81: { id: 81, name: 'Journal Fragment #14', category: ItemCategory.Resource, maxStack: 1, description: 'A page with a crude map. "Day 94 — Mapped the safe routes between the camps..."' },
-  82: { id: 82, name: 'Journal Fragment #15', category: ItemCategory.Resource, maxStack: 1, description: 'A hastily written page. "Day 100 — Centennial. Still standing. The line remains..."' },
-  83: { id: 83, name: 'Journal Fragment #16', category: ItemCategory.Resource, maxStack: 1, description: 'A formal-looking page. "Day 107 — Established trade with the harbor settlement..."' },
-  84: { id: 84, name: 'Journal Fragment #17', category: ItemCategory.Resource, maxStack: 1, description: 'A page torn from a notebook. "Day 115 — The brutes grow larger. Something is changing them..."' },
-  85: { id: 85, name: 'Journal Fragment #18', category: ItemCategory.Resource, maxStack: 1, description: 'A carefully preserved page. "Day 120 — Recording everything for those who come after..."' },
-  86: { id: 86, name: 'Journal Fragment #19', category: ItemCategory.Resource, maxStack: 1, description: 'A page sealed with wax. "Day 130 — If you find this, know that we tried. We held the line..."' },
-  87: { id: 87, name: 'Journal Fragment #20', category: ItemCategory.Resource, maxStack: 1, description: 'The final page. "Day 142 — This is the last entry. The wall stands. Someone must continue..."' },
+  68: {
+    id: 68,
+    name: 'Journal Fragment #1',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description: 'A weathered page. "Day 1 — The line holds. We built the wall higher today..."',
+  },
+  69: {
+    id: 69,
+    name: 'Journal Fragment #2',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description: 'A torn page. "Day 14 — They come every night now. The husks never tire..."',
+  },
+  70: {
+    id: 70,
+    name: 'Journal Fragment #3',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A stained page. "Day 23 — Lost two more. Maria says we should abandon the east tower..."',
+  },
+  71: {
+    id: 71,
+    name: 'Journal Fragment #4',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A crumpled page. "Day 31 — The blood moon rose again. Fourth time. They brought something new..."',
+  },
+  72: {
+    id: 72,
+    name: 'Journal Fragment #5',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A faded page. "Day 40 — Found the old supply cache in the forest. Enough ammo for a week..."',
+  },
+  73: {
+    id: 73,
+    name: 'Journal Fragment #6',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A damp page. "Day 45 — The fog rolled in thick today. Could barely see the wall..."',
+  },
+  74: {
+    id: 74,
+    name: 'Journal Fragment #7',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A brittle page. "Day 52 — The cold ones appeared in the northern peaks. Blue eyes in the blizzard..."',
+  },
+  75: {
+    id: 75,
+    name: 'Journal Fragment #8',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A bloodstained page. "Day 58 — They breached the western section. We held, barely..."',
+  },
+  76: {
+    id: 76,
+    name: 'Journal Fragment #9',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description: 'A charred page. "Day 63 — Lit a signal fire. No one came. Are we the last ones?"',
+  },
+  77: {
+    id: 77,
+    name: 'Journal Fragment #10',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A carefully folded page. "Day 70 — Three camps spotted to the south. Others survived..."',
+  },
+  78: {
+    id: 78,
+    name: 'Journal Fragment #11',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A water-damaged page. "Day 75 — The swamp creatures are the worst. You can hear them before you see them..."',
+  },
+  79: {
+    id: 79,
+    name: 'Journal Fragment #12',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A page wrapped in cloth. "Day 82 — Found an old armory. The metal doors still hold..."',
+  },
+  80: {
+    id: 80,
+    name: 'Journal Fragment #13',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A scrawled page. "Day 89 — The dust hoppers are friendly if you don\'t startle them..."',
+  },
+  81: {
+    id: 81,
+    name: 'Journal Fragment #14',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description: 'A page with a crude map. "Day 94 — Mapped the safe routes between the camps..."',
+  },
+  82: {
+    id: 82,
+    name: 'Journal Fragment #15',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A hastily written page. "Day 100 — Centennial. Still standing. The line remains..."',
+  },
+  83: {
+    id: 83,
+    name: 'Journal Fragment #16',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A formal-looking page. "Day 107 — Established trade with the harbor settlement..."',
+  },
+  84: {
+    id: 84,
+    name: 'Journal Fragment #17',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A page torn from a notebook. "Day 115 — The brutes grow larger. Something is changing them..."',
+  },
+  85: {
+    id: 85,
+    name: 'Journal Fragment #18',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A carefully preserved page. "Day 120 — Recording everything for those who come after..."',
+  },
+  86: {
+    id: 86,
+    name: 'Journal Fragment #19',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'A page sealed with wax. "Day 130 — If you find this, know that we tried. We held the line..."',
+  },
+  87: {
+    id: 87,
+    name: 'Journal Fragment #20',
+    category: ItemCategory.Resource,
+    maxStack: 1,
+    description:
+      'The final page. "Day 142 — This is the last entry. The wall stands. Someone must continue..."',
+  },
 
   // ═══════════════════════════════════════
   // CREATURE DROPS (88-89)
   // ═══════════════════════════════════════
-  88: { id: 88, name: 'Frost Fang', category: ItemCategory.Resource, maxStack: 10, description: 'A razor-sharp tooth from a Frost Stalker. Cold to the touch.' },
-  89: { id: 89, name: 'Crimson Core', category: ItemCategory.Resource, maxStack: 5, description: 'A pulsing organ from a Crimson Husk. Radiates faint heat.' },
+  88: {
+    id: 88,
+    name: 'Frost Fang',
+    category: ItemCategory.Resource,
+    maxStack: 10,
+    description: 'A razor-sharp tooth from a Frost Stalker. Cold to the touch.',
+  },
+  89: {
+    id: 89,
+    name: 'Crimson Core',
+    category: ItemCategory.Resource,
+    maxStack: 5,
+    description: 'A pulsing organ from a Crimson Husk. Radiates faint heat.',
+  },
 
   // ═══════════════════════════════════════
   // ENDGAME ITEMS (90-96)
@@ -707,5 +855,74 @@ export const ITEM_REGISTRY: Record<number, ItemDefinition> = {
     category: ItemCategory.Resource,
     maxStack: 1000,
     description: 'Salvaged material used for research.',
+  },
+
+  // ═══════════════════════════════════════
+  // ISLAND ITEMS (97-103)
+  // ═══════════════════════════════════════
+  97: {
+    id: 97,
+    name: 'Wild Berry',
+    category: ItemCategory.Consumable,
+    maxStack: 20,
+    description: 'Sweet berries foraged from island bushes.',
+    hungerRestore: 8,
+    thirstRestore: 5,
+  },
+  98: {
+    id: 98,
+    name: 'Mushroom Stew',
+    category: ItemCategory.Consumable,
+    maxStack: 5,
+    description: 'A hearty stew made from mushrooms. Very nourishing.',
+    hungerRestore: 25,
+    thirstRestore: 15,
+    healAmount: 5,
+  },
+  99: {
+    id: 99,
+    name: 'Water Flask',
+    category: ItemCategory.Consumable,
+    maxStack: 5,
+    description: 'A flask of fresh water.',
+    hungerRestore: 0,
+    thirstRestore: 30,
+  },
+  100: {
+    id: 100,
+    name: 'Torch',
+    category: ItemCategory.Tool,
+    maxStack: 5,
+    description: 'A burning torch. Provides light.',
+    durability: 100,
+    damage: 5,
+    equipSlot: EquipSlot.Held,
+  },
+  101: {
+    id: 101,
+    name: 'Fiber Rope',
+    category: ItemCategory.Component,
+    maxStack: 20,
+    description: 'Strong rope woven from plant fibers.',
+  },
+  102: {
+    id: 102,
+    name: 'Stone Knife',
+    category: ItemCategory.WeaponMelee,
+    maxStack: 1,
+    description: 'A crude knife chipped from stone.',
+    durability: 100,
+    damage: 15,
+    equipSlot: EquipSlot.Held,
+  },
+  103: {
+    id: 103,
+    name: 'Wooden Shield',
+    category: ItemCategory.Armor,
+    maxStack: 1,
+    description: 'A rough shield made from planks and rope.',
+    durability: 150,
+    armorReduction: 10,
+    equipSlot: EquipSlot.Held,
   },
 };

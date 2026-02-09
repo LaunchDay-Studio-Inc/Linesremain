@@ -59,6 +59,27 @@ export type IconName =
   | 'lineage'
   | 'map-pin'
   | 'compass'
+  // Island World
+  | 'berry'
+  | 'water-source'
+  | 'portal'
+  | 'island'
+  | 'tree-oak'
+  | 'rock-node'
+  | 'fire-pit'
+  | 'shelter'
+  | 'warning'
+  | 'sunrise'
+  | 'moon'
+  | 'wind'
+  | 'footprint'
+  | 'leaf'
+  | 'volcano'
+  | 'bridge'
+  | 'chest'
+  | 'flask'
+  | 'bandage'
+  | 'torch'
   // Legacy (backward compatibility with itemIcons.ts)
   | 'metal-frags'
   | 'charcoal'
@@ -485,6 +506,187 @@ const ICON_PATHS: Record<IconName, React.ReactNode> = {
       <path d="M12 12 L8 18 L12 16 L16 18 Z" fill="currentColor" opacity={0.3} />
       <path d="M12 12 L16 6 L12 8 L8 6 Z" fill="currentColor" opacity={0.15} />
       <circle cx="12" cy="12" r="1.5" fill="currentColor" opacity={0.4} />
+    </>
+  ),
+
+  // ─── Island World ───
+  berry: (
+    <>
+      <circle cx="10" cy="14" r="3" fill="currentColor" opacity={0.25} />
+      <circle cx="15" cy="12" r="2.5" fill="currentColor" opacity={0.25} />
+      <circle cx="12" cy="17" r="2.5" fill="currentColor" opacity={0.25} />
+      <path d="M12 4 Q14 8 12 10" />
+      <path d="M12 4 Q10 7 11 10" />
+      <path d="M12 4 L14 2" />
+      <path d="M12 4 L10 3" />
+    </>
+  ),
+  'water-source': (
+    <>
+      <path d="M3 14 Q6 10 9 14 Q12 18 15 14 Q18 10 21 14" />
+      <path d="M3 18 Q6 14 9 18 Q12 22 15 18 Q18 14 21 18" opacity={0.4} />
+      <path d="M12 2 L12 8" />
+      <path d="M12 8 Q8 6 10 10" opacity={0.5} />
+      <path d="M12 8 Q16 6 14 10" opacity={0.5} />
+    </>
+  ),
+  portal: (
+    <>
+      <ellipse cx="12" cy="12" rx="8" ry="10" />
+      <ellipse cx="12" cy="12" rx="5" ry="7" opacity={0.4} />
+      <ellipse cx="12" cy="12" rx="2" ry="4" opacity={0.2} />
+      <path d="M12 2 L14 5 L10 5 Z" fill="currentColor" opacity={0.3} />
+      <path d="M12 22 L14 19 L10 19 Z" fill="currentColor" opacity={0.3} />
+    </>
+  ),
+  island: (
+    <>
+      <path d="M2 16 Q6 10 12 12 Q18 14 22 16" />
+      <path d="M2 16 Q12 20 22 16" />
+      <path d="M10 12 L10 6" strokeWidth={2} />
+      <path d="M7 7 Q10 4 13 7" fill="currentColor" opacity={0.15} />
+      <path d="M8 9 Q10 6 12 9" fill="currentColor" opacity={0.15} />
+    </>
+  ),
+  'tree-oak': (
+    <>
+      <line x1="12" y1="22" x2="12" y2="12" strokeWidth={2.5} />
+      <circle cx="12" cy="8" r="6" fill="currentColor" opacity={0.15} />
+      <circle cx="8" cy="10" r="4" fill="currentColor" opacity={0.1} />
+      <circle cx="16" cy="10" r="4" fill="currentColor" opacity={0.1} />
+    </>
+  ),
+  'rock-node': (
+    <>
+      <path d="M4 20 L2 14 L6 8 L10 6 L16 8 L20 14 L18 20 Z" />
+      <path d="M6 8 L10 14 L16 8" opacity={0.3} />
+      <path d="M10 14 L12 20" opacity={0.3} />
+      <circle cx="8" cy="12" r="1" fill="currentColor" opacity={0.4} />
+      <circle cx="14" cy="11" r="1.5" fill="currentColor" opacity={0.3} />
+    </>
+  ),
+  'fire-pit': (
+    <>
+      <path d="M6 20 L8 18 L10 20 L12 16 L14 20 L16 18 L18 20" />
+      <path d="M12 16 Q14 10 12 6 Q10 10 12 16" fill="currentColor" opacity={0.2} />
+      <path d="M10 16 Q11 12 10 9" opacity={0.4} />
+      <path d="M14 16 Q13 12 14 9" opacity={0.4} />
+      <ellipse cx="12" cy="21" rx="7" ry="1.5" opacity={0.2} />
+    </>
+  ),
+  shelter: (
+    <>
+      <path d="M2 14 L12 4 L22 14" strokeWidth={2} />
+      <rect x="5" y="14" width="14" height="8" />
+      <rect x="9" y="16" width="6" height="6" />
+      <line x1="12" y1="16" x2="12" y2="22" opacity={0.3} />
+      <line x1="9" y1="19" x2="15" y2="19" opacity={0.3} />
+    </>
+  ),
+  warning: (
+    <>
+      <path d="M12 2 L22 20 H2 Z" />
+      <line x1="12" y1="8" x2="12" y2="14" strokeWidth={2} />
+      <circle cx="12" cy="17" r="1" fill="currentColor" />
+    </>
+  ),
+  sunrise: (
+    <>
+      <path d="M2 16 Q12 8 22 16" />
+      <line x1="12" y1="4" x2="12" y2="8" />
+      <line x1="5" y1="8" x2="7" y2="10" />
+      <line x1="19" y1="8" x2="17" y2="10" />
+      <line x1="2" y1="20" x2="22" y2="20" opacity={0.3} />
+      <circle cx="12" cy="14" r="4" fill="currentColor" opacity={0.15} />
+    </>
+  ),
+  moon: (
+    <>
+      <path
+        d="M16 4 Q10 6 10 12 Q10 18 16 20 Q8 18 8 12 Q8 6 16 4 Z"
+        fill="currentColor"
+        opacity={0.15}
+      />
+      <circle cx="6" cy="6" r="0.5" fill="currentColor" opacity={0.3} />
+      <circle cx="18" cy="8" r="0.5" fill="currentColor" opacity={0.3} />
+      <circle cx="4" cy="16" r="0.5" fill="currentColor" opacity={0.3} />
+      <circle cx="20" cy="14" r="0.5" fill="currentColor" opacity={0.3} />
+    </>
+  ),
+  wind: (
+    <>
+      <path d="M3 8 Q8 4 12 8 Q16 12 20 8" />
+      <path d="M3 14 Q10 10 14 14 Q18 18 21 14" />
+      <path d="M5 20 Q8 18 11 20" opacity={0.4} />
+    </>
+  ),
+  footprint: (
+    <>
+      <ellipse cx="10" cy="8" rx="3" ry="5" transform="rotate(-10 10 8)" />
+      <circle cx="6" cy="4" r="1.5" />
+      <ellipse cx="16" cy="16" rx="3" ry="5" transform="rotate(10 16 16)" />
+      <circle cx="20" cy="12" r="1.5" />
+    </>
+  ),
+  leaf: (
+    <>
+      <path d="M6 20 Q4 12 12 4 Q20 12 18 20" />
+      <path d="M12 4 L12 20" opacity={0.3} />
+      <path d="M12 10 L8 14" opacity={0.3} />
+      <path d="M12 14 L16 18" opacity={0.3} />
+    </>
+  ),
+  volcano: (
+    <>
+      <path d="M2 22 L8 8 L10 12 L12 4 L14 12 L16 8 L22 22 Z" />
+      <path d="M10 12 L12 4 L14 12" fill="currentColor" opacity={0.2} />
+      <path d="M11 2 Q12 0 13 2" opacity={0.5} />
+      <path d="M10 3 Q11 1 12 3" opacity={0.3} />
+    </>
+  ),
+  bridge: (
+    <>
+      <path d="M2 12 Q12 18 22 12" strokeWidth={2} />
+      <line x1="2" y1="12" x2="2" y2="20" />
+      <line x1="22" y1="12" x2="22" y2="20" />
+      <line x1="7" y1="14" x2="7" y2="18" opacity={0.4} />
+      <line x1="12" y1="15" x2="12" y2="18" opacity={0.4} />
+      <line x1="17" y1="14" x2="17" y2="18" opacity={0.4} />
+    </>
+  ),
+  chest: (
+    <>
+      <rect x="3" y="8" width="18" height="12" rx="2" />
+      <path d="M3 12 L21 12" />
+      <rect x="10" y="10" width="4" height="4" rx="1" fill="currentColor" opacity={0.3} />
+      <path d="M6 8 Q6 4 12 4 Q18 4 18 8" />
+    </>
+  ),
+  flask: (
+    <>
+      <path d="M9 2 L9 8 L4 18 Q4 22 8 22 L16 22 Q20 22 20 18 L15 8 L15 2" />
+      <line x1="9" y1="2" x2="15" y2="2" />
+      <path d="M6 16 L18 16" opacity={0.3} />
+      <path d="M5 18 Q12 20 19 18" fill="currentColor" opacity={0.1} />
+    </>
+  ),
+  bandage: (
+    <>
+      <path d="M4 8 L8 4 L20 16 L16 20 Z" />
+      <line x1="10" y1="8" x2="14" y2="12" opacity={0.3} />
+      <line x1="8" y1="10" x2="12" y2="14" opacity={0.3} />
+      <circle cx="12" cy="12" r="1" fill="currentColor" opacity={0.3} />
+      <path d="M4 8 L2 10" opacity={0.4} />
+      <path d="M16 20 L18 22" opacity={0.4} />
+    </>
+  ),
+  torch: (
+    <>
+      <line x1="12" y1="22" x2="12" y2="10" strokeWidth={2.5} />
+      <path d="M12 10 Q16 6 12 2 Q8 6 12 10" fill="currentColor" opacity={0.2} />
+      <path d="M10 8 Q12 4 14 8" opacity={0.5} />
+      <line x1="8" y1="4" x2="9" y2="6" opacity={0.3} />
+      <line x1="16" y1="4" x2="15" y2="6" opacity={0.3} />
     </>
   ),
 

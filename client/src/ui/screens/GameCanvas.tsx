@@ -28,6 +28,7 @@ import { AudioManager } from '../../engine/AudioManager';
 import { CameraController } from '../../engine/Camera';
 import { Engine } from '../../engine/Engine';
 import { InputManager } from '../../engine/InputManager';
+import { IslandAmbientSound } from '../../engine/IslandAmbientSound';
 import { musicSystem } from '../../engine/MusicSystem';
 import { ParticleSystem } from '../../engine/ParticleSystem';
 import { BuildingPreview } from '../../entities/BuildingPreview';
@@ -74,6 +75,7 @@ import { CodeLockPanel } from '../panels/CodeLockPanel';
 import { ContainerPanel } from '../panels/ContainerPanel';
 import { CraftingPanel } from '../panels/CraftingPanel';
 import { InventoryPanel } from '../panels/InventoryPanel';
+import { IslandCraftingPanel } from '../panels/IslandCraftingPanel';
 import { triggerJournalPopup } from '../panels/JournalPanel';
 import { MapPanel } from '../panels/MapPanel';
 import { ResearchPanel } from '../panels/ResearchPanel';
@@ -418,6 +420,7 @@ export const GameCanvas: React.FC = () => {
 
     // ── Click Handling (building placement, focus, audio init) ──
     const audio = AudioManager.getInstance();
+    const islandAmbient = new IslandAmbientSound();
     const handleClick = (e: MouseEvent) => {
       // Don't capture clicks on interactive UI elements
       const target = e.target as HTMLElement;
@@ -451,6 +454,7 @@ export const GameCanvas: React.FC = () => {
       // Initialize audio on first user gesture
       audio.init();
       musicSystem.init();
+      islandAmbient.init();
     };
     canvas.addEventListener('click', handleClick);
     // Fallback: window mousedown catches clicks that land on HUD overlay divs
@@ -899,6 +903,11 @@ export const GameCanvas: React.FC = () => {
       musicSystem.setEnabled(settings.musicEnabled);
       musicSystem.update(dt, worldTime, false, buildingActive);
 
+      // Island ambient sound (procedural ocean, birds, wind, volcanic rumble)
+      if (playerWorld === 'islands') {
+        islandAmbient.update(dt, pos.x, pos.z, worldTime);
+      }
+
       // Apply FOV from settings
       if (camera.fov !== settings.fov) {
         camera.fov = settings.fov;
@@ -1018,6 +1027,7 @@ export const GameCanvas: React.FC = () => {
       lightingSystem.dispose();
       supplyDropRenderer.dispose();
       weatherSystem.dispose();
+      islandAmbient.dispose();
       socketClient.off(ServerMessage.WorldEvent, handleWorldEvent);
       socketClient.off(ServerMessage.JournalFound, handleJournalFound);
       socketClient.off(ServerMessage.CinematicText, handleCinematicText);
@@ -1079,6 +1089,7 @@ export const GameCanvas: React.FC = () => {
       {/* Panels */}
       <InventoryPanel />
       <CraftingPanel />
+      <IslandCraftingPanel />
       <BuildingPanel onSelectPiece={handleSelectPiece} onCancelPreview={handleCancelPreview} />
       <MapPanel />
       <SettingsPanel />

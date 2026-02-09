@@ -1,7 +1,7 @@
 // ─── Block Registry ───
 
-import { BlockType } from '../types/blocks.js';
 import type { BlockDefinition } from '../types/blocks.js';
+import { BlockType } from '../types/blocks.js';
 
 export const BLOCK_REGISTRY: Record<number, BlockDefinition> = {
   [BlockType.Air]: {
@@ -69,6 +69,8 @@ export const BLOCK_REGISTRY: Record<number, BlockDefinition> = {
     id: BlockType.Leaves,
     name: 'Leaves',
     hardness: 0.5,
+    dropItemId: 97, // Wild Berry
+    dropQuantity: 1,
     transparent: true,
     textureAtlasPosition: { x: 7, y: 0 },
   },

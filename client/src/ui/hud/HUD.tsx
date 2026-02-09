@@ -14,6 +14,8 @@ import { Crosshair } from './Crosshair';
 import { DamageIndicator } from './DamageIndicator';
 import { HealthBar } from './HealthBar';
 import { Hotbar } from './Hotbar';
+import { IslandHUD } from './IslandHUD';
+import { IslandMinimap } from './IslandMinimap';
 import { LevelUpNotification } from './LevelUpNotification';
 import { Minimap } from './Minimap';
 import { NotificationToast } from './NotificationToast';
@@ -50,6 +52,8 @@ export const HUD: React.FC = () => {
       <CustomizationPanel />
       <LeaderboardPanel />
       <NotificationToast />
+      <IslandHUD />
+      <IslandMinimap />
     </div>
   );
 };

@@ -48,6 +48,8 @@ import { toolCupboardSystem } from './systems/ToolCupboardSystem.js';
 import { wipeSystem } from './systems/WipeSystem.js';
 import { teleportSystem } from './systems/TeleportSystem.js';
 import { worldEventSystem } from './systems/WorldEventSystem.js';
+import { islandNPCSpawnSystem } from './systems/IslandNPCSpawnSystem.js';
+import { islandSurvivalSystem } from './systems/IslandSurvivalSystem.js';
 
 // ─── Input Queue ───
 
@@ -144,6 +146,12 @@ export class GameLoop {
     // 14. NPC spawning (proximity-based creature population)
     this.world.addSystem(npcSpawnSystem);
 
+    // 14b. Island NPC spawning (Ember Isle hostiles)
+    this.world.addSystem(islandNPCSpawnSystem);
+
+    // 14c. Island survival mechanics (water drinking, campfire warmth)
+    this.world.addSystem(islandSurvivalSystem);
+
     // 15. Journal system (event-driven journal fragment tracking)
     this.world.addSystem(journalSystem);
 
@@ -158,7 +166,7 @@ export class GameLoop {
     this.world.addSystem(blueprintSystem);
     this.world.addSystem(wipeSystem);
 
-    logger.info({ systemCount: 28 }, 'GameLoop initialized with all systems');
+    logger.info({ systemCount: 30 }, 'GameLoop initialized with all systems');
   }
 
   // ─── Input Queue ───

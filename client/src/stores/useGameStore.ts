@@ -1,6 +1,6 @@
 // ─── Game Store ───
 
-import type { AncestorRecord, LineagePayload } from '@lineremain/shared';
+import type { AncestorRecord, LineagePayload, PlayerWorldType } from '@lineremain/shared';
 import { create } from 'zustand';
 
 export type Screen = 'menu' | 'character-select' | 'loading' | 'playing' | 'dead' | 'legacy';
@@ -17,6 +17,8 @@ interface GameState {
   legacyData: LineagePayload | null;
   loadingProgress: number;
   loadingStage: string;
+  playerWorld: PlayerWorldType;
+  exploredIslandChunks: number;
 
   setScreen: (screen: Screen) => void;
   setConnected: (connected: boolean) => void;
@@ -27,6 +29,8 @@ interface GameState {
   setLineage: (lineage: { generation: number; ancestors: AncestorRecord[] } | null) => void;
   setLegacyData: (data: LineagePayload | null) => void;
   setLoadingProgress: (progress: number, stage: string) => void;
+  setPlayerWorld: (world: PlayerWorldType) => void;
+  setExploredIslandChunks: (count: number) => void;
   logout: () => void;
 }
 
@@ -42,6 +46,8 @@ export const useGameStore = create<GameState>((set) => ({
   legacyData: null,
   loadingProgress: 0,
   loadingStage: 'Connecting to server...',
+  playerWorld: 'islands',
+  exploredIslandChunks: 0,
 
   setScreen: (screen) => set({ screen }),
   setConnected: (connected) => set({ isConnected: connected }),
@@ -52,6 +58,8 @@ export const useGameStore = create<GameState>((set) => ({
   setLineage: (lineage) => set({ lineage }),
   setLegacyData: (data) => set({ legacyData: data }),
   setLoadingProgress: (progress, stage) => set({ loadingProgress: progress, loadingStage: stage }),
+  setPlayerWorld: (world) => set({ playerWorld: world }),
+  setExploredIslandChunks: (count) => set({ exploredIslandChunks: count }),
   logout: () =>
     set({
       screen: 'menu',
@@ -65,5 +73,7 @@ export const useGameStore = create<GameState>((set) => ({
       legacyData: null,
       loadingProgress: 0,
       loadingStage: 'Connecting to server...',
+      playerWorld: 'islands',
+      exploredIslandChunks: 0,
     }),
 }));

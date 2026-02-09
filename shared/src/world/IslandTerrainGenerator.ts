@@ -163,6 +163,29 @@ export class IslandTerrainGenerator {
           }
         }
 
+        // ── Haven freshwater pond ──
+        if (isHaven && surfaceY > seaLevel) {
+          const pondNoise = hash2D(wx * 5 + 77, wz * 5 + 33, this.seed + 900);
+          // Pond centered around a specific area - use distance from Haven center offset
+          const pondCX = havenCX + 8;
+          const pondCZ = havenCZ - 6;
+          const pondDx = wx - pondCX;
+          const pondDz = wz - pondCZ;
+          const pondDist = Math.sqrt(pondDx * pondDx + pondDz * pondDz);
+          if (pondDist < 5 && pondNoise < 0.7) {
+            // Carve pond: set surface to water
+            for (let py = seaLevel; py <= surfaceY + 1; py++) {
+              if (py < CHUNK_SIZE_Y) {
+                blocks[getBlockIndex(lx, py, lz)] = py <= seaLevel ? BlockType.Water : BlockType.Air;
+              }
+            }
+            // Replace dirt layer under pond with sand
+            if (seaLevel - 1 >= 0) {
+              blocks[getBlockIndex(lx, seaLevel - 1, lz)] = BlockType.Sand;
+            }
+          }
+        }
+
         // ── Haven decorations ──
         if (isHaven && surfaceY > seaLevel) {
           const decoRng = hash2D(wx, wz, this.seed + 500);
@@ -213,6 +236,12 @@ export class IslandTerrainGenerator {
             const mushY = surfaceY + 1;
             if (mushY < CHUNK_SIZE_Y) {
               blocks[getBlockIndex(lx, mushY, lz)] = BlockType.Mushroom;
+            }
+          } else if (decoRng > 0.68) {
+            // Berry bush (a Leaves block on the ground acts as a harvestable bush)
+            const bushY = surfaceY + 1;
+            if (bushY < CHUNK_SIZE_Y) {
+              blocks[getBlockIndex(lx, bushY, lz)] = BlockType.Leaves;
             }
           }
         }

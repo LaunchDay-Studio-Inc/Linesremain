@@ -26,6 +26,7 @@ import {
   type SnapshotPayload,
   type TutorialStepPayload,
   type WipeWarningPayload,
+  type WorldChangePayload,
   type WorldTimePayload,
   type XpGainPayload,
 } from '@shared/types/network';
@@ -264,6 +265,12 @@ export function initializeMessageHandlers(): void {
   socketClient.on(ServerMessage.GameNotification, (data) => {
     const payload = data as GameNotificationPayload;
     showNotification(payload.type, payload.title, payload.message);
+  });
+
+  // World change (island ↔ main world transition)
+  socketClient.on(ServerMessage.WorldChange, (data) => {
+    const payload = data as WorldChangePayload;
+    useGameStore.getState().setPlayerWorld(payload.world as 'islands' | 'main');
   });
 }
 
