@@ -23,12 +23,14 @@ import {
   type HungerComponent,
   type JournalFoundPayload,
   type LevelUpPayload,
+  type NotificationPayload,
   type PlayerStatsPayload,
   type PositionComponent,
   type ResearchProgressPayload,
   type TemperatureComponent,
   type ThirstComponent,
   type WipeWarningPayload,
+  type WorldChangePayload,
   type WorldEventPayload,
   type WorldTimePayload,
   type XpGainPayload,
@@ -123,6 +125,9 @@ export class StateBroadcaster {
   // ─── Per-Tick Handler ───
 
   private onTick(world: GameWorld, tick: number): void {
+    // Broadcast teleport world-change notifications (every tick — teleports should be immediate)
+    this.broadcastTeleports(world);
+
     // Broadcast death notifications (every tick — deaths should be immediate)
     this.broadcastDeathNotifications(world);
 
@@ -356,6 +361,30 @@ export class StateBroadcaster {
     };
 
     this.socketServer.broadcast(ServerMessage.WorldTime, payload);
+  }
+
+  // ─── Teleport Notification Broadcast ───
+
+  private broadcastTeleports(world: GameWorld): void {
+    if (world.pendingTeleports.length === 0) return;
+
+    const teleported = world.pendingTeleports.splice(0);
+    for (const playerId of teleported) {
+      const socket = this.socketServer.getPlayerSocket(playerId);
+      if (!socket) continue;
+
+      const worldChangePayload: WorldChangePayload = {
+        world: (world.playerWorldMap.get(playerId) as 'islands' | 'main') ?? 'main',
+      };
+      socket.emit(ServerMessage.WorldChange, worldChangePayload);
+
+      const notifPayload: NotificationPayload = {
+        type: 'info',
+        message: 'You step through the portal into an unknown world...',
+        duration: 5000,
+      };
+      socket.emit(ServerMessage.Notification, notifPayload);
+    }
   }
 
   // ─── Death Notification Broadcast ───

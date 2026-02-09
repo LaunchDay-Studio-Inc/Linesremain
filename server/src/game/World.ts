@@ -6,6 +6,9 @@ import {
   AIBehavior,
   AIState,
   BUILDING_REGISTRY,
+  CHUNK_SIZE_X,
+  CHUNK_SIZE_Y,
+  CHUNK_SIZE_Z,
   ComponentType,
   DECAY_NO_TC_DELAY_SECONDS,
   DECAY_TIME_PER_TIER,
@@ -36,6 +39,7 @@ import {
   type LootTableEntry,
   type NPCTypeComponent,
   type OwnershipComponent,
+  type PlayerWorldType,
   type PositionComponent,
   type ProjectileComponent,
   type ResearchComponent,
@@ -46,6 +50,7 @@ import {
 } from '@lineremain/shared';
 import { logger } from '../utils/logger.js';
 import { ChunkStore } from '../world/ChunkStore.js';
+import { IslandChunkStore } from '../world/IslandChunkStore.js';
 import { TerrainGenerator } from '../world/TerrainGenerator.js';
 import { ECSWorld } from './ECS.js';
 
@@ -58,6 +63,15 @@ export class GameWorld {
   readonly ecs: ECSWorld;
   readonly chunkStore: ChunkStore;
   terrainGenerator!: TerrainGenerator;
+
+  /** Island world (pre-generated starter islands) */
+  islandChunkStore!: IslandChunkStore;
+
+  /** Tracks which world each player is in */
+  playerWorldMap = new Map<string, PlayerWorldType>();
+
+  /** Player IDs that just teleported (drained by SocketServer each tick) */
+  pendingTeleports: string[] = [];
 
   /** Day/night cycle progress: 0 = midnight, 0.2 = dawn, 0.5 = noon, 0.8 = dusk */
   worldTime = 0;
@@ -80,6 +94,7 @@ export class GameWorld {
 
   initialize(seed: number): void {
     this.terrainGenerator = new TerrainGenerator(seed);
+    this.islandChunkStore = new IslandChunkStore(seed);
 
     // Register all component stores
     this.ecs.registerComponent<PositionComponent>(ComponentType.Position);
@@ -536,5 +551,22 @@ export class GameWorld {
     });
 
     return entityId;
+  }
+
+  // ─── Surface Height Query ───
+
+  findMainWorldSurfaceY(wx: number, wz: number): number {
+    const cx = Math.floor(wx / CHUNK_SIZE_X);
+    const cz = Math.floor(wz / CHUNK_SIZE_Z);
+    const chunk = this.chunkStore.getOrGenerate(cx, cz, this.terrainGenerator);
+    const lx = ((Math.floor(wx) % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
+    const lz = ((Math.floor(wz) % CHUNK_SIZE_Z) + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
+    for (let y = CHUNK_SIZE_Y - 2; y > 0; y--) {
+      const idx = lx + lz * CHUNK_SIZE_X + y * CHUNK_SIZE_X * CHUNK_SIZE_Z;
+      if (chunk[idx] !== 0 && chunk[idx] !== 14) { // not Air or Water
+        return y;
+      }
+    }
+    return 40;
   }
 }

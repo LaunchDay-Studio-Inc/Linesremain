@@ -393,6 +393,19 @@ export class ChunkManager {
 
   // ─── Cleanup ───
 
+  /** Remove all loaded chunks and meshes (for world switching). Does NOT dispose materials. */
+  clearAll(): void {
+    for (const [, chunk] of this.loadedChunks) {
+      this.removeChunkMeshes(chunk);
+    }
+    this.loadedChunks.clear();
+    this.pendingChunks.clear();
+    this.dirtyChunks.clear();
+    this.chunkMeshesCache.length = 0;
+    this.chunkMeshesDirty = true;
+    this.loadedKeySetDirty = true;
+  }
+
   dispose(): void {
     for (const [, chunk] of this.loadedChunks) {
       this.removeChunkMeshes(chunk);

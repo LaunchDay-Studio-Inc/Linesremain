@@ -87,6 +87,7 @@ export enum ServerMessage {
   StorePurchaseResult = 'store:purchaseResult',
   BattlePassState = 'battlePass:state',
   GameNotification = 'game:notification',
+  WorldChange = 's:world_change',
 }
 
 // ─── Client Payload Interfaces ───
@@ -220,6 +221,11 @@ export interface SnapshotPayload {
   tick: number;
   entities: EntitySnapshot[];
   playerEntityId: number;
+  playerWorld?: string; // 'islands' | 'main' — which world the player is in
+}
+
+export interface WorldChangePayload {
+  world: 'islands' | 'main';
 }
 
 export interface DeltaPayload {

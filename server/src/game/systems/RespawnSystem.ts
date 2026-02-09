@@ -5,6 +5,7 @@
 import {
   ComponentType,
   CORPSE_DESPAWN_SECONDS,
+  HAVEN_ISLAND,
   levelFromXP,
   SEA_LEVEL,
   WORLD_SIZE,
@@ -297,7 +298,17 @@ export function processRespawn(
 ): EntityId {
   let spawnPos: { x: number; y: number; z: number };
 
-  if (respawnType === 'bag') {
+  // Determine which world the player is in
+  const playerWorld = world.playerWorldMap.get(playerId) ?? 'islands';
+
+  if (playerWorld === 'islands') {
+    // Island world: always respawn at Haven Island center
+    const spawnY =
+      world.islandChunkStore.getGenerator().findSurfaceY(HAVEN_ISLAND.spawnX, HAVEN_ISLAND.spawnZ) +
+      1;
+    spawnPos = { x: HAVEN_ISLAND.spawnX, y: spawnY, z: HAVEN_ISLAND.spawnZ };
+    logger.info({ playerId }, 'Player respawning at Haven Island');
+  } else if (respawnType === 'bag') {
     const bagResult = findPlayerSleepingBag(world, playerId);
     const now = Date.now();
 

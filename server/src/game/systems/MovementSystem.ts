@@ -11,6 +11,7 @@ import {
   type ColliderComponent,
   type HealthComponent,
   type LastDamageSourceComponent,
+  type PlayerWorldType,
   type PositionComponent,
   type VelocityComponent,
 } from '@lineremain/shared';
@@ -19,13 +20,24 @@ import { isSolidBlock } from './PhysicsSystem.js';
 
 // ─── Block Query (Movement-specific: unloaded chunks → solid) ───
 
-function getBlockAt(world: GameWorld, x: number, y: number, z: number): number {
+function getBlockAt(
+  world: GameWorld,
+  x: number,
+  y: number,
+  z: number,
+  worldType: PlayerWorldType = 'main',
+): number {
   if (y < 0 || y >= CHUNK_SIZE_Y) return 0;
 
   const chunkX = Math.floor(x / CHUNK_SIZE_X);
   const chunkZ = Math.floor(z / CHUNK_SIZE_Z);
 
-  const chunk = world.chunkStore.getChunk(chunkX, chunkZ);
+  let chunk: Uint8Array | null | undefined;
+  if (worldType === 'islands') {
+    chunk = world.islandChunkStore.getChunk(chunkX, chunkZ);
+  } else {
+    chunk = world.chunkStore.getChunk(chunkX, chunkZ);
+  }
   if (!chunk) return 1; // Treat unloaded chunks as solid — prevents falling through world
 
   const localX = ((Math.floor(x) % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
@@ -50,6 +62,7 @@ function checkBlockCollision(
   halfW: number,
   height: number,
   halfD: number,
+  worldType: PlayerWorldType = 'main',
 ): boolean {
   // Check all block positions the AABB could overlap
   const minBx = Math.floor(cx - halfW);
@@ -62,7 +75,7 @@ function checkBlockCollision(
   for (let bx = minBx; bx <= maxBx; bx++) {
     for (let by = minBy; by <= maxBy; by++) {
       for (let bz = minBz; bz <= maxBz; bz++) {
-        if (isSolidBlock(getBlockAt(world, bx, by, bz))) {
+        if (isSolidBlock(getBlockAt(world, bx, by, bz, worldType))) {
           return true;
         }
       }
@@ -80,6 +93,12 @@ export function movementSystem(world: GameWorld, dt: number): void {
     ComponentType.Collider,
   );
 
+  // Build reverse map: entityId → worldType (only player entities differ)
+  const entityWorldMap = new Map<number, PlayerWorldType>();
+  for (const [playerId, entityId] of world.getPlayerEntityMap()) {
+    entityWorldMap.set(entityId, world.playerWorldMap.get(playerId) ?? 'main');
+  }
+
   for (const entityId of entities) {
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position)!;
     const vel = world.ecs.getComponent<VelocityComponent>(entityId, ComponentType.Velocity)!;
@@ -88,13 +107,14 @@ export function movementSystem(world: GameWorld, dt: number): void {
     // Skip static entities
     if (col.isStatic) continue;
 
+    const worldType = entityWorldMap.get(entityId) ?? 'main';
     const halfW = col.width / 2;
     const halfD = col.depth / 2;
     const height = col.height;
 
     // ── X Axis ──
     const newX = pos.x + vel.vx * dt;
-    if (!checkBlockCollision(world, newX, pos.y, pos.z, halfW, height, halfD)) {
+    if (!checkBlockCollision(world, newX, pos.y, pos.z, halfW, height, halfD, worldType)) {
       pos.x = newX;
     } else {
       // Push back to nearest block surface
@@ -109,7 +129,7 @@ export function movementSystem(world: GameWorld, dt: number): void {
     // ── Y Axis ──
     const prevVy = vel.vy;
     const newY = pos.y + vel.vy * dt;
-    if (!checkBlockCollision(world, pos.x, newY, pos.z, halfW, height, halfD)) {
+    if (!checkBlockCollision(world, pos.x, newY, pos.z, halfW, height, halfD, worldType)) {
       pos.y = newY;
     } else {
       if (vel.vy < 0) {
@@ -125,12 +145,16 @@ export function movementSystem(world: GameWorld, dt: number): void {
           if (health) {
             health.current = Math.max(0, health.current - damage);
             // Record fall as damage source for death cause tracking (Issue 124)
-            world.ecs.addComponent<LastDamageSourceComponent>(entityId, ComponentType.LastDamageSource, {
-              cause: 'fall',
-              attackerEntityId: null,
-              attackerPlayerId: null,
-              timestamp: Date.now(),
-            });
+            world.ecs.addComponent<LastDamageSourceComponent>(
+              entityId,
+              ComponentType.LastDamageSource,
+              {
+                cause: 'fall',
+                attackerEntityId: null,
+                attackerPlayerId: null,
+                timestamp: Date.now(),
+              },
+            );
           }
         }
       } else {
@@ -142,7 +166,7 @@ export function movementSystem(world: GameWorld, dt: number): void {
 
     // ── Z Axis ──
     const newZ = pos.z + vel.vz * dt;
-    if (!checkBlockCollision(world, pos.x, pos.y, newZ, halfW, height, halfD)) {
+    if (!checkBlockCollision(world, pos.x, pos.y, newZ, halfW, height, halfD, worldType)) {
       pos.z = newZ;
     } else {
       if (vel.vz > 0) {

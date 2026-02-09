@@ -46,6 +46,7 @@ import { temperatureSystem } from './systems/TemperatureSystem.js';
 import { thirstSystem } from './systems/ThirstSystem.js';
 import { toolCupboardSystem } from './systems/ToolCupboardSystem.js';
 import { wipeSystem } from './systems/WipeSystem.js';
+import { teleportSystem } from './systems/TeleportSystem.js';
 import { worldEventSystem } from './systems/WorldEventSystem.js';
 
 // ─── Input Queue ───
@@ -113,6 +114,9 @@ export class GameLoop {
     // 7. Movement (collision resolution)
     this.world.addSystem(movementSystem);
 
+    // 7b. Teleport (portal detection after position resolves)
+    this.world.addSystem(teleportSystem);
+
     // 8. Survival systems
     this.world.addSystem(hungerSystem);
     this.world.addSystem(thirstSystem);
@@ -154,7 +158,7 @@ export class GameLoop {
     this.world.addSystem(blueprintSystem);
     this.world.addSystem(wipeSystem);
 
-    logger.info({ systemCount: 27 }, 'GameLoop initialized with all systems');
+    logger.info({ systemCount: 28 }, 'GameLoop initialized with all systems');
   }
 
   // ─── Input Queue ───
@@ -274,6 +278,9 @@ export class GameLoop {
 
       if (!vel || !pos) continue;
 
+      // Determine which world this player is in for block queries
+      const worldType = this.world.playerWorldMap.get(playerId) ?? 'main';
+
       // Apply rotation
       pos.rotation = input.rotation;
 
@@ -306,11 +313,11 @@ export class GameLoop {
       const halfD = collider ? collider.depth / 2 : 0.3;
       // Check 4 corners + center for reliable ground detection
       const grounded =
-        isSolidBlock(getBlockAt(this.world, pos.x, feetY, pos.z)) ||
-        isSolidBlock(getBlockAt(this.world, pos.x - halfW, feetY, pos.z - halfD)) ||
-        isSolidBlock(getBlockAt(this.world, pos.x + halfW, feetY, pos.z - halfD)) ||
-        isSolidBlock(getBlockAt(this.world, pos.x - halfW, feetY, pos.z + halfD)) ||
-        isSolidBlock(getBlockAt(this.world, pos.x + halfW, feetY, pos.z + halfD));
+        isSolidBlock(getBlockAt(this.world, pos.x, feetY, pos.z, worldType)) ||
+        isSolidBlock(getBlockAt(this.world, pos.x - halfW, feetY, pos.z - halfD, worldType)) ||
+        isSolidBlock(getBlockAt(this.world, pos.x + halfW, feetY, pos.z - halfD, worldType)) ||
+        isSolidBlock(getBlockAt(this.world, pos.x - halfW, feetY, pos.z + halfD, worldType)) ||
+        isSolidBlock(getBlockAt(this.world, pos.x + halfW, feetY, pos.z + halfD, worldType));
 
       if (grounded) {
         // On ground: apply full desired movement

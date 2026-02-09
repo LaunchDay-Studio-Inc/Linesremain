@@ -10,6 +10,7 @@ import {
   GRAVITY,
   TERMINAL_VELOCITY,
   type ColliderComponent,
+  type PlayerWorldType,
   type PositionComponent,
   type VelocityComponent,
 } from '@lineremain/shared';
@@ -17,13 +18,24 @@ import type { GameWorld } from '../World.js';
 
 // ─── Block Query Helper ───
 
-function getBlockAt(world: GameWorld, x: number, y: number, z: number): number {
+function getBlockAt(
+  world: GameWorld,
+  x: number,
+  y: number,
+  z: number,
+  worldType: PlayerWorldType = 'main',
+): number {
   if (y < 0 || y >= CHUNK_SIZE_Y) return 0; // air outside vertical bounds
 
   const chunkX = Math.floor(x / CHUNK_SIZE_X);
   const chunkZ = Math.floor(z / CHUNK_SIZE_Z);
 
-  const chunk = world.chunkStore.getChunk(chunkX, chunkZ);
+  let chunk: Uint8Array | null | undefined;
+  if (worldType === 'islands') {
+    chunk = world.islandChunkStore.getChunk(chunkX, chunkZ);
+  } else {
+    chunk = world.chunkStore.getChunk(chunkX, chunkZ);
+  }
   if (!chunk) return 0;
 
   const localX = ((Math.floor(x) % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
@@ -35,7 +47,13 @@ function getBlockAt(world: GameWorld, x: number, y: number, z: number): number {
 }
 
 function isSolidBlock(blockId: number): boolean {
-  return blockId > 0 && blockId !== BlockType.Water;
+  return (
+    blockId > 0 &&
+    blockId !== BlockType.Water &&
+    blockId !== BlockType.TallGrass &&
+    blockId !== BlockType.DeadBush &&
+    blockId !== BlockType.Mushroom
+  );
 }
 
 function isWaterBlock(blockId: number): boolean {
@@ -52,6 +70,12 @@ const WATER_DRAG_FACTOR = 3.0; // exponential drag coefficient for water
 export function physicsSystem(world: GameWorld, dt: number): void {
   const entities = world.ecs.query(ComponentType.Position, ComponentType.Velocity);
 
+  // Build reverse map: entityId → worldType (only player entities differ)
+  const entityWorldMap = new Map<number, PlayerWorldType>();
+  for (const [playerId, entityId] of world.getPlayerEntityMap()) {
+    entityWorldMap.set(entityId, world.playerWorldMap.get(playerId) ?? 'main');
+  }
+
   for (const entityId of entities) {
     const pos = world.ecs.getComponent<PositionComponent>(entityId, ComponentType.Position)!;
     const vel = world.ecs.getComponent<VelocityComponent>(entityId, ComponentType.Velocity)!;
@@ -63,6 +87,8 @@ export function physicsSystem(world: GameWorld, dt: number): void {
     // Skip projectile entities — they have dedicated movement in ProjectileSystem
     if (world.ecs.hasComponent(entityId, ComponentType.Projectile)) continue;
 
+    const worldType = entityWorldMap.get(entityId) ?? 'main';
+
     const halfHeight = collider ? collider.height / 2 : 0.9;
     const halfW = collider ? collider.width / 2 : 0.3;
     const halfD = collider ? collider.depth / 2 : 0.3;
@@ -70,14 +96,14 @@ export function physicsSystem(world: GameWorld, dt: number): void {
     // ── Ground Detection (4-corner + center) ──
     const feetY = pos.y - 0.01;
     const grounded =
-      isSolidBlock(getBlockAt(world, pos.x, feetY, pos.z)) ||
-      isSolidBlock(getBlockAt(world, pos.x - halfW, feetY, pos.z - halfD)) ||
-      isSolidBlock(getBlockAt(world, pos.x + halfW, feetY, pos.z - halfD)) ||
-      isSolidBlock(getBlockAt(world, pos.x - halfW, feetY, pos.z + halfD)) ||
-      isSolidBlock(getBlockAt(world, pos.x + halfW, feetY, pos.z + halfD));
+      isSolidBlock(getBlockAt(world, pos.x, feetY, pos.z, worldType)) ||
+      isSolidBlock(getBlockAt(world, pos.x - halfW, feetY, pos.z - halfD, worldType)) ||
+      isSolidBlock(getBlockAt(world, pos.x + halfW, feetY, pos.z - halfD, worldType)) ||
+      isSolidBlock(getBlockAt(world, pos.x - halfW, feetY, pos.z + halfD, worldType)) ||
+      isSolidBlock(getBlockAt(world, pos.x + halfW, feetY, pos.z + halfD, worldType));
 
     // ── Water Detection ──
-    const blockAtCenter = getBlockAt(world, pos.x, pos.y + halfHeight, pos.z);
+    const blockAtCenter = getBlockAt(world, pos.x, pos.y + halfHeight, pos.z, worldType);
     const inWater = isWaterBlock(blockAtCenter);
 
     // ── Apply Gravity ──

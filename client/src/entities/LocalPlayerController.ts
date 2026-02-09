@@ -65,7 +65,13 @@ function getBlock(chunkManager: ChunkManager, wx: number, wy: number, wz: number
 }
 
 function isSolidBlock(blockType: BlockType): boolean {
-  return blockType !== BlockType.Air && blockType !== BlockType.Water;
+  return (
+    blockType !== BlockType.Air &&
+    blockType !== BlockType.Water &&
+    blockType !== BlockType.TallGrass &&
+    blockType !== BlockType.DeadBush &&
+    blockType !== BlockType.Mushroom
+  );
 }
 
 // ─── Local Player Controller ───

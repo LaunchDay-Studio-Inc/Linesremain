@@ -9,6 +9,7 @@ import {
   DAY_LENGTH_SECONDS,
   SEA_LEVEL,
 } from '@shared/constants/game';
+import { HAVEN_ISLAND } from '@shared/constants/islands';
 import { BuildingPieceType, BuildingTier } from '@shared/types/buildings';
 import {
   ClientMessage,
@@ -16,8 +17,10 @@ import {
   type CinematicTextPayload,
   type InputPayload,
   type JournalFoundPayload,
+  type WorldChangePayload,
   type WorldEventPayload,
 } from '@shared/types/network';
+import { IslandTerrainGenerator } from '@shared/world/IslandTerrainGenerator';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { generateSpriteSheet } from '../../assets/SpriteGenerator';
@@ -153,15 +156,19 @@ export const GameCanvas: React.FC = () => {
     const skyRenderer = new SkyRenderer(scene);
     skyRenderer.update(0.35); // Start at morning
 
-    // ── Terrain Generator (full biome variety) ──
-    const terrainGenerator = new ClientTerrainGenerator(42);
+    // ── Terrain Generators ──
+    // Start with island world; switch to main world on teleport
+    const islandGenerator = new IslandTerrainGenerator(42);
+    const mainGenerator = new ClientTerrainGenerator(42);
+    let activeGenerator: { generateChunk(cx: number, cz: number): Uint8Array } = islandGenerator;
+    let playerWorld: 'islands' | 'main' = 'islands';
 
     // ── Chunk Manager (voxel terrain) ──
     const chunkManager = new ChunkManager(scene, 4);
 
-    // Set up local chunk generation with the full terrain generator
+    // Set up local chunk generation — routes through activeGenerator
     chunkManager.setChunkRequestCallback((cx, cz) => {
-      const data = terrainGenerator.generateChunk(cx, cz);
+      const data = activeGenerator.generateChunk(cx, cz);
       chunkManager.onChunkDataReceived(cx, cz, data);
     });
 
@@ -201,7 +208,7 @@ export const GameCanvas: React.FC = () => {
     const entityInterpolation = new EntityInterpolation();
 
     // ── Biome Tracker (biome-specific atmosphere transitions) ──
-    const biomeTracker = new BiomeTracker(terrainGenerator);
+    const biomeTracker = new BiomeTracker(mainGenerator);
 
     // ── Biome Particle System (biome-specific ambient particles) ──
     const biomeParticleSystem = new BiomeParticleSystem(scene);
@@ -309,11 +316,12 @@ export const GameCanvas: React.FC = () => {
       return 0;
     };
 
-    let spawnX = 16;
-    let spawnZ = 16;
+    // Spawn at Haven Island center
+    let spawnX = HAVEN_ISLAND.spawnX;
+    let spawnZ = HAVEN_ISLAND.spawnZ;
     const spawnCX = Math.floor(spawnX / CHUNK_SIZE_X);
     const spawnCZ = Math.floor(spawnZ / CHUNK_SIZE_Z);
-    const spawnChunkData = terrainGenerator.generateChunk(spawnCX, spawnCZ);
+    const spawnChunkData = activeGenerator.generateChunk(spawnCX, spawnCZ);
     chunkManager.onChunkDataReceived(spawnCX, spawnCZ, spawnChunkData);
     const localX = ((spawnX % CHUNK_SIZE_X) + CHUNK_SIZE_X) % CHUNK_SIZE_X;
     const localZ = ((spawnZ % CHUNK_SIZE_Z) + CHUNK_SIZE_Z) % CHUNK_SIZE_Z;
@@ -331,7 +339,7 @@ export const GameCanvas: React.FC = () => {
             if (Math.abs(dx) !== radius && Math.abs(dz) !== radius) continue;
             const cx = spawnCX + dx;
             const cz = spawnCZ + dz;
-            const chunkData = terrainGenerator.generateChunk(cx, cz);
+            const chunkData = activeGenerator.generateChunk(cx, cz);
             chunkManager.onChunkDataReceived(cx, cz, chunkData);
             // Check center of this chunk
             const checkX = Math.floor(CHUNK_SIZE_X / 2);
@@ -497,11 +505,25 @@ export const GameCanvas: React.FC = () => {
       }));
     };
 
+    const handleWorldChange = (data: unknown) => {
+      const payload = data as WorldChangePayload;
+      if (payload.world === playerWorld) return; // already in this world
+      playerWorld = payload.world;
+      if (playerWorld === 'main') {
+        activeGenerator = mainGenerator;
+      } else {
+        activeGenerator = islandGenerator;
+      }
+      // Clear all loaded chunks so they regenerate with the new terrain
+      chunkManager.clearAll();
+    };
+
     // Only register socket event listeners when not in offline mode
     if (!useGameStore.getState().isOffline) {
       socketClient.on(ServerMessage.WorldEvent, handleWorldEvent);
       socketClient.on(ServerMessage.JournalFound, handleJournalFound);
       socketClient.on(ServerMessage.CinematicText, handleCinematicText);
+      socketClient.on(ServerMessage.WorldChange, handleWorldChange);
     }
 
     // ── Game Loop ──
@@ -999,6 +1021,7 @@ export const GameCanvas: React.FC = () => {
       socketClient.off(ServerMessage.WorldEvent, handleWorldEvent);
       socketClient.off(ServerMessage.JournalFound, handleJournalFound);
       socketClient.off(ServerMessage.CinematicText, handleCinematicText);
+      socketClient.off(ServerMessage.WorldChange, handleWorldChange);
       waterRenderer.dispose();
       skyRenderer.dispose();
       chunkManager.dispose();

@@ -6,6 +6,7 @@ import {
   CHUNK_SIZE_X,
   ClientMessage,
   ComponentType,
+  HAVEN_ISLAND,
   ServerMessage,
   VIEW_DISTANCE_CHUNKS,
   type EntitySnapshot,
@@ -17,6 +18,7 @@ import {
   type RespawnPayload,
   type SnapshotPayload,
   type ThirstComponent,
+  type WorldChangePayload,
 } from '@lineremain/shared';
 import type { Socket, Server as SocketIOServer } from 'socket.io';
 import { config } from '../config.js';
@@ -212,30 +214,38 @@ export class SocketServer {
   private async spawnPlayerEntity(playerId: string): Promise<number> {
     // Try to load saved state
     const savedState = await playerRepository.loadPlayerState(playerId);
+    const world = gameLoop.world;
 
-    let position = { x: 2048, y: 50, z: 2048 }; // default spawn
+    let position: { x: number; y: number; z: number };
     let state: { health?: number; hunger?: number; thirst?: number } | undefined;
 
-    if (savedState) {
-      if (
-        savedState.positionX != null &&
-        savedState.positionY != null &&
-        savedState.positionZ != null
-      ) {
-        position = {
-          x: savedState.positionX,
-          y: savedState.positionY,
-          z: savedState.positionZ,
-        };
-      }
+    if (savedState && savedState.positionX != null && savedState.positionY != null && savedState.positionZ != null) {
+      // Restore saved position (player is in whatever world they left off in)
+      position = {
+        x: savedState.positionX,
+        y: savedState.positionY,
+        z: savedState.positionZ,
+      };
       state = {
         health: savedState.health ?? undefined,
         hunger: savedState.hunger ?? undefined,
         thirst: savedState.thirst ?? undefined,
       };
+    } else {
+      // New player — spawn at Haven Island center
+      const spawnY = world.islandChunkStore.getGenerator().findSurfaceY(
+        HAVEN_ISLAND.spawnX, HAVEN_ISLAND.spawnZ,
+      ) + 1;
+      position = { x: HAVEN_ISLAND.spawnX, y: spawnY, z: HAVEN_ISLAND.spawnZ };
+      world.playerWorldMap.set(playerId, 'islands');
     }
 
-    return gameLoop.world.createPlayerEntity(playerId, position, state);
+    // Default to 'islands' if not already set (e.g. reconnecting player)
+    if (!world.playerWorldMap.has(playerId)) {
+      world.playerWorldMap.set(playerId, 'islands');
+    }
+
+    return world.createPlayerEntity(playerId, position, state);
   }
 
   // ─── Send Initial Snapshot ───
@@ -271,6 +281,7 @@ export class SocketServer {
       tick: gameLoop.currentTick,
       entities,
       playerEntityId: player.entityId,
+      playerWorld: world.playerWorldMap.get(player.playerId) ?? 'islands',
     };
 
     player.socket.emit(ServerMessage.Snapshot, payload);
