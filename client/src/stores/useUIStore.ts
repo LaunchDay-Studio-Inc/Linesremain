@@ -1,6 +1,12 @@
 // ─── UI Store ───
 
 import { create } from 'zustand';
+import { AudioManager } from '../engine/AudioManager';
+
+/** Play uiOpen or uiClose sound based on toggle direction */
+function playToggleSound(opening: boolean): void {
+  AudioManager.getInstance().play(opening ? 'uiOpen' : 'uiClose');
+}
 
 interface UIState {
   inventoryOpen: boolean;
@@ -56,22 +62,22 @@ export const useUIStore = create<UIState>((set) => ({
   menuPanel: null,
 
   toggleInventory: () =>
-    set((s) => ({
-      ...CLOSE_PANELS,
-      inventoryOpen: !s.inventoryOpen,
-    })),
+    set((s) => {
+      playToggleSound(!s.inventoryOpen);
+      return { ...CLOSE_PANELS, inventoryOpen: !s.inventoryOpen };
+    }),
 
   toggleCrafting: () =>
-    set((s) => ({
-      ...CLOSE_PANELS,
-      craftingOpen: !s.craftingOpen,
-    })),
+    set((s) => {
+      playToggleSound(!s.craftingOpen);
+      return { ...CLOSE_PANELS, craftingOpen: !s.craftingOpen };
+    }),
 
   toggleMap: () =>
-    set((s) => ({
-      ...CLOSE_PANELS,
-      mapOpen: !s.mapOpen,
-    })),
+    set((s) => {
+      playToggleSound(!s.mapOpen);
+      return { ...CLOSE_PANELS, mapOpen: !s.mapOpen };
+    }),
 
   toggleChat: () =>
     set((s) => ({
@@ -82,28 +88,28 @@ export const useUIStore = create<UIState>((set) => ({
   toggleBuildingMode: () => set((s) => ({ buildingMode: !s.buildingMode })),
 
   toggleSettings: () =>
-    set((s) => ({
-      ...CLOSE_PANELS,
-      settingsOpen: !s.settingsOpen,
-    })),
+    set((s) => {
+      playToggleSound(!s.settingsOpen);
+      return { ...CLOSE_PANELS, settingsOpen: !s.settingsOpen };
+    }),
 
   toggleAchievements: () =>
-    set((s) => ({
-      ...CLOSE_PANELS,
-      achievementsOpen: !s.achievementsOpen,
-    })),
+    set((s) => {
+      playToggleSound(!s.achievementsOpen);
+      return { ...CLOSE_PANELS, achievementsOpen: !s.achievementsOpen };
+    }),
 
   toggleCustomization: () =>
-    set((s) => ({
-      ...CLOSE_PANELS,
-      customizationOpen: !s.customizationOpen,
-    })),
+    set((s) => {
+      playToggleSound(!s.customizationOpen);
+      return { ...CLOSE_PANELS, customizationOpen: !s.customizationOpen };
+    }),
 
   toggleLeaderboard: () =>
-    set((s) => ({
-      ...CLOSE_PANELS,
-      leaderboardOpen: !s.leaderboardOpen,
-    })),
+    set((s) => {
+      playToggleSound(!s.leaderboardOpen);
+      return { ...CLOSE_PANELS, leaderboardOpen: !s.leaderboardOpen };
+    }),
 
   setCursorLocked: (locked) => set({ cursorLocked: locked }),
 

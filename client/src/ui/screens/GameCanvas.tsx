@@ -24,6 +24,7 @@ import { IslandTerrainGenerator } from '@shared/world/IslandTerrainGenerator';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import * as THREE from 'three';
 import { generateSpriteSheet } from '../../assets/SpriteGenerator';
+import { AmbientSoundSystem } from '../../engine/AmbientSoundSystem';
 import { AudioManager } from '../../engine/AudioManager';
 import { CameraController } from '../../engine/Camera';
 import { Engine } from '../../engine/Engine';
@@ -278,6 +279,10 @@ export const GameCanvas: React.FC = () => {
     let _cachedSettings = useSettingsStore.getState();
     const isOffline = useGameStore.getState().isOffline;
 
+    // ── Night/combat sting tracking ──
+    let _wasNight = false;
+    let _nightStingCooldown = 0;
+
     // ── View distance squared for entity culling ──
     const VIEW_DIST_SQ = 4 * CHUNK_SIZE_X * (4 * CHUNK_SIZE_X);
 
@@ -421,6 +426,7 @@ export const GameCanvas: React.FC = () => {
     // ── Click Handling (building placement, focus, audio init) ──
     const audio = AudioManager.getInstance();
     const islandAmbient = new IslandAmbientSound();
+    const ambientSoundSystem = new AmbientSoundSystem();
     const handleClick = (e: MouseEvent) => {
       // Don't capture clicks on interactive UI elements
       const target = e.target as HTMLElement;
@@ -455,6 +461,10 @@ export const GameCanvas: React.FC = () => {
       audio.init();
       musicSystem.init();
       islandAmbient.init();
+      // Initialize main-world ambient system using shared AudioContext
+      const ctx = audio.getContext();
+      const mg = audio.getMasterGain();
+      if (ctx && mg) ambientSoundSystem.init(ctx, mg);
     };
     canvas.addEventListener('click', handleClick);
     // Fallback: window mousedown catches clicks that land on HUD overlay divs
@@ -854,6 +864,7 @@ export const GameCanvas: React.FC = () => {
 
       // Block interaction (raycast, breaking, placing)
       blockInteraction.update(dt);
+      usePlayerStore.getState().setGatherProgress(blockInteraction.getBreakProgress());
 
       // Building preview (ghost mesh follows camera) — reuse vector
       _playerVec.set(pos.x, pos.y, pos.z);
@@ -901,11 +912,29 @@ export const GameCanvas: React.FC = () => {
       const buildingActive = buildingPreview.active;
       musicSystem.setVolume(settings.musicVolume / 100);
       musicSystem.setEnabled(settings.musicEnabled);
-      musicSystem.update(dt, worldTime, false, buildingActive);
+
+      // Expanded music params: low health, underwater, dead
+      const playerHealth = usePlayerStore.getState().health;
+      const lowHealth = playerHealth > 0 && playerHealth < 25;
+      const isUnderwater = pos.y < SEA_LEVEL - 1;
+      const isDead = useGameStore.getState().screen === 'dead';
+      musicSystem.update(dt, worldTime, false, buildingActive, lowHealth, isUnderwater, isDead);
+
+      // Night transition sting (once per transition, with 30s cooldown)
+      const isNight = worldTime > 0.75 || worldTime < 0.25;
+      if (_nightStingCooldown > 0) _nightStingCooldown -= dt;
+      if (isNight && !_wasNight && _nightStingCooldown <= 0) {
+        audio.play('nightSting');
+        _nightStingCooldown = 30;
+      }
+      _wasNight = isNight;
 
       // Island ambient sound (procedural ocean, birds, wind, volcanic rumble)
       if (playerWorld === 'islands') {
         islandAmbient.update(dt, pos.x, pos.z, worldTime);
+      } else {
+        // Main world ambient sound (wind, water, crickets, birds)
+        ambientSoundSystem.update(dt, pos.y, worldTime, SEA_LEVEL, lastBiomeName);
       }
 
       // Apply FOV from settings
@@ -1028,6 +1057,7 @@ export const GameCanvas: React.FC = () => {
       supplyDropRenderer.dispose();
       weatherSystem.dispose();
       islandAmbient.dispose();
+      ambientSoundSystem.dispose();
       socketClient.off(ServerMessage.WorldEvent, handleWorldEvent);
       socketClient.off(ServerMessage.JournalFound, handleJournalFound);
       socketClient.off(ServerMessage.CinematicText, handleCinematicText);

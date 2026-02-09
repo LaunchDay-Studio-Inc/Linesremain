@@ -6,7 +6,7 @@
 
 // ─── Types ───
 
-export type MusicMood = 'exploration' | 'night' | 'combat' | 'building' | 'menu';
+export type MusicMood = 'exploration' | 'night' | 'combat' | 'building' | 'menu' | 'tension' | 'death' | 'respawn' | 'underwater';
 
 interface MoodVoice {
   oscillator: OscillatorNode;
@@ -90,12 +90,62 @@ const MENU_CONFIG: MoodConfig = {
   volume: 0.15,
 };
 
+// Tension (low health): Dissonant minor 2nd cluster, uneasy
+const TENSION_CONFIG: MoodConfig = {
+  frequencies: [110.0, 116.54, 130.81], // A2, Bb2, C3 (minor cluster)
+  waveforms: ['triangle', 'triangle', 'sine'],
+  detune: [0, -15, 8],
+  lfoRate: 0.5,
+  lfoDepth: 0.5,
+  volume: 0.1,
+  filterCutoff: 600,
+  filterLfoRate: 0.3,
+  filterLfoDepth: 200,
+};
+
+// Death: Very low drone, hollow, desolate
+const DEATH_CONFIG: MoodConfig = {
+  frequencies: [32.7, 49.0], // C1, G1 (low open 5th)
+  waveforms: ['sine', 'triangle'],
+  detune: [0, -20],
+  lfoRate: 0.02,
+  lfoDepth: 0.3,
+  volume: 0.08,
+};
+
+// Respawn: Rising, hopeful major chord
+const RESPAWN_CONFIG: MoodConfig = {
+  frequencies: [196.0, 246.94, 293.66, 392.0], // G3, B3, D4, G4 (G major spread)
+  waveforms: ['sine', 'sine', 'sine', 'triangle'],
+  detune: [0, 4, -2, 3],
+  lfoRate: 0.12,
+  lfoDepth: 0.25,
+  volume: 0.13,
+};
+
+// Underwater: Muffled, deep, filtered
+const UNDERWATER_CONFIG: MoodConfig = {
+  frequencies: [65.41, 82.41, 98.0], // C2, E2, G2 (C major low)
+  waveforms: ['sine', 'sine', 'triangle'],
+  detune: [0, 6, -4],
+  lfoRate: 0.06,
+  lfoDepth: 0.35,
+  volume: 0.09,
+  filterCutoff: 300,
+  filterLfoRate: 0.08,
+  filterLfoDepth: 100,
+};
+
 const MOOD_CONFIGS: Record<MusicMood, MoodConfig> = {
   exploration: EXPLORATION_CONFIG,
   night: NIGHT_CONFIG,
   combat: COMBAT_CONFIG,
   building: BUILDING_CONFIG,
   menu: MENU_CONFIG,
+  tension: TENSION_CONFIG,
+  death: DEATH_CONFIG,
+  respawn: RESPAWN_CONFIG,
+  underwater: UNDERWATER_CONFIG,
 };
 
 // Pentatonic scale notes for melody fragments (exploration & building)
@@ -132,6 +182,11 @@ class MusicSystem {
   private nextMelodyAt = 0;
   private activeMelodyOsc: OscillatorNode | null = null;
   private activeMelodyGain: GainNode | null = null;
+
+  // Temporary mood override
+  private tempMood: MusicMood | null = null;
+  private tempMoodTimer = 0;
+  private tempMoodDuration = 0;
 
   private constructor() {
     // Private — use getInstance()
@@ -183,6 +238,14 @@ class MusicSystem {
     this.targetMood = mood;
   }
 
+  /** Play a mood for a fixed duration, then revert to auto-determined mood */
+  playTemporaryMood(mood: MusicMood, durationSeconds: number): void {
+    this.tempMood = mood;
+    this.tempMoodTimer = 0;
+    this.tempMoodDuration = durationSeconds;
+    this.setMood(mood);
+  }
+
   private transitionTo(mood: MusicMood): void {
     if (!this.ctx || !this.masterGain) return;
     if (mood === this.currentMood) return;
@@ -214,14 +277,38 @@ class MusicSystem {
   // ─── Update ───
 
   /** Call once per frame with delta time in seconds */
-  update(dt: number, timeOfDay?: number, inCombat?: boolean, buildingMode?: boolean): void {
+  update(dt: number, timeOfDay?: number, inCombat?: boolean, buildingMode?: boolean, lowHealth?: boolean, isUnderwater?: boolean, isDead?: boolean): void {
     if (!this.ctx || !this.masterGain) return;
 
-    // Auto-determine mood if game-state params are provided
-    if (timeOfDay !== undefined) {
+    // Handle temporary mood countdown
+    if (this.tempMood !== null) {
+      this.tempMoodTimer += dt;
+      if (this.tempMoodTimer >= this.tempMoodDuration) {
+        this.tempMood = null;
+        this.tempMoodTimer = 0;
+        this.tempMoodDuration = 0;
+      } else {
+        // Don't auto-determine mood while temp mood active
+        // Check if we need to transition
+        if (this.targetMood && this.targetMood !== this.currentMood) {
+          this.transitionTo(this.targetMood);
+          this.targetMood = null;
+        }
+        // ... rest of crossfade and melody (fall through below)
+      }
+    }
+
+    // Auto-determine mood if game-state params are provided (and no temp mood)
+    if (this.tempMood === null && timeOfDay !== undefined) {
       let newMood: MusicMood = 'exploration';
-      if (inCombat) {
+      if (isDead) {
+        newMood = 'death';
+      } else if (inCombat) {
         newMood = 'combat';
+      } else if (isUnderwater) {
+        newMood = 'underwater';
+      } else if (lowHealth) {
+        newMood = 'tension';
       } else if (buildingMode) {
         newMood = 'building';
       } else if (timeOfDay > 0.75 || timeOfDay < 0.25) {
@@ -500,6 +587,9 @@ class MusicSystem {
     }
     this.currentMood = null;
     this.targetMood = null;
+    this.tempMood = null;
+    this.tempMoodTimer = 0;
+    this.tempMoodDuration = 0;
   }
 }
 

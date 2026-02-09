@@ -7,6 +7,7 @@ import { getStarColor, levelFromXP, xpProgressInLevel } from '@shared/constants/
 import type { PlayerCustomization, TutorialStep } from '@shared/types/customization';
 import { DEFAULT_CUSTOMIZATION } from '@shared/types/customization';
 import { create } from 'zustand';
+import { AudioManager } from '../engine/AudioManager';
 
 // ─── Types ───
 
@@ -94,6 +95,9 @@ export const useAchievementStore = create<AchievementState>((set, get) => ({
       unlockedIds: new Set([...s.unlockedIds, achievementId]),
       toasts: [...s.toasts, toast],
     }));
+
+    // Play achievement fanfare
+    AudioManager.getInstance().play('achievementFanfare');
 
     // Auto-dismiss after 5 seconds
     setTimeout(() => {

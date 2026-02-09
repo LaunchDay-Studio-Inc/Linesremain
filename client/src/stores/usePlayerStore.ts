@@ -16,9 +16,11 @@ interface PlayerState {
   equipment: Record<string, ItemStack | null>;
   hotbarIndex: number;
   currentBiome: string;
+  gatherProgress: number; // 0.0 to 1.0 block-break progress
   deathPosition: { x: number; y: number; z: number } | null;
   deathTime: number | null; // timestamp of last death
 
+  setGatherProgress: (progress: number) => void;
   setPosition: (x: number, y: number, z: number) => void;
   setYaw: (yaw: number) => void;
   setHealth: (health: number) => void;
@@ -43,9 +45,11 @@ export const usePlayerStore = create<PlayerState>((set) => ({
   equipment: {},
   hotbarIndex: 0,
   currentBiome: 'Greenhollow',
+  gatherProgress: 0,
   deathPosition: null,
   deathTime: null,
 
+  setGatherProgress: (progress) => set({ gatherProgress: progress }),
   setPosition: (x, y, z) => set({ position: { x, y, z } }),
   setYaw: (yaw) => set({ yaw }),
   setHealth: (health) => set({ health }),

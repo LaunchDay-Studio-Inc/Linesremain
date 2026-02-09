@@ -1,10 +1,13 @@
 // ─── Pickup Notifications ───
 // Shows floating "+N ItemName" text on the HUD when items are added to inventory.
 
-import React, { useEffect, useRef, useState } from 'react';
-import { usePlayerStore } from '../../stores/usePlayerStore';
 import { ITEM_REGISTRY } from '@shared/constants/items';
 import type { ItemStack } from '@shared/types/items';
+import { ItemCategory } from '@shared/types/items';
+import React, { useEffect, useRef, useState } from 'react';
+import type { SoundName } from '../../engine/AudioManager';
+import { AudioManager } from '../../engine/AudioManager';
+import { usePlayerStore } from '../../stores/usePlayerStore';
 
 interface PickupNotification {
   id: number;
@@ -14,6 +17,25 @@ interface PickupNotification {
 
 const NOTIFICATION_DURATION = 2500; // ms
 let nextId = 0;
+
+// Epic items: HQM Ore (5), C4 (62), Rocket (63), Assault Rifle (50)
+const EPIC_ITEM_IDS = new Set([5, 50, 62, 63]);
+
+function getPickupSound(itemId: number): SoundName {
+  if (EPIC_ITEM_IDS.has(itemId)) return 'pickupEpic';
+  const def = ITEM_REGISTRY[itemId];
+  if (!def) return 'pickup';
+  const cat = def.category;
+  if (
+    cat === ItemCategory.WeaponMelee ||
+    cat === ItemCategory.WeaponRanged ||
+    cat === ItemCategory.Armor ||
+    cat === ItemCategory.Ammo
+  ) {
+    return 'pickupRare';
+  }
+  return 'pickup';
+}
 
 export const PickupNotifications: React.FC = () => {
   const [notifications, setNotifications] = useState<PickupNotification[]>([]);
@@ -51,6 +73,8 @@ export const PickupNotifications: React.FC = () => {
           text: `+${diff} ${name}`,
           createdAt: Date.now(),
         });
+        // Play rarity-based pickup sound
+        AudioManager.getInstance().play(getPickupSound(itemId));
       }
     }
 

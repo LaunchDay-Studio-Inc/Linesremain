@@ -3,6 +3,8 @@
 
 import { ClientMessage, type RespawnPayload } from '@shared/types/network';
 import React, { useEffect, useState } from 'react';
+import { AudioManager } from '../../engine/AudioManager';
+import { musicSystem } from '../../engine/MusicSystem';
 import { socketClient } from '../../network/SocketClient';
 import { useGameStore } from '../../stores/useGameStore';
 
@@ -15,12 +17,19 @@ export const DeathScreen: React.FC = () => {
 
   useEffect(() => {
     const timer = setTimeout(() => setFadeIn(true), 200);
+    // Play death sting and set death mood
+    AudioManager.getInstance().play('deathSting');
+    musicSystem.playTemporaryMood('death', 10);
     return () => clearTimeout(timer);
   }, []);
 
   const handleRespawn = (option: 'random' | 'bag') => {
     if (respawning) return;
     setRespawning(true);
+
+    // Play respawn sound and set respawn mood
+    AudioManager.getInstance().play('respawnRise');
+    musicSystem.playTemporaryMood('respawn', 5);
 
     if (isConnected) {
       const payload: RespawnPayload = { spawnOption: option };
