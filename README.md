@@ -167,7 +167,8 @@ See [deploy/DEPLOYMENT.md](deploy/DEPLOYMENT.md) for the full guide.
 | --------------- | -------------------- |
 | `W` `A` `S` `D` | Move                 |
 | `Mouse`         | Look around          |
-| `Left Click`    | Attack / Use tool    |
+| `Shift`         | Attack / Gather      |
+| `F`             | Interact / Open      |
 | `Right Click`   | Place building piece |
 | `1` - `6`       | Select hotbar slot   |
 | `Tab`           | Open inventory       |

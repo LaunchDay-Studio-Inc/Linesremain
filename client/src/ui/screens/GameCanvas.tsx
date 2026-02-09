@@ -84,7 +84,6 @@ export const GameCanvas: React.FC = () => {
   const buildingPreviewRef = useRef<BuildingPreview | null>(null);
   const chunkManagerRef = useRef<ChunkManager | null>(null);
   const playerControllerRef = useRef<LocalPlayerController | null>(null);
-  const setCursorLocked = useUIStore((s) => s.setCursorLocked);
   const toggleInventory = useUIStore((s) => s.toggleInventory);
   const toggleCrafting = useUIStore((s) => s.toggleCrafting);
   const toggleMap = useUIStore((s) => s.toggleMap);
@@ -113,9 +112,8 @@ export const GameCanvas: React.FC = () => {
   // Debug state for diagnosing input issues in iframe environments
   const [debugState, setDebugState] = useState<{
     hasFocus: boolean;
-    pointerLocked: boolean;
     lastKey: string;
-  }>({ hasFocus: false, pointerLocked: false, lastKey: '' });
+  }>({ hasFocus: false, lastKey: '' });
 
   // Building panel callbacks
   const handleSelectPiece = useCallback((pieceType: BuildingPieceType, tier: BuildingTier) => {
@@ -374,13 +372,6 @@ export const GameCanvas: React.FC = () => {
     // ── Day/night cycle state ──
     let worldTime = 0.35; // Start at morning
 
-    // ── Pointer Lock tracking ──
-    const handleLockChange = () => {
-      const locked = document.pointerLockElement === canvas;
-      setCursorLocked(locked);
-    };
-    document.addEventListener('pointerlockchange', handleLockChange);
-
     // ── UI keybinds ──
     const handleUIKeys = (e: KeyboardEvent) => {
       // Don't process game keybinds when typing in an input/textarea
@@ -417,7 +408,7 @@ export const GameCanvas: React.FC = () => {
     };
     window.addEventListener('keydown', handleUIKeys);
 
-    // ── Pointer Lock on Click ──
+    // ── Click Handling (building placement, focus, audio init) ──
     const audio = AudioManager.getInstance();
     const handleClick = (e: MouseEvent) => {
       // Don't capture clicks on interactive UI elements
@@ -434,9 +425,7 @@ export const GameCanvas: React.FC = () => {
       // Re-focus canvas so keyboard events (WASD) are received
       canvas.focus();
 
-      if (!input.isPointerLocked()) {
-        input.requestPointerLock(canvas);
-      } else if (buildingPreview.active && buildingPreview.isValid) {
+      if (buildingPreview.active && buildingPreview.isValid) {
         // Place building piece
         const data = buildingPreview.getPlacementData();
         if (data) {
@@ -455,7 +444,6 @@ export const GameCanvas: React.FC = () => {
       audio.init();
       musicSystem.init();
     };
-    // Primary: canvas click — most reliable for requestPointerLock (event target matches lock target)
     canvas.addEventListener('click', handleClick);
     // Fallback: window mousedown catches clicks that land on HUD overlay divs
     const handleWindowMouseDown = (e: MouseEvent) => {
@@ -468,10 +456,9 @@ export const GameCanvas: React.FC = () => {
       ) {
         return;
       }
-      // Only act if click didn't reach the canvas directly (canvas handler will cover that)
-      if (!input.isPointerLocked() && target !== canvas) {
+      // Focus canvas if click landed on an overlay div
+      if (target !== canvas) {
         canvas.focus();
-        input.requestPointerLock(canvas);
       }
       audio.init();
       musicSystem.init();
@@ -533,7 +520,6 @@ export const GameCanvas: React.FC = () => {
         debugThrottleCounter = 0;
         setDebugState({
           hasFocus: document.activeElement === canvas,
-          pointerLocked: input.isPointerLocked(),
           lastKey: input.getLastPressedKey(),
         });
       }
@@ -981,7 +967,6 @@ export const GameCanvas: React.FC = () => {
 
     // ── Cleanup ──
     return () => {
-      document.removeEventListener('pointerlockchange', handleLockChange);
       window.removeEventListener('keydown', handleUIKeys);
       window.removeEventListener('mousedown', handleWindowMouseDown);
       canvas.removeEventListener('click', handleClick);
@@ -1050,7 +1035,6 @@ export const GameCanvas: React.FC = () => {
           }}
         >
           <div>Focus: {debugState.hasFocus ? 'CANVAS' : 'OTHER'}</div>
-          <div>PtrLock: {debugState.pointerLocked ? 'YES' : 'NO'}</div>
           <div>LastKey: {debugState.lastKey || 'none'}</div>
         </div>
       )}

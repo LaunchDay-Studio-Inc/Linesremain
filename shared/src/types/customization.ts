@@ -307,8 +307,8 @@ export const TUTORIAL_HINTS: Record<TutorialStep, { title: string; hint: string;
   },
   gather: {
     title: 'Gathering',
-    hint: 'Hit a tree or rock with left click to gather resources.',
-    key: 'LMB',
+    hint: 'Hold Shift near a tree or rock to gather resources.',
+    key: 'SHIFT',
   },
   craft: {
     title: 'Crafting',

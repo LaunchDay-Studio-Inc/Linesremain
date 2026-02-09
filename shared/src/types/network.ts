@@ -99,8 +99,8 @@ export interface InputPayload {
   crouch: boolean;
   sprint: boolean;
   rotation: number; // radians
-  primaryAction: boolean; // left click
-  secondaryAction: boolean; // right click
+  primaryAction: boolean; // attack key (Shift) or left click
+  secondaryAction: boolean; // interact key (F) or right click
   selectedSlot: number;
 }
 

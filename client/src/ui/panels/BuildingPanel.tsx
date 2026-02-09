@@ -196,7 +196,7 @@ export const BuildingPanel: React.FC<BuildingPanelProps> = ({ onSelectPiece, onC
 
       {/* Controls */}
       <div className="bp-controls">
-        <span>Click to place</span>
+        <span>RMB / F — Place</span>
         <span className="bp-controls__sep">•</span>
         <span>R — Rotate</span>
         <span className="bp-controls__sep">•</span>

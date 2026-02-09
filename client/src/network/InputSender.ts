@@ -2,11 +2,11 @@
 // Samples local input state at the server tick rate and sends it to the server.
 // Manages sequence numbers for client-side prediction reconciliation.
 
-import { socketClient } from './SocketClient';
+import { TICK_RATE } from '@shared/constants/game';
+import { ClientMessage, type InputPayload } from '@shared/types/network';
 import { InputManager } from '../engine/InputManager';
 import { usePlayerStore } from '../stores/usePlayerStore';
-import { ClientMessage, type InputPayload } from '@shared/types/network';
-import { TICK_RATE } from '@shared/constants/game';
+import { socketClient } from './SocketClient';
 
 // ─── State ───
 
@@ -57,12 +57,12 @@ export function stopInputSender(): void {
   inputHistory.length = 0;
 }
 
-/** Queue a primary action (left click attack/harvest) for the next tick */
+/** Queue a primary action (attack/harvest) for the next tick */
 export function queuePrimaryAction(): void {
   pendingPrimaryAction = true;
 }
 
-/** Queue a secondary action (right click place/interact) for the next tick */
+/** Queue a secondary action (place/interact) for the next tick */
 export function queueSecondaryAction(): void {
   pendingSecondaryAction = true;
 }
@@ -105,16 +105,28 @@ function sampleAndSend(): void {
     (inputManager.isKeyDown(kb.moveForward) ? 1 : 0) -
     (inputManager.isKeyDown(kb.moveBackward) ? 1 : 0);
   const right =
-    (inputManager.isKeyDown(kb.moveRight) ? 1 : 0) -
-    (inputManager.isKeyDown(kb.moveLeft) ? 1 : 0);
+    (inputManager.isKeyDown(kb.moveRight) ? 1 : 0) - (inputManager.isKeyDown(kb.moveLeft) ? 1 : 0);
 
   const jump = inputManager.isKeyDown(kb.jump);
   const crouch = inputManager.isKeyDown(kb.crouch);
   const sprint = inputManager.isKeyDown(kb.sprint);
 
-  // Consume queued actions
-  const primaryAction = pendingPrimaryAction || inputManager.isMouseButtonDown(0);
-  const secondaryAction = pendingSecondaryAction || inputManager.isMouseButtonDown(2);
+  // ── Gather (Shift held = continuous primaryAction) ──
+  const gatherHeld = inputManager.isKeyDown(kb.gather);
+
+  // ── Attack/Interact (F pressed = one-shot primary+secondary) ──
+  const attackPressed = inputManager.isKeyPressed(kb.attack);
+
+  // Consume queued actions — LMB/RMB still work as mouse fallbacks
+  const primaryAction =
+    pendingPrimaryAction ||
+    inputManager.isMouseButtonDown(0) ||
+    gatherHeld ||
+    attackPressed;
+  const secondaryAction =
+    pendingSecondaryAction ||
+    inputManager.isMouseButtonDown(2) ||
+    attackPressed;
   pendingPrimaryAction = false;
   pendingSecondaryAction = false;
 

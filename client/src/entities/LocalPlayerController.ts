@@ -18,7 +18,6 @@ import {
   TERMINAL_VELOCITY,
 } from '@shared/constants/game';
 import { BlockType } from '@shared/types/blocks';
-import { useSettingsStore } from '../stores/useSettingsStore';
 import * as THREE from 'three';
 import type { AnimationName } from '../assets/SpriteGenerator';
 import { CameraController } from '../engine/Camera';
@@ -30,7 +29,6 @@ import { PlayerRenderer } from './PlayerRenderer';
 
 // ─── Constants ───
 
-const MOUSE_SENSITIVITY = 0.15; // degrees per pixel
 const ARROW_KEY_SENSITIVITY = 0.5; // degrees per frame
 const HALF_WIDTH = PLAYER_WIDTH / 2;
 const COLLISION_EPSILON = 0.001;
@@ -144,7 +142,6 @@ export class LocalPlayerController {
   // ─── Update (call each fixed timestep) ───
 
   update(dt: number): void {
-    this.handleMouseLook();
     this.handleCameraInput();
     this.handleMovement(dt);
     this.handleCollision(dt);
@@ -152,19 +149,6 @@ export class LocalPlayerController {
     this.updateAnimation();
     this.updateCamera();
     this.syncStore();
-  }
-
-  // ─── Mouse Look (orbits camera) ───
-
-  private handleMouseLook(): void {
-    if (!this.input.isPointerLocked()) return;
-
-    const delta = this.input.getMouseDelta();
-    const invertY = useSettingsStore.getState().invertY;
-    const yMultiplier = invertY ? -1 : 1;
-    // Orbit camera with mouse when pointer is locked
-    this.cameraController.rotateAzimuth(-delta.x * MOUSE_SENSITIVITY);
-    this.cameraController.rotateElevation(delta.y * MOUSE_SENSITIVITY * yMultiplier);
   }
 
   // ─── Arrow Key Camera Control ───

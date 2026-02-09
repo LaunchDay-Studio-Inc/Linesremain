@@ -7,6 +7,7 @@ import {
   FREE_COLORS,
   type BodyType,
 } from '@shared/types/customization';
+import { CHARACTER_TAGLINES, CHARACTER_ROLES } from '@shared/constants/narrative';
 import { ClientMessage } from '@shared/types/network';
 import React, { useCallback, useEffect, useRef, useState } from 'react';
 import { generateCharacterPreview } from '../../assets/SpriteGenerator';
@@ -97,6 +98,12 @@ export const CharacterSelect: React.FC = () => {
             <p className="charsel__preview-desc">
               {BODY_TYPE_DEFINITIONS[hoveredType ?? selectedType].description}
             </p>
+            <p className="charsel__preview-tagline">
+              {CHARACTER_TAGLINES[hoveredType ?? selectedType]}
+            </p>
+            <span className="charsel__preview-role">
+              {CHARACTER_ROLES[hoveredType ?? selectedType]}
+            </span>
           </div>
         </div>
 

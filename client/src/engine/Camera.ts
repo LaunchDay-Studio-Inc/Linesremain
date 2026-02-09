@@ -24,8 +24,8 @@ export class CameraController {
   // Smoothing
   private readonly lerpFactor = 0.1;
 
-  // Input state
-  private isOrbiting = false;
+  // Input state — any mouse button can orbit
+  private orbitButton = -1; // which button is currently orbiting (-1 = none)
   private lastMouseX = 0;
   private lastMouseY = 0;
   private readonly orbitSensitivity = 0.3;
@@ -44,7 +44,7 @@ export class CameraController {
     canvas.addEventListener('mousedown', this.onMouseDown);
     canvas.addEventListener('mousemove', this.onMouseMove);
     canvas.addEventListener('mouseup', this.onMouseUp);
-    canvas.addEventListener('mouseleave', this.onMouseUp);
+    canvas.addEventListener('mouseleave', this.onMouseLeave);
     canvas.addEventListener('wheel', this.onWheel, { passive: false });
     canvas.addEventListener('contextmenu', this.onContextMenu);
   }
@@ -54,7 +54,7 @@ export class CameraController {
     this.canvas.removeEventListener('mousedown', this.onMouseDown);
     this.canvas.removeEventListener('mousemove', this.onMouseMove);
     this.canvas.removeEventListener('mouseup', this.onMouseUp);
-    this.canvas.removeEventListener('mouseleave', this.onMouseUp);
+    this.canvas.removeEventListener('mouseleave', this.onMouseLeave);
     this.canvas.removeEventListener('wheel', this.onWheel);
     this.canvas.removeEventListener('contextmenu', this.onContextMenu);
     this.canvas = null;
@@ -105,16 +105,14 @@ export class CameraController {
   // ── Input Handlers ──
 
   private onMouseDown = (e: MouseEvent): void => {
-    // Right-click to orbit
-    if (e.button === 2) {
-      this.isOrbiting = true;
-      this.lastMouseX = e.clientX;
-      this.lastMouseY = e.clientY;
-    }
+    if (this.orbitButton >= 0) return; // already orbiting
+    this.orbitButton = e.button;
+    this.lastMouseX = e.clientX;
+    this.lastMouseY = e.clientY;
   };
 
   private onMouseMove = (e: MouseEvent): void => {
-    if (!this.isOrbiting) return;
+    if (this.orbitButton < 0) return;
 
     const dx = e.clientX - this.lastMouseX;
     const dy = e.clientY - this.lastMouseY;
@@ -133,9 +131,13 @@ export class CameraController {
   };
 
   private onMouseUp = (e: MouseEvent): void => {
-    if (e.button === 2) {
-      this.isOrbiting = false;
+    if (e.button === this.orbitButton) {
+      this.orbitButton = -1;
     }
+  };
+
+  private onMouseLeave = (): void => {
+    this.orbitButton = -1;
   };
 
   private onWheel = (e: WheelEvent): void => {

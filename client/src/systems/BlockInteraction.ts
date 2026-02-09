@@ -1,5 +1,5 @@
 // ─── Block Interaction System ───
-// Handles block breaking (left mouse) and block placing (right mouse) via
+// Handles block breaking (Shift gather key / left mouse) and block placing (right mouse) via
 // DDA voxel raycasting. Renders a wireframe highlight on the targeted block
 // and tracks break progress with per-block hardness timing.
 
@@ -204,15 +204,7 @@ export class BlockInteraction {
       this.breakingBlock = null;
     }
 
-    // Only process interactions when pointer is locked
-    if (!this.input.isPointerLocked()) {
-      this.breakProgress = 0;
-      this.breakingBlock = null;
-      this.rightClickConsumed = false;
-      return;
-    }
-
-    // ── Block Breaking (left mouse held) ──
+    // ── Block Breaking (gather key / left mouse held) ──
     this.updateBreaking(dt);
 
     // ── Block Placing (right mouse click) ──
@@ -236,7 +228,8 @@ export class BlockInteraction {
   // ─── Breaking Logic ───
 
   private updateBreaking(dt: number): void {
-    const leftDown = this.input.isMouseButtonDown(0);
+    const leftDown =
+      this.input.isMouseButtonDown(0) || this.input.isKeyDown(this.input.keybinds.gather);
 
     if (!leftDown || !this.targetBlock) {
       // Released or lost target

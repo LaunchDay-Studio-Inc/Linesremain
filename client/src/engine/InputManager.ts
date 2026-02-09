@@ -8,6 +8,8 @@ export interface KeybindMap {
   jump: string;
   sprint: string;
   crouch: string;
+  gather: string;
+  attack: string;
   interact: string;
   inventory: string;
   chat: string;
@@ -23,8 +25,10 @@ export const DEFAULT_KEYBINDS: KeybindMap = {
   moveLeft: 'KeyA',
   moveRight: 'KeyD',
   jump: 'Space',
-  sprint: 'ShiftLeft',
+  sprint: 'AltLeft',
   crouch: 'ControlLeft',
+  gather: 'ShiftLeft',
+  attack: 'KeyF',
   interact: 'KeyE',
   inventory: 'Tab',
   chat: 'Enter',
@@ -68,9 +72,6 @@ export class InputManager {
   private mouseButtons = new Set<number>();
   private scrollDelta = 0;
 
-  // Pointer lock
-  private pointerLocked = false;
-
   // Keybinds
   keybinds: KeybindMap = { ...DEFAULT_KEYBINDS };
 
@@ -91,7 +92,6 @@ export class InputManager {
     window.addEventListener('mousemove', this.onMouseMove);
     window.addEventListener('wheel', this.onWheel, { passive: false });
     window.addEventListener('blur', this.onBlur);
-    document.addEventListener('pointerlockchange', this.onPointerLockChange);
   }
 
   static getInstance(): InputManager {
@@ -100,20 +100,6 @@ export class InputManager {
     }
     InputManager.refCount++;
     return InputManager.instance;
-  }
-
-  // ── Pointer Lock ──
-
-  requestPointerLock(canvas: HTMLCanvasElement): void {
-    canvas.requestPointerLock();
-  }
-
-  exitPointerLock(): void {
-    document.exitPointerLock();
-  }
-
-  isPointerLocked(): boolean {
-    return this.pointerLocked;
   }
 
   /**
@@ -215,18 +201,12 @@ export class InputManager {
   };
 
   private onMouseMove = (e: MouseEvent): void => {
-    if (this.pointerLocked) {
-      this.mouseDeltaX += e.movementX;
-      this.mouseDeltaY += e.movementY;
-    }
+    this.mouseDeltaX += e.movementX;
+    this.mouseDeltaY += e.movementY;
   };
 
   private onWheel = (e: WheelEvent): void => {
     this.scrollDelta += e.deltaY;
-  };
-
-  private onPointerLockChange = (): void => {
-    this.pointerLocked = document.pointerLockElement !== null;
   };
 
   private onBlur = (): void => {
@@ -252,7 +232,6 @@ export class InputManager {
     window.removeEventListener('mousemove', this.onMouseMove);
     window.removeEventListener('wheel', this.onWheel);
     window.removeEventListener('blur', this.onBlur);
-    document.removeEventListener('pointerlockchange', this.onPointerLockChange);
     this.detachFromElement();
     InputManager.instance = null;
   }

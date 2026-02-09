@@ -31,7 +31,9 @@ const KEYBIND_LABELS: Record<keyof KeybindMap, string> = {
   jump: 'Jump',
   sprint: 'Sprint',
   crouch: 'Crouch',
-  interact: 'Interact',
+  gather: 'Gather',
+  attack: 'Attack / Interact',
+  interact: 'Interact / Open',
   inventory: 'Inventory',
   chat: 'Chat',
   map: 'Map',
@@ -299,11 +301,7 @@ export const SettingsPanel: React.FC = () => {
             <div className="settings-row">
               <label className="settings-label">Max FPS</label>
               <div className="settings-control">
-                <select
-                  className="settings-select"
-                  value={maxFps}
-                  onChange={handleMaxFpsChange}
-                >
+                <select className="settings-select" value={maxFps} onChange={handleMaxFpsChange}>
                   {FPS_OPTIONS.map((opt) => (
                     <option key={opt.value} value={opt.value}>
                       {opt.label}
@@ -340,11 +338,7 @@ export const SettingsPanel: React.FC = () => {
               onChange={setSfxVolume}
             />
 
-            <ToggleRow
-              label="Music"
-              checked={musicEnabled}
-              onChange={handleMusicEnabledChange}
-            />
+            <ToggleRow label="Music" checked={musicEnabled} onChange={handleMusicEnabledChange} />
 
             <SliderRow
               label="Music Volume"
@@ -374,9 +368,7 @@ export const SettingsPanel: React.FC = () => {
             <ToggleRow label="Invert Y Axis" checked={invertY} onChange={setInvertY} />
 
             <div style={{ marginTop: '12px', marginBottom: '8px' }}>
-              <p className="settings-section__title">
-                Keybinds
-              </p>
+              <p className="settings-section__title">Keybinds</p>
 
               {(Object.keys(KEYBIND_LABELS) as (keyof KeybindMap)[]).map((action) => (
                 <KeybindRow

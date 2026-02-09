@@ -23,5 +23,6 @@ export * from './types/customization.js';
 export * from './types/season.js';
 export * from './types/monetization.js';
 export * from './constants/monetization.js';
+export * from './constants/narrative.js';
 export * from './utils/chunkUtils.js';
 export * from './utils/inventoryUtils.js';
